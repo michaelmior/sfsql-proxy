@@ -21,7 +21,7 @@
 
 #define PROXY_PORT   4040
 
-extern MYSQL *mysql;
+//extern MYSQL *mysql;
 
 void proxy_error(const char *fmt, ...);
 

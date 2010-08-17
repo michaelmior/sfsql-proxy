@@ -9,26 +9,13 @@
 #define BACKEND_PASS "root"
 #define BACKEND_DB   "test"
 
-MYSQL *mysql_backend = NULL;
+static MYSQL *mysql_backend = NULL;
 
-int proxy_backend_connect() {
-    mysql_backend = mysql_init(NULL);
-    if (mysql_backend == NULL)
-        proxy_error("Out of memory when allocating MySQL backend");
-
-    if (!mysql_real_connect(mysql_backend,
-                BACKEND_HOST, BACKEND_USER, BACKEND_PASS,
-                BACKEND_DB, BACKEND_PORT, NULL, 0)) {
-        proxy_error("Failed to connect to MySQL backend: %s",
-                mysql_error(mysql_backend));
-        return 1;
-    }
-
-    return 0;
-}
+static my_bool backend_read_rows(MYSQL *proxy, uint fields);
+static ulong backend_read_to_proxy(MYSQL *proxy);
 
 /* derived from sql/client.c:cli_safe_read */
-ulong _backend_read_to_proxy(MYSQL *proxy) {
+static ulong backend_read_to_proxy(MYSQL *proxy) {
     NET *net = &(mysql_backend->net);
     ulong pkt_len;
 
@@ -96,7 +83,7 @@ ulong _backend_read_to_proxy(MYSQL *proxy) {
 }
 
 /* derived from sql/client.c:cli_read_rows */
-my_bool _backend_read_rows(MYSQL *proxy, uint fields) {
+static my_bool backend_read_rows(MYSQL *proxy, uint fields) {
     uchar *cp;
     uint field;
     ulong pkt_len = 8, len;
@@ -112,12 +99,28 @@ my_bool _backend_read_rows(MYSQL *proxy, uint fields) {
         }
 
         /* Read and forward the row to the proxy */
-        if ((pkt_len = _backend_read_to_proxy(proxy)) == packet_error)
+        if ((pkt_len = backend_read_to_proxy(proxy)) == packet_error)
             return TRUE;
     }
 
     /* success */
     return FALSE;
+}
+
+int proxy_backend_connect() {
+    mysql_backend = mysql_init(NULL);
+    if (mysql_backend == NULL)
+        proxy_error("Out of memory when allocating MySQL backend");
+
+    if (!mysql_real_connect(mysql_backend,
+                BACKEND_HOST, BACKEND_USER, BACKEND_PASS,
+                BACKEND_DB, BACKEND_PORT, NULL, 0)) {
+        proxy_error("Failed to connect to MySQL backend: %s",
+                mysql_error(mysql_backend));
+        return 1;
+    }
+
+    return 0;
 }
 
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
@@ -133,12 +136,12 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     /* derived from sql/client.c:cli_read_query_result */
     /* read info and result header packets */
     for (i=0; i<2; i++) {
-        if ((pkt_len = _backend_read_to_proxy(proxy)) == packet_error)
+        if ((pkt_len = backend_read_to_proxy(proxy)) == packet_error)
             return TRUE;
     }
 
     /* read field info */
-    if (_backend_read_rows(proxy, 7))
+    if (backend_read_rows(proxy, 7))
         return TRUE;
 
     /* Read result rows
@@ -149,7 +152,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
      * decide when to fetch rows. (Clients using mysql_use_result()
      * should still function, but with possible network overhead.
      * */
-    if (_backend_read_rows(proxy, mysql_backend->field_count))
+    if (backend_read_rows(proxy, mysql_backend->field_count))
         return TRUE;
 
     if (mysql_backend->net.read_pos[0] == 254)

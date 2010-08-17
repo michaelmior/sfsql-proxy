@@ -8,7 +8,7 @@
 
 #define QUEUE_LENGTH 10
 
-MYSQL *mysql;
+static MYSQL *mysql;
 
 /* Output error message */
 void proxy_error(const char *fmt, ...) {
@@ -68,11 +68,11 @@ void server_run() {
         my_net_set_read_timeout(net, NET_READ_TIMEOUT);
 
         /* Perform "authentication" (credentials not checked) */
-        proxy_handshake(&clientaddr, 0);
+        proxy_handshake(mysql, &clientaddr, 0);
 
         /* from sql/sql_connect.cc:handle_one_connection */
         while (!mysql->net.error && mysql->net.vio != 0) {
-            if (proxy_read_query()) {
+            if (proxy_read_query(mysql)) {
                 proxy_error("Error in processing client query, disconnecting");
                 break;
             }

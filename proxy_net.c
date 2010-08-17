@@ -6,7 +6,7 @@ extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
 /* derived from sql/sql_connect.cc:check_connection */
-void proxy_handshake(struct sockaddr_in *clientaddr, int thread_id) {
+void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id) {
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
     ulong server_caps, client_caps, pkt_len;
@@ -116,7 +116,7 @@ void proxy_handshake(struct sockaddr_in *clientaddr, int thread_id) {
         }
 
         /* Ok, client. You're good to go */
-        proxy_send_ok(0, 0, 0, 0);
+        proxy_send_ok(mysql, 0, 0, 0, 0);
     }
 }
 
@@ -126,7 +126,7 @@ my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_le
 }
 
 /* derived from sql/sql_parse.cc:do_command */
-my_bool proxy_read_query() {
+my_bool proxy_read_query(MYSQL *mysql) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -171,7 +171,7 @@ my_bool proxy_read_query() {
             break;
         case COM_PING:
             /* Yep, still here */
-            return proxy_send_ok(0, 0, 0, 0);
+            return proxy_send_ok(mysql, 0, 0, 0, 0);
             break;
 
         /* Commands below not implemented */
@@ -207,7 +207,7 @@ my_bool proxy_read_query() {
 }
 
 /* derived from sql/protocol.cc:net_send_ok */
-my_bool proxy_send_ok(uint status, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
+my_bool proxy_send_ok(MYSQL *mysql, uint status, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
     NET *net = &(mysql->net);
     uchar buff[MYSQL_ERRMSG_SIZE + 10], *pos;
 
