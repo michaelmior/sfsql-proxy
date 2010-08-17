@@ -30,7 +30,9 @@ void proxy_handshake(struct sockaddr_in *clientaddr, int thread_id) {
     end = strmake(end, scramble, SCRAMBLE_LENGTH_323) + 1;
 
     /* Add capabilities */
-    server_caps = CLIENT_BASIC_FLAGS; /* XXX: transactions flag? get from backend? */
+    /* XXX: transactions flag? get from backend?
+     *      don't allow client to pick a DB or use multiple statements for now */
+    server_caps = CLIENT_BASIC_FLAGS & ~(CLIENT_CONNECT_WITH_DB & CLIENT_MULTI_STATEMENTS);
     int2store(end, server_caps);
 
     end[2] = (char) default_charset_info->number;
@@ -104,14 +106,14 @@ void proxy_handshake(struct sockaddr_in *clientaddr, int thread_id) {
             user_len -= 2;
         }
 
-#if 0
         /* Authenticate the user */
-        if proxy_check_user(user, user_len, passwd, passwd_len, db, db_len) {
+        if (proxy_check_user(user, user_len, passwd, passwd_len, db, db_len)) {
             if (db && db[0]) {
-                /* Set DB */
+                /* XXX: need to set DB here eventually */
             }
+        } else {
+            /* XXX: send error, not authenticated */
         }
-#endif
 
         /* Ok, client. You're good to go */
         proxy_send_ok(0, 0, 0, 0);
@@ -123,30 +125,114 @@ my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_le
     return TRUE;
 }
 
+/* derived from sql/sql_parse.cc:do_command */
+my_bool proxy_read_query() {
+    NET *net = &(mysql->net);
+    ulong pkt_len;
+    char *packet = 0;
+    enum enum_server_command command;
+
+    /* Start a new transaction and read the incoming packet */
+    net_new_transaction(net);
+    if ((pkt_len = my_net_read(net)) == packet_error) {
+        proxy_error("Error reading query from client");
+        return TRUE;
+    }
+
+    printf("Read %lu byte packet from client\n", pkt_len);
+
+    packet = (char*) net->read_pos;
+    if (pkt_len == 0) {
+        packet[0] = (uchar) COM_SLEEP;
+        pkt_len = 1;
+    }
+
+    /* Pull the command out of the packet */
+    command = (enum enum_server_command) (uchar) packet[0];
+    packet[pkt_len] = '\0';
+    packet++; pkt_len--;
+
+    /* Reset server status flags */
+    mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
+
+    printf("Got command %d\n", (int) command);
+
+    switch (command) {
+        case COM_INIT_DB:
+            /* XXX: using a single DB for now */
+            return TRUE;
+            break;
+        case COM_QUERY:
+            /* pass the query to the backend */
+            return proxy_backend_query(mysql, packet, pkt_len);
+            break;
+        case COM_QUIT:
+            return TRUE;
+            break;
+        case COM_PING:
+            /* Yep, still here */
+            return proxy_send_ok(0, 0, 0, 0);
+            break;
+
+        /* Commands below not implemented */
+        case COM_REGISTER_SLAVE:
+        case COM_TABLE_DUMP:
+        case COM_CHANGE_USER:
+        case COM_STMT_EXECUTE:
+        case COM_STMT_FETCH:
+        case COM_STMT_PREPARE:
+        case COM_STMT_CLOSE:
+        case COM_STMT_RESET:
+        case COM_FIELD_LIST:
+        case COM_CREATE_DB:
+        case COM_DROP_DB:
+        case COM_BINLOG_DUMP:
+        case COM_REFRESH:
+        case COM_SHUTDOWN:
+        case COM_STATISTICS:
+        case COM_PROCESS_INFO:
+        case COM_PROCESS_KILL:
+        case COM_SET_OPTION:
+        case COM_DEBUG:
+        case COM_SLEEP:
+        case COM_CONNECT:
+        case COM_TIME:
+        case COM_DELAYED_INSERT:
+        case COM_END:
+        default:
+            /* XXX: send error */
+            return TRUE;
+            break;
+    }
+}
+
 /* derived from sql/protocol.cc:net_send_ok */
 my_bool proxy_send_ok(uint status, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
     NET *net = &(mysql->net);
     uchar buff[MYSQL_ERRMSG_SIZE + 10], *pos;
-    my_bool error = FALSE;
 
     buff[0] = 0;
-    pos = net_store_length(buff + 1, 0);
-    pos = net_store_length(pos, 0);
+    pos = net_store_length(buff + 1, affected_rows);
+    pos = net_store_length(pos, last_insert_id);
 
-    /* XXX: not tracking status */
-    int2store(pos, 0);
-    pos += 1;
+    /* XXX: ignoring 4.0 protocol */
 
-    /* XXX: 0 warnings */
-    int2store(pos, 0);
+    int2store(pos, mysql->server_status);
     pos += 2;
+
+    int2store(pos, min(warnings, 65535));
+    pos += 2;
+
+    /* XXX: ignore messages for now 
+    if (message && message[0])
+        pos = net_store_data(pos, (uchar*), message, strlen(message));
+    */
 
     /* Send an ok back to the client */
     if (my_net_write(net, buff, (size_t) (pos - buff))) {
         proxy_error("Error writing OK to client");
+        return TRUE;
     } else {
-        error = net_flush(net);
+        return net_flush(net);
     }
-
-    return error;
 }

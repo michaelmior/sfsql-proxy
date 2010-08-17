@@ -15,6 +15,7 @@
 #include <mysql.h>
 
 #include "proxy_net.h"
+#include "proxy_backend.h"
 
 #define DEBUG 1
 

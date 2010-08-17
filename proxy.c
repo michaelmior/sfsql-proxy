@@ -18,16 +18,14 @@ void proxy_error(const char *fmt, ...) {
     va_end(arg);
 
     fprintf(stderr, "\n");
-
-    exit(1);
 }
 
 void server_run() {
     int serverfd, clientfd, optval;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
-    //struct hostent *client_host;
     struct st_vio *vio_tmp;
+    NET *net;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -48,36 +46,66 @@ void server_run() {
         proxy_error("Error binding server socket on port %d", PROXY_PORT);
 
     if (listen(serverfd, QUEUE_LENGTH) < 0)
-        proxy_error("Error listening on server socket");
+        proxy_error("Error listening on server socket: %s", strerror(errno));
 
     /* Server event loop */
     clientlen = sizeof(clientaddr);
     while(1) {
         clientfd = accept(serverfd, (struct sockaddr*) &clientaddr, &clientlen);
+        if (clientfd < 0) {
+            proxy_error("Error accepting client connection: %s", strerror(errno));
+            continue;
+        }
 
         /* derived from sql/mysqld.cc:handle_connections_sockets */
         vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
         vio_keepalive(vio_tmp, TRUE);
-        my_net_init(&(mysql->net), vio_tmp);
+
+        /* Initialize the client network structure */
+        net = &(mysql->net);
+        my_net_init(net, vio_tmp);
+        my_net_set_write_timeout(net, NET_WRITE_TIMEOUT);
+        my_net_set_read_timeout(net, NET_READ_TIMEOUT);
+
+        /* Perform "authentication" (credentials not checked) */
         proxy_handshake(&clientaddr, 0);
 
-        close(clientfd);
+        /* from sql/sql_connect.cc:handle_one_connection */
+        while (!mysql->net.error && mysql->net.vio != 0) {
+            if (proxy_read_query()) {
+                proxy_error("Error in processing client query, disconnecting");
+                break;
+            }
+        }
+
+        /* XXX: may need to send error before closing connection */
+        /* derived from sql/sql_mysqld.cc:close_connection */
+        if (vio_close(mysql->net.vio) < 0)
+            proxy_error("Error closing client connection: %s", strerror(errno));
     }
 }
 
 int main(int argc, char *argv[]) {
+    /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
-    
     mysql = mysql_init(NULL);
+    if (mysql == NULL)
+        proxy_error("Out of memory when allocating proxy server");
 
     /* Initialize network structures */
     mysql->protocol_version = PROTOCOL_VERSION;
     mysql->server_version = MYSQL_SERVER_VERSION;
 
+    /* Connect to the backend server */
+    proxy_backend_connect();
+
+    /* Start proxying */
     server_run();
 
+    /* Shutdown */
+    proxy_backend_close();
     mysql_close(mysql);
-
     mysql_library_end();
+
     return EXIT_SUCCESS;
 }
