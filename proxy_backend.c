@@ -158,6 +158,9 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     if (mysql_backend->net.read_pos[0] == 254)
         printf("EOF\n");
 
+    /* Flush the write buffer */
+    net_flush(&proxy->net);
+
     return error;
 }
 
