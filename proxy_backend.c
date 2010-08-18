@@ -32,15 +32,16 @@ static ulong backend_read_to_proxy(MYSQL *proxy) {
             /* XXX: fatal error, close down 
              * should give soft error to client and reconnect with backend */
             proxy_error("Interrupted when reading backend response");
-        }
+        } else
+            proxy_error("Received error from backend");
+
         return (packet_error);
     }
 
-    if (net->read_pos[0] == 255) {
-        /* XXX: need to return error to client */
-        if (pkt_len <= 3)
-            return (packet_error);
-    }
+    /* XXX: could probably generate soft error
+     * for client in below case */
+    if (net->read_pos[0] == 255 && pkt_len <= 3)
+        return (packet_error);
 
     /* Read from the backend and forward to the proxy connection */
     printf("backend packet:%d, proxy packet: %d, socket: %d\n", (int) net->pkt_nr, proxy->net.pkt_nr, proxy->net.vio->sd);
@@ -114,7 +115,7 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
 }
 
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
-    uint error = 0, i;
+    my_bool error = FALSE, i;
     ulong pkt_len = 8;
     uchar *pos;
 
@@ -128,11 +129,13 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
         if ((pkt_len = backend_read_to_proxy(proxy)) == packet_error)
             return TRUE;
 
+        printf("Got %lu byte packet\n", pkt_len);
+
         /* If the query doesn't return results, no more to do */
         pos = (uchar*) mysql_backend->net.read_pos;
-        if (net_field_length(&pos) == 0) {
-           error = FALSE;
-           goto out; 
+        if (net_field_length(&pos) == 0 || mysql_backend->net.read_pos[0] == 255) {
+            error = FALSE;
+            goto out; 
         }
     }
 
@@ -153,7 +156,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
 
 out:
     /* Flush the write buffer */
-    return net_flush(&proxy->net);
+    return net_flush(&proxy->net) || error;
 }
 
 /* Close the open connection to the backend */
