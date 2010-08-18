@@ -142,6 +142,7 @@ void usage() {
     printf(
             "SnowFlock SQL proxy server - (C) Michael Mior <mmior@cs.toronto.edu>, 2010\n\n"
             "Options:\n"
+            "\t--help,         -?\tShow this message\n"
             "\t--backend-host, -h\tHost to forward queries to\n"
             "\t--backend-port, -p\tPort of the backend host\n"
             "\t--backend-db,   -D\tName of database on the backend\n"
@@ -166,6 +167,7 @@ int main(int argc, char *argv[]) {
     /* Parse command-line options */
     while(1) {
         static struct option long_options[] = {
+            {"help",         optional_argument, 0, '?'},
             {"backend-host", optional_argument, 0, 'h'},
             {"backend-port", optional_argument, 0, 'P'},
             {"backend-db",   optional_argument, 0, 'D'},
@@ -176,12 +178,15 @@ int main(int argc, char *argv[]) {
         };
 
         int opt = 0;
-        c = getopt_long(argc, argv, "h:P:D:u:p:L:", long_options, &opt);
+        c = getopt_long(argc, argv, "?h:P:D:u:p:L:", long_options, &opt);
 
         if (c == -1)
             break;
 
         switch(c) {
+            case '?':
+                usage();
+                return EXIT_FAILURE;
             case 'h':
                 host = strdup(optarg);
                 break;
