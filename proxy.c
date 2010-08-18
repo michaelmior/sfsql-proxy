@@ -88,23 +88,30 @@ void server_run() {
 }
 
 int main(int argc, char *argv[]) {
+    int error;
+
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
     mysql = mysql_init(NULL);
-    if (mysql == NULL)
+    if (mysql == NULL) {
+        error = -1;
         proxy_error("Out of memory when allocating proxy server");
+        goto out;
+    }
 
     /* Initialize network structures */
     mysql->protocol_version = PROTOCOL_VERSION;
-    mysql->server_version = MYSQL_SERVER_VERSION;
+    mysql->server_version   = MYSQL_SERVER_VERSION;
 
-    /* Connect to the backend server */
-    proxy_backend_connect();
+    /* Connect to the backend server (default parameters for now) */
+    if ((error = proxy_backend_connect(NULL, -1, NULL, NULL, NULL)))
+        goto out;
 
     /* Start proxying */
     server_run();
 
     /* Shutdown */
+out:
     proxy_backend_close();
     mysql_close(mysql);
     mysql_library_end();

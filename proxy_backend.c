@@ -77,17 +77,37 @@ static my_bool backend_read_rows(MYSQL *proxy, uint fields) {
     return FALSE;
 }
 
-int proxy_backend_connect() {
+int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db) {
     mysql_backend = mysql_init(NULL);
-    if (mysql_backend == NULL)
+    if (mysql_backend == NULL) {
         proxy_error("Out of memory when allocating MySQL backend");
+        return -1;
+    }
+
+    /* Set default parameters
+     * use empty strings to specify NULL */
+    if (!host)
+        host = BACKEND_HOST;
+    if (port < 0)
+        port = BACKEND_PORT;
+    if (!user)
+        user = BACKEND_USER;
+    else if (*user == '\0')
+        user = NULL;
+    if (!pass)
+        pass = BACKEND_PASS;
+    else if (*pass == '\0')
+        pass = NULL;
+    if (!db)
+        db = BACKEND_DB;
+    else if (*db == '\0')
+        db = NULL;
 
     if (!mysql_real_connect(mysql_backend,
-                BACKEND_HOST, BACKEND_USER, BACKEND_PASS,
-                BACKEND_DB, BACKEND_PORT, NULL, 0)) {
+                host, user, pass, db, port, NULL, 0)) {
         proxy_error("Failed to connect to MySQL backend: %s",
                 mysql_error(mysql_backend));
-        return 1;
+        return -1;
     }
 
     return 0;
