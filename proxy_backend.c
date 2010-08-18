@@ -19,13 +19,12 @@ static ulong backend_read_to_proxy(MYSQL *proxy) {
     NET *net = &(mysql_backend->net);
     ulong pkt_len;
 
-    printf("Starting packet forwarding (vio is %p)\n", net->vio);
+    printf("Starting packet forwarding\n");
 
     if (unlikely(!net->vio))
         return (packet_error);
 
     pkt_len = my_net_read(net);
-    printf("Read %lu bytes from backend\n", (unsigned long) pkt_len);
 
     /* XXX: need to return error to client */
     if (pkt_len == packet_error || pkt_len == 0) {
@@ -36,8 +35,6 @@ static ulong backend_read_to_proxy(MYSQL *proxy) {
         }
         return (packet_error);
     }
-
-    printf("Read %lu bytes from backend\n", (unsigned long) pkt_len);
 
     if (net->read_pos[0] == 255) {
         /* XXX: need to return error to client */
@@ -51,33 +48,6 @@ static ulong backend_read_to_proxy(MYSQL *proxy) {
         proxy_error("Couldn't forward backend packet to proxy");
         return (packet_error);
     }
-
-#if 0
-    {
-        /* Let's try a manual write */
-        uchar buf[NET_HEADER_SIZE];
-        int c, sd;
-        int3store(buf, pkt_len);
-        buf[3] = (uchar) net->pkt_nr;
-
-        sd = proxy->net.vio->sd;
-
-        printf("packet:%d, socket: %d\n", (int) net->pkt_nr, sd);
-        
-        if ((c = write(sd, buf, NET_HEADER_SIZE)) < 0) {
-            proxy_error("%s", strerror(errno));
-        } else {
-            printf("Wrote %d bytes\n", c);
-        }
-        if ((c = write(sd, net->read_pos, pkt_len)) < 0) {
-            proxy_error("%s", strerror(errno));
-        } else {
-            printf("Wrote %d bytes\n", c);
-        }
-    }
-#endif
-
-    printf("Wrote to proxy\n");
 
     return pkt_len;
 }
@@ -125,9 +95,8 @@ int proxy_backend_connect() {
 
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     uint error = 0, i;
-    ulong pkt_len = 8; //, field_count;
-    //uchar *pos;
-    //MYSQL_DATA *fields;
+    ulong pkt_len = 8;
+    uchar *pos;
 
     /* XXX: need to sync with proxy? */
     printf("Sending query %s to backend\n", query);
@@ -138,6 +107,13 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     for (i=0; i<2; i++) {
         if ((pkt_len = backend_read_to_proxy(proxy)) == packet_error)
             return TRUE;
+
+        /* If the query doesn't return results, no more to do */
+        pos = (uchar*) mysql_backend->net.read_pos;
+        if (net_field_length(&pos) == 0) {
+           error = FALSE;
+           goto out; 
+        }
     }
 
     /* read field info */
@@ -155,13 +131,9 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     if (backend_read_rows(proxy, mysql_backend->field_count))
         return TRUE;
 
-    if (mysql_backend->net.read_pos[0] == 254)
-        printf("EOF\n");
-
+out:
     /* Flush the write buffer */
-    net_flush(&proxy->net);
-
-    return error;
+    return net_flush(&proxy->net);
 }
 
 /* Close the open connection to the backend */
