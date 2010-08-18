@@ -126,7 +126,9 @@ my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_le
 }
 
 /* derived from sql/sql_parse.cc:do_command */
-my_bool proxy_read_query(MYSQL *mysql) {
+/* returns positive to disconnect without error,
+ * negative for errors, 0 to keep going */
+int proxy_read_query(MYSQL *mysql) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -136,7 +138,7 @@ my_bool proxy_read_query(MYSQL *mysql) {
     net_new_transaction(net);
     if ((pkt_len = my_net_read(net)) == packet_error) {
         proxy_error("Error reading query from client");
-        return TRUE;
+        return -1;
     }
 
     printf("Read %lu byte packet from client\n", pkt_len);
@@ -155,23 +157,23 @@ my_bool proxy_read_query(MYSQL *mysql) {
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    printf("Got command %d\n", (int) command);
+    printf("Got command %d\n", command);
 
     switch (command) {
         case COM_INIT_DB:
             /* XXX: using a single DB for now */
-            return TRUE;
+            return -1;
             break;
         case COM_QUERY:
             /* pass the query to the backend */
-            return proxy_backend_query(mysql, packet, pkt_len);
+            return proxy_backend_query(mysql, packet, pkt_len) ? -1 : 0;
             break;
         case COM_QUIT:
-            return TRUE;
+            return 1;
             break;
         case COM_PING:
             /* Yep, still here */
-            return proxy_send_ok(mysql, 0, 0, 0, 0);
+            return proxy_send_ok(mysql, 0, 0, 0, 0) ? -1 : 0;
             break;
 
         /* Commands below not implemented */
@@ -201,7 +203,7 @@ my_bool proxy_read_query(MYSQL *mysql) {
         case COM_END:
         default:
             /* XXX: send error */
-            return TRUE;
+            return -1;
             break;
     }
 }

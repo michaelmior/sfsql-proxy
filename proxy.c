@@ -21,7 +21,7 @@ void proxy_error(const char *fmt, ...) {
 }
 
 void server_run() {
-    int serverfd, clientfd, optval;
+    int serverfd, clientfd, optval, error;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
     struct st_vio *vio_tmp;
@@ -72,8 +72,10 @@ void server_run() {
 
         /* from sql/sql_connect.cc:handle_one_connection */
         while (!mysql->net.error && mysql->net.vio != 0) {
-            if (proxy_read_query(mysql)) {
-                proxy_error("Error in processing client query, disconnecting");
+            error = proxy_read_query(mysql);
+            if (error != 0) {
+                if (error < 0)
+                    proxy_error("Error in processing client query, disconnecting");
                 break;
             }
         }
