@@ -10,7 +10,6 @@
 
 #define QUEUE_LENGTH 10
 
-static MYSQL *mysql;
 volatile sig_atomic_t run = 1;
 
 /* Output error message */
@@ -23,13 +22,37 @@ void proxy_error(const char *fmt, ...) {
     fprintf(stderr, "\n");
 }
 
+MYSQL* proxy_init(Vio *vio) {
+    MYSQL *mysql;
+    NET *net;
+
+    /* Initialize a MySQL object */
+    mysql = mysql_init(NULL);
+    if (mysql == NULL) {
+        proxy_error("Out of memory when allocating proxy server");
+        return NULL;
+    }
+
+    /* Initialize network structures */
+    mysql->protocol_version = PROTOCOL_VERSION;
+    mysql->server_version   = MYSQL_SERVER_VERSION;
+
+    /* Initialize the client network structure */
+    net = &(mysql->net);
+    my_net_init(net, vio);
+    my_net_set_write_timeout(net, NET_WRITE_TIMEOUT);
+    my_net_set_read_timeout(net, NET_READ_TIMEOUT);
+
+    return mysql;
+}
+
 void server_run(int port) {
     int serverfd, clientfd, optval, error;
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
-    struct st_vio *vio_tmp;
-    NET *net;
+    Vio *vio_tmp;
+    MYSQL *mysql;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -78,11 +101,9 @@ void server_run(int port) {
         vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
         vio_keepalive(vio_tmp, TRUE);
 
-        /* Initialize the client network structure */
-        net = &(mysql->net);
-        my_net_init(net, vio_tmp);
-        my_net_set_write_timeout(net, NET_WRITE_TIMEOUT);
-        my_net_set_read_timeout(net, NET_READ_TIMEOUT);
+        mysql = proxy_init(vio_tmp);
+        if (mysql == NULL)
+            goto error;
 
         /* Perform "authentication" (credentials not checked) */
         proxy_handshake(mysql, &clientaddr, 0);
@@ -102,9 +123,11 @@ void server_run(int port) {
         if (vio_close(mysql->net.vio) < 0)
             proxy_error("Error closing client connection: %s", strerror(errno));
 
-        /* Clean up network data structures */
+error:
+        /* Clean up data structures */
         vio_delete(mysql->net.vio);
         mysql->net.vio = 0;
+        mysql_close(mysql);
     }
 }
 
@@ -186,16 +209,6 @@ int main(int argc, char *argv[]) {
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
-    mysql = mysql_init(NULL);
-    if (mysql == NULL) {
-        error = -1;
-        proxy_error("Out of memory when allocating proxy server");
-        goto out;
-    }
-
-    /* Initialize network structures */
-    mysql->protocol_version = PROTOCOL_VERSION;
-    mysql->server_version   = MYSQL_SERVER_VERSION;
 
     /* Connect to the backend server (default parameters for now) */
     if ((error = proxy_backend_connect(host, bport, user, pass, db)))
@@ -209,7 +222,6 @@ int main(int argc, char *argv[]) {
 out:
     printf("Shutting down...\n");
     proxy_backend_close();
-    mysql_close(mysql);
     mysql_library_end();
 
     return EXIT_SUCCESS;
