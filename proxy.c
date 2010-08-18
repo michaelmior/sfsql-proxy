@@ -63,8 +63,6 @@ void server_run(int port) {
 #endif
 
     /* Intialize the server address */
-    port = port < 0 ? PROXY_PORT : port;
-
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
     serveraddr.sin_addr.s_addr = htonl(INADDR_ANY); //TODO: allow specification of binding address
@@ -158,8 +156,12 @@ int main(int argc, char *argv[]) {
     char *host, *db, *user, *pass;
 
     /* Set arguments to default values */
-    bport = pport = -1;
-    host = db = user = pass = NULL;
+    host =  BACKEND_HOST;
+    db =    BACKEND_DB;
+    user =  BACKEND_USER;
+    pass =  BACKEND_PASS;
+    bport = BACKEND_PORT;
+    pport = PROXY_PORT;
 
     /* Parse command-line options */
     while(1) {
@@ -215,7 +217,7 @@ int main(int argc, char *argv[]) {
         goto out;
 
     /* Start proxying */
-    printf("Staring proxy on port %d\n", pport);
+    printf("Starting proxy on port %d\n", pport);
     server_run(pport);
 
     /* Shutdown */

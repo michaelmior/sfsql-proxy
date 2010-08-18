@@ -3,12 +3,6 @@
 #include <sql_common.h>
 #include <client_settings.h>
 
-#define BACKEND_HOST "127.0.0.1"
-#define BACKEND_PORT 3306
-#define BACKEND_USER "root"
-#define BACKEND_PASS "root"
-#define BACKEND_DB   "test"
-
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
 
 static MYSQL *mysql_backend = NULL;
@@ -89,21 +83,11 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
 
     /* Set default parameters
      * use empty strings to specify NULL */
-    if (!host)
-        host = BACKEND_HOST;
-    if (port < 0)
-        port = BACKEND_PORT;
-    if (!user)
-        user = BACKEND_USER;
-    else if (*user == '\0')
+    if (*user == '\0')
         user = NULL;
-    if (!pass)
-        pass = BACKEND_PASS;
-    else if (*pass == '\0')
+    if (*pass == '\0')
         pass = NULL;
-    if (!db)
-        db = BACKEND_DB;
-    else if (*db == '\0')
+    if (*db == '\0')
         db = NULL;
 
     if (!mysql_real_connect(mysql_backend,

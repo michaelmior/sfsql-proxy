@@ -19,6 +19,12 @@
 
 #define DEBUG 1
 
+#define BACKEND_HOST "127.0.0.1"
+#define BACKEND_PORT 3306
+#define BACKEND_USER "root"
+#define BACKEND_PASS "root"
+#define BACKEND_DB   "test"
+
 #define PROXY_PORT   4040
 
 //extern MYSQL *mysql;
