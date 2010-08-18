@@ -46,13 +46,49 @@ MYSQL* proxy_init(Vio *vio) {
     return mysql;
 }
 
+void proxy_new_client(int clientfd, struct sockaddr_in *clientaddr) {
+    int error;
+    Vio *vio_tmp;
+    MYSQL *mysql;
+
+    /* derived from sql/mysqld.cc:handle_connections_sockets */
+    vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
+    vio_keepalive(vio_tmp, TRUE);
+
+    mysql = proxy_init(vio_tmp);
+    if (mysql == NULL)
+        goto error;
+
+    /* Perform "authentication" (credentials not checked) */
+    proxy_handshake(mysql, clientaddr, 0);
+
+    /* from sql/sql_connect.cc:handle_one_connection */
+    while (!mysql->net.error && mysql->net.vio != 0) {
+        error = proxy_read_query(mysql);
+        if (error != 0) {
+            if (error < 0)
+                proxy_error("Error in processing client query, disconnecting");
+            break;
+        }
+    }
+
+    /* XXX: may need to send error before closing connection */
+    /* derived from sql/sql_mysqld.cc:close_connection */
+    if (vio_close(mysql->net.vio) < 0)
+        proxy_error("Error closing client connection: %s", strerror(errno));
+
+error:
+    /* Clean up data structures */
+    vio_delete(mysql->net.vio);
+    mysql->net.vio = 0;
+    mysql_close(mysql);
+}
+
 void server_run(int port) {
-    int serverfd, clientfd, optval, error;
+    int serverfd, clientfd, optval;
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
-    Vio *vio_tmp;
-    MYSQL *mysql;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -95,37 +131,8 @@ void server_run(int port) {
             continue;
         }
 
-        /* derived from sql/mysqld.cc:handle_connections_sockets */
-        vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
-        vio_keepalive(vio_tmp, TRUE);
-
-        mysql = proxy_init(vio_tmp);
-        if (mysql == NULL)
-            goto error;
-
-        /* Perform "authentication" (credentials not checked) */
-        proxy_handshake(mysql, &clientaddr, 0);
-
-        /* from sql/sql_connect.cc:handle_one_connection */
-        while (!mysql->net.error && mysql->net.vio != 0) {
-            error = proxy_read_query(mysql);
-            if (error != 0) {
-                if (error < 0)
-                    proxy_error("Error in processing client query, disconnecting");
-                break;
-            }
-        }
-
-        /* XXX: may need to send error before closing connection */
-        /* derived from sql/sql_mysqld.cc:close_connection */
-        if (vio_close(mysql->net.vio) < 0)
-            proxy_error("Error closing client connection: %s", strerror(errno));
-
-error:
-        /* Clean up data structures */
-        vio_delete(mysql->net.vio);
-        mysql->net.vio = 0;
-        mysql_close(mysql);
+        /* Process the new client */
+        proxy_new_client(clientfd, &clientaddr);
     }
 }
 
