@@ -27,6 +27,7 @@ static void server_run(int port) {
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
+    struct client_net client;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -70,7 +71,9 @@ static void server_run(int port) {
         }
 
         /* Process the new client */
-        proxy_new_client(clientfd, &clientaddr);
+        client.fd = clientfd;
+        client.addr = &clientaddr;
+        proxy_new_client(&client);
     }
 }
 
