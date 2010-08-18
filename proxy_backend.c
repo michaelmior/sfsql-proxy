@@ -9,6 +9,8 @@
 #define BACKEND_PASS "root"
 #define BACKEND_DB   "test"
 
+#define MAX_PACKET_LENGTH (256L*256L*256L-1)
+
 static MYSQL *mysql_backend = NULL;
 
 static my_bool backend_read_rows(MYSQL *proxy, uint fields);
@@ -18,8 +20,6 @@ static ulong backend_read_to_proxy(MYSQL *proxy);
 static ulong backend_read_to_proxy(MYSQL *proxy) {
     NET *net = &(mysql_backend->net);
     ulong pkt_len;
-
-    printf("Starting packet forwarding\n");
 
     if (unlikely(!net->vio))
         return (packet_error);
@@ -44,11 +44,13 @@ static ulong backend_read_to_proxy(MYSQL *proxy) {
         return (packet_error);
 
     /* Read from the backend and forward to the proxy connection */
-    printf("backend packet:%d, proxy packet: %d, socket: %d\n", (int) net->pkt_nr, proxy->net.pkt_nr, proxy->net.vio->sd);
     if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
         proxy_error("Couldn't forward backend packet to proxy");
         return (packet_error);
     }
+
+    /* Flush the write buffer */
+    net_flush(&(proxy->net));
 
     return pkt_len;
 }
@@ -129,8 +131,6 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
         if ((pkt_len = backend_read_to_proxy(proxy)) == packet_error)
             return TRUE;
 
-        printf("Got %lu byte packet\n", pkt_len);
-
         /* If the query doesn't return results, no more to do */
         pos = (uchar*) mysql_backend->net.read_pos;
         if (net_field_length(&pos) == 0 || mysql_backend->net.read_pos[0] == 255) {
@@ -156,7 +156,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
 
 out:
     /* Flush the write buffer */
-    return net_flush(&proxy->net) || error;
+    return error;
 }
 
 /* Close the open connection to the backend */
