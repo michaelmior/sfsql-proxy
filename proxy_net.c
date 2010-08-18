@@ -125,6 +125,68 @@ my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_le
     return TRUE;
 }
 
+static MYSQL* proxy_client_init(Vio *vio) {
+    MYSQL *mysql;
+    NET *net;
+
+    /* Initialize a MySQL object */
+    mysql = mysql_init(NULL);
+    if (mysql == NULL) {
+        proxy_error("Out of memory when allocating proxy server");
+        return NULL;
+    }
+
+    /* Initialize network structures */
+    mysql->protocol_version = PROTOCOL_VERSION;
+    mysql->server_version   = MYSQL_SERVER_VERSION;
+
+    /* Initialize the client network structure */
+    net = &(mysql->net);
+    my_net_init(net, vio);
+    my_net_set_write_timeout(net, NET_WRITE_TIMEOUT);
+    my_net_set_read_timeout(net, NET_READ_TIMEOUT);
+
+    return mysql;
+}
+
+void proxy_new_client(int clientfd, struct sockaddr_in *clientaddr) {
+    int error;
+    Vio *vio_tmp;
+    MYSQL *mysql;
+
+    /* derived from sql/mysqld.cc:handle_connections_sockets */
+    vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
+    vio_keepalive(vio_tmp, TRUE);
+
+    mysql = proxy_client_init(vio_tmp);
+    if (mysql == NULL)
+        goto error;
+
+    /* Perform "authentication" (credentials not checked) */
+    proxy_handshake(mysql, clientaddr, 0);
+
+    /* from sql/sql_connect.cc:handle_one_connection */
+    while (!mysql->net.error && mysql->net.vio != 0) {
+        error = proxy_read_query(mysql);
+        if (error != 0) {
+            if (error < 0)
+                proxy_error("Error in processing client query, disconnecting");
+            break;
+        }
+    }
+
+    /* XXX: may need to send error before closing connection */
+    /* derived from sql/sql_mysqld.cc:close_connection */
+    if (vio_close(mysql->net.vio) < 0)
+        proxy_error("Error closing client connection: %s", strerror(errno));
+
+error:
+    /* Clean up data structures */
+    vio_delete(mysql->net.vio);
+    mysql->net.vio = 0;
+    mysql_close(mysql);
+}
+
 /* derived from sql/sql_parse.cc:do_command */
 /* returns positive to disconnect without error,
  * negative for errors, 0 to keep going */
