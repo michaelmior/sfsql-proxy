@@ -3,12 +3,14 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 #include "proxy.h"
 
 #define QUEUE_LENGTH 10
 
 static MYSQL *mysql;
+volatile sig_atomic_t run = 1;
 
 /* Output error message */
 void proxy_error(const char *fmt, ...) {
@@ -22,6 +24,7 @@ void proxy_error(const char *fmt, ...) {
 
 void server_run() {
     int serverfd, clientfd, optval, error;
+    fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
     struct st_vio *vio_tmp;
@@ -50,10 +53,17 @@ void server_run() {
 
     /* Server event loop */
     clientlen = sizeof(clientaddr);
-    while(1) {
+    while(run) {
+        FD_ZERO(&fds);
+        FD_SET(serverfd, &fds);
+
+        if (select(FD_SETSIZE, &fds, NULL, NULL, NULL) != 1)
+            continue;
+
         clientfd = accept(serverfd, (struct sockaddr*) &clientaddr, &clientlen);
         if (clientfd < 0) {
-            proxy_error("Error accepting client connection: %s", strerror(errno));
+            if (errno != EINTR)
+                proxy_error("Error accepting client connection: %s", strerror(errno));
             continue;
         }
 
@@ -84,11 +94,27 @@ void server_run() {
         /* derived from sql/sql_mysqld.cc:close_connection */
         if (vio_close(mysql->net.vio) < 0)
             proxy_error("Error closing client connection: %s", strerror(errno));
+
+        /* Clean up network data structures */
+        vio_delete(mysql->net.vio);
+        mysql->net.vio = 0;
+    }
+}
+
+void catch_sig(int sig) {
+    switch (sig) {
+        /* Tell the server to stop */
+        case SIGINT:
+            run = 0;
+            break;
     }
 }
 
 int main(int argc, char *argv[]) {
     int error;
+
+    /* Install signal handler */
+    signal(SIGINT, catch_sig);
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
@@ -112,6 +138,7 @@ int main(int argc, char *argv[]) {
 
     /* Shutdown */
 out:
+    printf("Shutting down...\n");
     proxy_backend_close();
     mysql_close(mysql);
     mysql_library_end();
