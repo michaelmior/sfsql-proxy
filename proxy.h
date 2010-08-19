@@ -29,7 +29,11 @@
 
 #define PROXY_PORT   4040
 
-//extern MYSQL *mysql;
+typedef struct st_proxy_thread {
+    int id;
+    int clientfd;
+    struct sockaddr_in *addr;
+} proxy_thread_t;
 
 void proxy_error(const char *fmt, ...);
 

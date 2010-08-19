@@ -153,10 +153,10 @@ void* proxy_new_client(void *ptr) {
     int error;
     Vio *vio_tmp;
     MYSQL *mysql;
-    struct client_net *client = (struct client_net*) ptr;
+    proxy_thread_t *thread = (proxy_thread_t*) ptr;
 
     /* derived from sql/mysqld.cc:handle_connections_sockets */
-    vio_tmp = vio_new(client->fd, VIO_TYPE_TCPIP, 0);
+    vio_tmp = vio_new(thread->clientfd, VIO_TYPE_TCPIP, 0);
     vio_keepalive(vio_tmp, TRUE);
 
     mysql = proxy_client_init(vio_tmp);
@@ -164,7 +164,7 @@ void* proxy_new_client(void *ptr) {
         goto error;
 
     /* Perform "authentication" (credentials not checked) */
-    proxy_handshake(mysql, client->addr, 0);
+    proxy_handshake(mysql, thread->addr, 0);
 
     /* from sql/sql_connect.cc:handle_one_connection */
     while (!mysql->net.error && mysql->net.vio != 0) {

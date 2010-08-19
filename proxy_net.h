@@ -3,11 +3,6 @@
 
 #include <my_base.h>
 
-struct client_net {
-    int fd;
-    struct sockaddr_in *addr;
-};
-
 void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
 void* proxy_new_client(void *ptr);

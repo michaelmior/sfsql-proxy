@@ -8,9 +8,12 @@
 
 #include "proxy.h"
 
-#define QUEUE_LENGTH 10
+#define QUEUE_LENGTH  10
+#define PROXY_THREADS 10
 
 volatile sig_atomic_t run = 1;
+static pool_t *thread_pool;
+static pthread_t threads[PROXY_THREADS];
 
 /* Output error message */
 void proxy_error(const char *fmt, ...) {
@@ -27,7 +30,7 @@ static void server_run(int port) {
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
-    struct client_net *client;
+    proxy_thread_t *thread;
     pthread_attr_t attr;
     pthread_t *client_thread;
 
@@ -58,7 +61,7 @@ static void server_run(int port) {
 
     /* Set up thread attributes */
     pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
     /* Server event loop */
     clientlen = sizeof(clientaddr);
@@ -77,11 +80,12 @@ static void server_run(int port) {
         }
 
         /* Process the new client */
-        client = (struct client_net*) malloc(sizeof(struct client_net));
-        client->fd = clientfd;
-        client->addr = &clientaddr;
-        client_thread = (pthread_t*) malloc(sizeof(pthread_t));
-        pthread_create(client_thread, &attr, proxy_new_client, (void*) client);
+        thread = (proxy_thread_t*) malloc(sizeof(proxy_thread_t));
+        thread->clientfd = clientfd;
+        thread->addr = &clientaddr;
+        thread->id = proxy_get_from_pool(thread_pool);
+        client_thread = &(threads[thread->id]);
+        pthread_create(client_thread, &attr, proxy_new_client, (void*) thread);
     }
 }
 
@@ -172,6 +176,9 @@ int main(int argc, char *argv[]) {
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
+
+    /* Create a thread pool */
+    thread_pool = proxy_pool_new(PROXY_THREADS);
 
     /* Connect to the backend server (default parameters for now) */
     if ((error = proxy_backend_connect(host, bport, user, pass, db)))
