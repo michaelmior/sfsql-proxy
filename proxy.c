@@ -89,6 +89,8 @@ static void server_run(int port) {
         printf("Creating thread with id %d\n", thread->id);
         pthread_create(client_thread, &attr, proxy_new_client, (void*) thread);
     }
+
+    close(serverfd);
 }
 
 /* Cancel all running client threads */
