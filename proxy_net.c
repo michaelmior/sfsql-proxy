@@ -149,10 +149,11 @@ static MYSQL* proxy_client_init(Vio *vio) {
     return mysql;
 }
 
-void proxy_new_client(struct client_net *client) {
+void* proxy_new_client(void *ptr) {
     int error;
     Vio *vio_tmp;
     MYSQL *mysql;
+    struct client_net *client = (struct client_net*) ptr;
 
     /* derived from sql/mysqld.cc:handle_connections_sockets */
     vio_tmp = vio_new(client->fd, VIO_TYPE_TCPIP, 0);
@@ -185,6 +186,10 @@ error:
     vio_delete(mysql->net.vio);
     mysql->net.vio = 0;
     mysql_close(mysql);
+
+    /* Exit the thread */
+    printf("Exiting thread...\n");
+    pthread_exit(NULL);
 }
 
 /* derived from sql/sql_parse.cc:do_command */

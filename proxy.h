@@ -17,6 +17,7 @@
 
 #include "proxy_net.h"
 #include "proxy_backend.h"
+#include "proxy_pool.h"
 
 #define DEBUG 1
 

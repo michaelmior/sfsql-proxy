@@ -7,13 +7,10 @@
 #define BACKENDS 10
 
 static MYSQL *mysql_backend[BACKENDS];
+static pool_t *backend_pool;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
-
-static pthread_mutex_t avail_mutex[BACKENDS];
-static pthread_mutex_t availc_mutex;
-static pthread_cond_t  availc_cv;
 
 /* derived from sql/client.c:cli_safe_read */
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
@@ -81,9 +78,12 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
 
 int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db) {
     int i;
+    
+    /* Initialize a pool for locking backend access */
+    backend_pool = proxy_pool_new(BACKENDS);
 
-    /* Set default parameters
-     * use empty strings to specify NULL */
+    /* Set default parameters use empty strings
+     * to specify NULL */
     if (*user == '\0')
         user = NULL;
     if (*pass == '\0')
@@ -91,6 +91,7 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
     if (*db == '\0')
         db = NULL;
 
+    /* Connect to all backends */
     for (i=0; i<BACKENDS; i++) {
         mysql_backend[i] = NULL;
         mysql_backend[i] = mysql_init(NULL);
@@ -105,79 +106,22 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
                     mysql_error(mysql_backend[i]));
             return -1;
         }
-
-        /* Initialize the mutex for locking backend availability */
-        pthread_mutex_init(&(avail_mutex[i]), NULL);
     }
-
-    /* Initialize locks for signaling availability */
-    pthread_mutex_init(&availc_mutex, NULL);
-    pthread_cond_init(&availc_cv, NULL);
 
     return 0;
-}
-
-/* Try to get a lock on any backend */
-int backend_try_locks() {
-    int i;
-
-    /* Check if any backend is available */
-    for (i=0; i<BACKENDS; i++) {
-        printf("Trying to lock backend %d\n", i);
-        if (pthread_mutex_trylock(&(avail_mutex[i])) == 0) {
-            printf("Got lock on %d!\n", i);
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-/* Return the index of a backend not currently in use.
- * If all backends are in use, then wait until one
- * becomes available. */
-int backend_choose() {
-    int bi;
-
-    /* See if any backends are available */
-    if ((bi = backend_try_locks()) >= 0)
-        return bi;
-
-    printf("No joy. Waiting for backend to free\n");
-
-    while (1) {
-        /* Wait until a backend becomes free */
-        pthread_mutex_lock(&availc_mutex);
-        pthread_cond_wait(&availc_cv, &availc_mutex);
-
-        printf("Backend free!\n");
-
-        /* Now we're (almost) guaranteed backend access */
-        bi = backend_try_locks();
-
-        /* Unlock and return */
-        pthread_mutex_unlock(&availc_mutex);
-
-        /* We actually got a backend, return it
-         * (otherwise, we go again) */
-        if (bi >= 0)
-            return bi;
-
-        printf("Nevermind, no it isn't :(\n");
-    }
 }
 
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
     uchar *pos;
-    int i, bi = backend_choose();
+
+    /* The call below will block until a backend is free  */
+    int i, bi = proxy_get_from_pool(backend_pool);
     MYSQL *backend = mysql_backend[bi];
 
-    printf("I've got a shiny new backend (%d)!\n", bi);
-
     /* XXX: need to sync with proxy? */
-    printf("Sending query %s to backend\n", query);
+    printf("Sending query %s to backend %d\n", query, bi);
     mysql_send_query(backend, query, length);
 
     /* derived from sql/client.c:cli_read_query_result */
@@ -217,8 +161,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
 
 out:
     /* Make the backend available again */
-    printf("Backend %d...I don't know how to say this...I'm leaving you\n", bi);
-    pthread_mutex_unlock(&(avail_mutex[bi]));
+    proxy_return_to_pool(backend_pool, bi);
     return error;
 }
 
@@ -227,11 +170,10 @@ out:
 void proxy_backend_close() {
     int i;
 
-    for (i=0; i<BACKENDS; i++) {
-        mysql_close(mysql_backend[i]);
-        pthread_mutex_destroy(&(avail_mutex[i]));
-    }
+    /* Destroy lock pool */
+    proxy_pool_destroy(backend_pool);
 
-    pthread_mutex_destroy(&availc_mutex);
-    pthread_cond_destroy(&availc_cv);
+    /* Close connection with backends */
+    for (i=0; i<BACKENDS; i++)
+        mysql_close(mysql_backend[i]);
 }

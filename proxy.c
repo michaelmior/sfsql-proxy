@@ -27,7 +27,9 @@ static void server_run(int port) {
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
-    struct client_net client;
+    struct client_net *client;
+    pthread_attr_t attr;
+    pthread_t *client_thread;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -54,6 +56,10 @@ static void server_run(int port) {
         return;
     }
 
+    /* Set up thread attributes */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
     /* Server event loop */
     clientlen = sizeof(clientaddr);
     while(run) {
@@ -71,9 +77,11 @@ static void server_run(int port) {
         }
 
         /* Process the new client */
-        client.fd = clientfd;
-        client.addr = &clientaddr;
-        proxy_new_client(&client);
+        client = (struct client_net*) malloc(sizeof(struct client_net));
+        client->fd = clientfd;
+        client->addr = &clientaddr;
+        client_thread = (pthread_t*) malloc(sizeof(pthread_t));
+        pthread_create(client_thread, &attr, proxy_new_client, (void*) client);
     }
 }
 

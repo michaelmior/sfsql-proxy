@@ -4,7 +4,7 @@ MYSQL_LIBS = -rdynamic -L/apps/mysql-5.1.49/libmysql_r/.libs -lmysqlclient_r -lz
 CFLAGS = $(MYSQL_CFLAGS) -g -O0 -Werror -Wall
 LIBS = $(MYSQL_LIBS)
 
-OBJS = proxy.o sql_string.o proxy_net.o proxy_backend.o
+OBJS = proxy.o sql_string.o proxy_net.o proxy_backend.o proxy_pool.o
 HEADERS = proxy.h proxy_net.h proxy_backend.h
 
 all: sfsql-proxy
