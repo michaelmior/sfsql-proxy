@@ -186,8 +186,15 @@ void* proxy_new_thread(void *ptr) {
     pthread_cleanup_push(client_destroy, ptr);
 
     while (1) {
+        /* Wait for work to be available */
         pthread_cond_wait(&(thread->cv), &(thread->lock));
+
+        /* Handle client requests */
         client_do_work(thread->work);
+        free(thread->work);
+        thread->work = NULL;
+
+        /* Signify that we are available for work again */
         proxy_return_to_pool(thread_pool, thread->id);
         pthread_mutex_unlock(&(thread->lock));
     }
