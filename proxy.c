@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
 
     /* Set up thread attributes */
     pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
     /* Create the new threads */
     for (i=0; i<PROXY_THREADS; i++) {
@@ -223,7 +223,10 @@ out:
     cancel_threads();
     proxy_pool_destroy(thread_pool);
     for (i=0; i<PROXY_THREADS; i++) {
+        pthread_join(threads[i].thread, NULL);
+
         pthread_cond_destroy(&(threads[i].cv));
+        pthread_mutex_destroy(&(threads[i].lock));
         threads[i].work = NULL;
     }
 
