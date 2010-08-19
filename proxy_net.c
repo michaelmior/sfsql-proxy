@@ -5,6 +5,8 @@
 extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
+static MYSQL* client_init(Vio *vio);
+
 /* derived from sql/sql_connect.cc:check_connection */
 void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id) {
     NET *net;
@@ -125,7 +127,7 @@ my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_le
     return TRUE;
 }
 
-static MYSQL* proxy_client_init(Vio *vio) {
+static MYSQL* client_init(Vio *vio) {
     MYSQL *mysql;
     NET *net;
 
@@ -159,7 +161,7 @@ void* proxy_new_client(void *ptr) {
     vio_tmp = vio_new(thread->clientfd, VIO_TYPE_TCPIP, 0);
     vio_keepalive(vio_tmp, TRUE);
 
-    mysql = proxy_client_init(vio_tmp);
+    mysql = client_init(vio_tmp);
     if (mysql == NULL)
         goto error;
 
