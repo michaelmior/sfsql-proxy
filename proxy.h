@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <mysql.h>
+#include <pthread.h>
 
 #include "proxy_net.h"
 #include "proxy_backend.h"
