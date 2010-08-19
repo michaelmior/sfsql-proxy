@@ -21,20 +21,31 @@
 
 #define DEBUG 1
 
-#define BACKEND_HOST "127.0.0.1"
-#define BACKEND_PORT 3306
-#define BACKEND_USER "root"
-#define BACKEND_PASS "root"
-#define BACKEND_DB   "test"
+#define BACKEND_HOST  "127.0.0.1"
+#define BACKEND_PORT  3306
+#define BACKEND_USER  "root"
+#define BACKEND_PASS  "root"
+#define BACKEND_DB    "test"
 
-#define PROXY_PORT   4040
+#define PROXY_PORT    4040
+#define PROXY_THREADS 10
 
-typedef struct st_proxy_thread {
-    int id;
+pool_t *thread_pool;
+
+typedef struct st_proxy_work {
     int clientfd;
     struct sockaddr_in *addr;
     MYSQL *proxy;
+} proxy_work_t;
+
+typedef struct st_proxy_thread {
+    int id;
+    pthread_t thread;
+    pthread_cond_t cv;
+    pthread_mutex_t lock;
+    proxy_work_t *work;
 } proxy_thread_t;
+proxy_thread_t threads[PROXY_THREADS];
 
 void proxy_error(const char *fmt, ...);
 

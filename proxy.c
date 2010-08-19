@@ -9,11 +9,8 @@
 #include "proxy.h"
 
 #define QUEUE_LENGTH  10
-#define PROXY_THREADS 10
 
 volatile sig_atomic_t run = 1;
-static pool_t *thread_pool;
-static pthread_t threads[PROXY_THREADS];
 
 /* Output error message */
 void proxy_error(const char *fmt, ...) {
@@ -30,9 +27,8 @@ static void server_run(int port) {
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
+    proxy_work_t *work;
     proxy_thread_t *thread;
-    pthread_attr_t attr;
-    pthread_t *client_thread;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -59,10 +55,6 @@ static void server_run(int port) {
         return;
     }
 
-    /* Set up thread attributes */
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
     /* Server event loop */
     clientlen = sizeof(clientaddr);
     while(run) {
@@ -80,14 +72,15 @@ static void server_run(int port) {
         }
 
         /* Process the new client */
-        thread = (proxy_thread_t*) malloc(sizeof(proxy_thread_t));
-        thread->clientfd = clientfd;
-        thread->addr = &clientaddr;
-        thread->id = proxy_get_from_pool(thread_pool);
-        thread->proxy = NULL;
-        client_thread = &(threads[thread->id]);
-        printf("Creating thread with id %d\n", thread->id);
-        pthread_create(client_thread, &attr, proxy_new_client, (void*) thread);
+        work = (proxy_work_t*) malloc(sizeof(proxy_work_t));
+        work->clientfd = clientfd;
+        work->addr = &clientaddr;
+        work->proxy = NULL;
+
+        /* TODO: get thread and dispatch work */
+        thread = &(threads[proxy_get_from_pool(thread_pool)]);
+        thread->work = work;
+        pthread_cond_signal(&(thread->cv));
     }
 
     close(serverfd);
@@ -98,11 +91,8 @@ static void cancel_threads() {
     int id;
     
     while ((id = proxy_pool_get_locked(thread_pool)) >= 0) {
-        printf("Canceling thread %d\n", id);
-        pthread_cancel(threads[id]);
-        pthread_join(threads[id], NULL);
+        pthread_cancel(threads[id].thread);
         proxy_return_to_pool(thread_pool, id);
-        printf("Thread %d canceled and joined\n", id);
     }
 }
 
@@ -113,7 +103,7 @@ static void catch_sig(int sig) {
             /* Stop the server loop */
             run = 0;
 
-            /* Canel running threads */
+            /* Cancel running threads */
             cancel_threads();
 
             break;
@@ -135,8 +125,9 @@ static void usage() {
 }
 
 int main(int argc, char *argv[]) {
-    int error, bport, pport, c;
+    int error, bport, pport, c, i;
     char *host, *db, *user, *pass;
+    pthread_attr_t attr;
 
     /* Set arguments to default values */
     host =  BACKEND_HOST;
@@ -202,6 +193,20 @@ int main(int argc, char *argv[]) {
     /* Create a thread pool */
     thread_pool = proxy_pool_new(PROXY_THREADS);
 
+    /* Set up thread attributes */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+    /* Create the new threads */
+    for (i=0; i<PROXY_THREADS; i++) {
+        threads[i].id = i;
+        pthread_cond_init(&(threads[i].cv), NULL);
+        pthread_mutex_init(&(threads[i].lock), NULL);
+        threads[i].work = NULL;
+
+        pthread_create(&(threads[i].thread), &attr, proxy_new_thread, (void*) &(threads[i]));
+    }
+
     /* Connect to the backend server (default parameters for now) */
     if ((error = proxy_backend_connect(host, bport, user, pass, db)))
         goto out;
@@ -216,6 +221,11 @@ out:
 
     /* Cancel any outstanding client threads */
     cancel_threads();
+    proxy_pool_destroy(thread_pool);
+    for (i=0; i<PROXY_THREADS; i++) {
+        pthread_cond_destroy(&(threads[i].cv));
+        threads[i].work = NULL;
+    }
 
     proxy_backend_close();
     mysql_library_end();

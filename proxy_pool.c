@@ -43,6 +43,7 @@ int proxy_get_from_pool(pool_t *pool) {
 
     /* Wait for something to become available */
     while (1) {
+        printf("No more threads :( I'll wait...\n");
         pthread_mutex_lock(pool->avail_mutex);
         pthread_cond_wait(pool->avail_cv, pool->avail_mutex);
 
@@ -70,12 +71,15 @@ int proxy_pool_get_locked(pool_t *pool) {
 }
 
 void proxy_return_to_pool(pool_t *pool, int idx) {
+    printf("You can have %d back\n", idx);
+    
     /* Unlock the associated mutex */
     pthread_mutex_unlock(&(pool->locks[idx]));
 
     /* Someone is waiting for something in the pool,
      * let them know something is available */
     if (pthread_mutex_trylock(pool->avail_mutex)  == EBUSY) {
+        printf("Waiting for a thread? Here you go!\n");
         pthread_cond_signal(pool->avail_cv);
         pthread_mutex_unlock(pool->avail_mutex);
     }

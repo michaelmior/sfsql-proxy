@@ -6,6 +6,7 @@ extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
 static MYSQL* client_init(Vio *vio);
+void client_do_work(proxy_work_t *work);
 
 /* derived from sql/sql_connect.cc:check_connection */
 void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id) {
@@ -153,10 +154,12 @@ static MYSQL* client_init(Vio *vio) {
 
 void client_destroy(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
-    MYSQL *mysql = thread->proxy;
 
     printf("Called client_destroy\n");
 
+    /* XXX: should probably try to clean up connection
+     * if still live */
+#if 0
     if (mysql) {
         /* XXX: may need to send error before closing connection */
         /* derived from sql/sql_mysqld.cc:close_connection */
@@ -170,37 +173,47 @@ void client_destroy(void *ptr) {
 
         thread->proxy = NULL;
     }
+#endif
 
-    /* Free any remaining MySQL resources */
+    /* Free any remaining resources */
     mysql_thread_end();
+    free(thread);
 }
 
-void* proxy_new_client(void *ptr) {
-    int error;
-    Vio *vio_tmp;
+void* proxy_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
-    MYSQL *mysql;
-
-    /* derived from sql/mysqld.cc:handle_connections_sockets */
-    vio_tmp = vio_new(thread->clientfd, VIO_TYPE_TCPIP, 0);
-    vio_keepalive(vio_tmp, TRUE);
-
-    mysql = client_init(vio_tmp);
-    if (mysql == NULL) {
-        client_destroy(ptr);
-        pthread_exit(NULL);
-    }
-
-    thread->proxy = mysql;
 
     pthread_cleanup_push(client_destroy, ptr);
 
+    while (1) {
+        pthread_cond_wait(&(thread->cv), &(thread->lock));
+        client_do_work(thread->work);
+        proxy_return_to_pool(thread_pool, thread->id);
+        pthread_mutex_unlock(&(thread->lock));
+    }
+
+    pthread_cleanup_pop(1);
+    pthread_exit(NULL);
+}
+
+void client_do_work(proxy_work_t *work) {
+    int error;
+    Vio *vio_tmp;
+
+    /* derived from sql/mysqld.cc:handle_connections_sockets */
+    vio_tmp = vio_new(work->clientfd, VIO_TYPE_TCPIP, 0);
+    vio_keepalive(vio_tmp, TRUE);
+
+    work->proxy = client_init(vio_tmp);
+    if (work->proxy == NULL)
+        return;
+
     /* Perform "authentication" (credentials not checked) */
-    proxy_handshake(mysql, thread->addr, 0);
+    proxy_handshake(work->proxy, work->addr, 0);
 
     /* from sql/sql_connect.cc:handle_one_connection */
-    while (thread->proxy && !mysql->net.error && mysql->net.vio != 0) {
-        error = proxy_read_query(mysql);
+    while (!work->proxy->net.error && work->proxy->net.vio != 0) {
+        error = proxy_read_query(work->proxy);
         if (error != 0) {
             if (error < 0)
                 proxy_error("Error in processing client query, disconnecting");
@@ -208,11 +221,7 @@ void* proxy_new_client(void *ptr) {
         }
     }
 
-    printf("Exited client thread loop\n");
-
-    /* Clean up thread data */
-    pthread_cleanup_pop(1);
-    pthread_exit(NULL);
+    printf("Exited client work loop\n");
 }
 
 /* derived from sql/sql_parse.cc:do_command */
