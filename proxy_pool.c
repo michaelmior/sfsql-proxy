@@ -76,13 +76,10 @@ void proxy_return_to_pool(pool_t *pool, int idx) {
     /* Unlock the associated mutex */
     pthread_mutex_unlock(&(pool->locks[idx]));
 
-    /* Someone is waiting for something in the pool,
-     * let them know something is available */
-    if (pthread_mutex_trylock(pool->avail_mutex)  == EBUSY) {
-        printf("Waiting for a thread? Here you go!\n");
-        pthread_cond_signal(pool->avail_cv);
-        pthread_mutex_unlock(pool->avail_mutex);
-    }
+    /* Signify availability in case someone is waiting */
+    pthread_mutex_lock(pool->avail_mutex);
+    pthread_cond_signal(pool->avail_cv);
+    pthread_mutex_unlock(pool->avail_mutex);
 }
 
 void proxy_pool_destroy(pool_t *pool) {
