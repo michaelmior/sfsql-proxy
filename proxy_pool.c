@@ -27,7 +27,7 @@ static int pool_try_locks(pool_t *pool) {
 
     /* Check if any object in the pool is already available */
     for (i=0; i<pool->size; i++) {
-        if(pthread_mutex_trylock(&(pool->locks[i])) == 0)
+        if (pthread_mutex_trylock(&(pool->locks[i])) == 0)
             return i;
     }
 
@@ -53,6 +53,20 @@ int proxy_get_from_pool(pool_t *pool) {
         if (idx >= 0)
             return idx;
     }
+}
+
+/* Get the next item in the pool which is currently locked */
+int proxy_pool_get_locked(pool_t *pool) {
+    int i;
+
+    for (i=0; i<pool->size; i++) {
+        if (pthread_mutex_trylock(&(pool->locks[i])) == EBUSY)
+            return i;
+
+        pthread_mutex_unlock(&(pool->locks[i]));
+    }
+
+    return -1;
 }
 
 void proxy_return_to_pool(pool_t *pool, int idx) {

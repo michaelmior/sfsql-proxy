@@ -84,8 +84,23 @@ static void server_run(int port) {
         thread->clientfd = clientfd;
         thread->addr = &clientaddr;
         thread->id = proxy_get_from_pool(thread_pool);
+        thread->proxy = NULL;
         client_thread = &(threads[thread->id]);
+        printf("Creating thread with id %d\n", thread->id);
         pthread_create(client_thread, &attr, proxy_new_client, (void*) thread);
+    }
+}
+
+/* Cancel all running client threads */
+static void cancel_threads() {
+    int id;
+    
+    while ((id = proxy_pool_get_locked(thread_pool)) >= 0) {
+        printf("Canceling thread %d\n", id);
+        pthread_cancel(threads[id]);
+        pthread_join(threads[id], NULL);
+        proxy_return_to_pool(thread_pool, id);
+        printf("Thread %d canceled and joined\n", id);
     }
 }
 
@@ -93,7 +108,12 @@ static void catch_sig(int sig) {
     switch (sig) {
         /* Tell the server to stop */
         case SIGINT:
+            /* Stop the server loop */
             run = 0;
+
+            /* Canel running threads */
+            cancel_threads();
+
             break;
     }
 }
@@ -191,6 +211,10 @@ int main(int argc, char *argv[]) {
     /* Shutdown */
 out:
     printf("Shutting down...\n");
+
+    /* Cancel any outstanding client threads */
+    cancel_threads();
+
     proxy_backend_close();
     mysql_library_end();
 

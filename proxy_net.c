@@ -151,25 +151,55 @@ static MYSQL* client_init(Vio *vio) {
     return mysql;
 }
 
+void client_destroy(void *ptr) {
+    proxy_thread_t *thread = (proxy_thread_t*) ptr;
+    MYSQL *mysql = thread->proxy;
+
+    printf("Called client_destroy\n");
+
+    if (mysql) {
+        /* XXX: may need to send error before closing connection */
+        /* derived from sql/sql_mysqld.cc:close_connection */
+        if (vio_close(mysql->net.vio) < 0)
+            proxy_error("Error closing client connection: %s", strerror(errno));
+
+        /* Clean up data structures */
+        vio_delete(mysql->net.vio);
+        mysql->net.vio = 0;
+        mysql_close(mysql);
+
+        thread->proxy = NULL;
+    }
+
+    /* Free any remaining MySQL resources */
+    mysql_thread_end();
+}
+
 void* proxy_new_client(void *ptr) {
     int error;
     Vio *vio_tmp;
-    MYSQL *mysql;
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
+    MYSQL *mysql;
 
     /* derived from sql/mysqld.cc:handle_connections_sockets */
     vio_tmp = vio_new(thread->clientfd, VIO_TYPE_TCPIP, 0);
     vio_keepalive(vio_tmp, TRUE);
 
     mysql = client_init(vio_tmp);
-    if (mysql == NULL)
-        goto error;
+    if (mysql == NULL) {
+        client_destroy(ptr);
+        pthread_exit(NULL);
+    }
+
+    thread->proxy = mysql;
+
+    pthread_cleanup_push(client_destroy, ptr);
 
     /* Perform "authentication" (credentials not checked) */
     proxy_handshake(mysql, thread->addr, 0);
 
     /* from sql/sql_connect.cc:handle_one_connection */
-    while (!mysql->net.error && mysql->net.vio != 0) {
+    while (thread->proxy && !mysql->net.error && mysql->net.vio != 0) {
         error = proxy_read_query(mysql);
         if (error != 0) {
             if (error < 0)
@@ -178,19 +208,10 @@ void* proxy_new_client(void *ptr) {
         }
     }
 
-    /* XXX: may need to send error before closing connection */
-    /* derived from sql/sql_mysqld.cc:close_connection */
-    if (vio_close(mysql->net.vio) < 0)
-        proxy_error("Error closing client connection: %s", strerror(errno));
+    printf("Exited client thread loop\n");
 
-error:
-    /* Clean up data structures */
-    vio_delete(mysql->net.vio);
-    mysql->net.vio = 0;
-    mysql_close(mysql);
-
-    /* Exit the thread */
-    printf("Exiting thread...\n");
+    /* Clean up thread data */
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
 }
 

@@ -33,6 +33,7 @@ typedef struct st_proxy_thread {
     int id;
     int clientfd;
     struct sockaddr_in *addr;
+    MYSQL *proxy;
 } proxy_thread_t;
 
 void proxy_error(const char *fmt, ...);
