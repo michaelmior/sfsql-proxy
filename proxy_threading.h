@@ -1,3 +1,6 @@
+#ifndef _proxy_threading_h
+#define _proxy_threading_h
+
 void proxy_threading_init();
 void proxy_threading_end();
 
@@ -184,3 +187,5 @@ int static inline __proxy_cond_wait(pthread_cond_t *cv, pthread_mutex_t *m, int(
 #define proxy_cond_wait(cv, m) pthread_cond_wait(cv, m)
 #define proxy_cond_timedwait(cv, m) pthread_cond_timedwait(cv, m)
 #endif
+
+#endif /* _proxy_threading_h */

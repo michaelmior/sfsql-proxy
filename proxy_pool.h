@@ -1,3 +1,6 @@
+#ifndef _proxy_pool_h
+#define _proxy_pool_h
+
 typedef struct st_pool {
     int size;
     pthread_mutex_t *locks;
@@ -10,3 +13,5 @@ int proxy_get_from_pool(pool_t *pool);
 void proxy_return_to_pool(pool_t *pool, int idx);
 int proxy_pool_get_locked(pool_t *pool);
 void proxy_pool_destroy(pool_t *pool);
+
+#endif /* _proxy_pool_h */
