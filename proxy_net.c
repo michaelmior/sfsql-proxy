@@ -154,30 +154,29 @@ static MYSQL* client_init(Vio *vio) {
 
 void client_destroy(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
+    MYSQL *mysql;
 
-    printf("Called client_destroy\n");
+    printf("Called client_destroy on thread %d\n", thread->id);
 
-    /* XXX: should probably try to clean up connection
-     * if still live */
-#if 0
-    if (mysql) {
-        /* XXX: may need to send error before closing connection */
-        /* derived from sql/sql_mysqld.cc:close_connection */
-        if (vio_close(mysql->net.vio) < 0)
-            proxy_error("Error closing client connection: %s", strerror(errno));
+    /* Clean up connection if still live */
+    if (thread->work) {
+        if ((mysql = thread->work->proxy)) {
+            /* XXX: may need to send error before closing connection */
+            /* derived from sql/sql_mysqld.cc:close_connection */
+            if (vio_close(mysql->net.vio) < 0)
+                proxy_error("Error closing client connection: %s", strerror(errno));
 
-        /* Clean up data structures */
-        vio_delete(mysql->net.vio);
-        mysql->net.vio = 0;
-        mysql_close(mysql);
+            /* Clean up data structures */
+            vio_delete(mysql->net.vio);
+            mysql->net.vio = 0;
+            mysql_close(mysql);
+        }
 
-        thread->proxy = NULL;
+        free(thread->work);
     }
-#endif
 
     /* Free any remaining resources */
     mysql_thread_end();
-    free(thread);
 }
 
 void* proxy_new_thread(void *ptr) {
@@ -187,7 +186,18 @@ void* proxy_new_thread(void *ptr) {
 
     while (1) {
         /* Wait for work to be available */
+        proxy_mutex_lock(&(thread->lock));
         pthread_cond_wait(&(thread->cv), &(thread->lock));
+
+        printf("Thread %d signaled\n", thread->id);
+
+        /* If no work specified, must be ready to exit */
+        if (thread->work == NULL) {
+            proxy_mutex_unlock(&(thread->lock));
+            break;
+        }
+
+        printf("Workin' on thead %d\n", thread->id);
 
         /* Handle client requests */
         client_do_work(thread->work);
@@ -196,8 +206,10 @@ void* proxy_new_thread(void *ptr) {
 
         /* Signify that we are available for work again */
         proxy_return_to_pool(thread_pool, thread->id);
-        pthread_mutex_unlock(&(thread->lock));
+        proxy_mutex_unlock(&(thread->lock));
     }
+
+    printf("Exiting loop on thead %d\n", thread->id);
 
     pthread_cleanup_pop(1);
     pthread_exit(NULL);

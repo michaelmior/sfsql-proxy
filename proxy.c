@@ -13,17 +13,17 @@
 volatile sig_atomic_t run = 1;
 
 /* Output error message */
-void proxy_error(const char *fmt, ...) {
+void __proxy_error(const char *loc, const char *fmt, ...) {
     va_list arg;
     va_start(arg, fmt);
     vfprintf(stderr, fmt, arg);
     va_end(arg);
 
-    fprintf(stderr, "\n");
+    fprintf(stderr, " at %s\n", loc);
 }
 
 static void server_run(int port) {
-    int serverfd, clientfd, optval;
+    int serverfd, clientfd;
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
@@ -34,8 +34,10 @@ static void server_run(int port) {
 
     /* If we're debugging, allow reuse of the socket */
 #ifdef DEBUG
-    optval = 1;
-    setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &optval, sizeof(int));
+    {
+        int optval = 1;
+        setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &optval, sizeof(int));
+    }
 #endif
 
     /* Intialize the server address */
@@ -77,10 +79,14 @@ static void server_run(int port) {
         work->addr = &clientaddr;
         work->proxy = NULL;
 
-        /* TODO: get thread and dispatch work */
+        /* Pick a thread to execute the work */
         thread = &(threads[proxy_get_from_pool(thread_pool)]);
+
+        /* Give work to thread and signal it to go */
+        proxy_mutex_lock(&(thread->lock));
         thread->work = work;
         pthread_cond_signal(&(thread->cv));
+        proxy_mutex_unlock(&(thread->lock));
     }
 
     close(serverfd);
@@ -88,12 +94,21 @@ static void server_run(int port) {
 
 /* Cancel all running client threads */
 static void cancel_threads() {
-    int id;
+    int i;
     
-    while ((id = proxy_pool_get_locked(thread_pool)) >= 0) {
-        pthread_cancel(threads[id].thread);
-        proxy_return_to_pool(thread_pool, id);
+    for (i=0; i<PROXY_THREADS; i++) {
+        /* Make sure worker threads release their mutex */
+        proxy_mutex_lock(&(threads[i].lock));
+        pthread_cond_signal(&(threads[i].cv));
+        proxy_mutex_unlock(&(threads[i].lock));
+
+        /* Cancel the running thead */
+        pthread_cancel(threads[i].thread);
     }
+
+    /* Return any locked threads to the pool */
+    while ((i = proxy_pool_get_locked(thread_pool)) >= 0)
+        proxy_return_to_pool(thread_pool, i);
 }
 
 static void catch_sig(int sig) {
@@ -184,6 +199,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    /* Threading initialization */
+    proxy_threading_init();
+
     /* Install signal handler */
     signal(SIGINT, catch_sig);
 
@@ -196,12 +214,12 @@ int main(int argc, char *argv[]) {
     /* Set up thread attributes */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
+    
     /* Create the new threads */
     for (i=0; i<PROXY_THREADS; i++) {
         threads[i].id = i;
         pthread_cond_init(&(threads[i].cv), NULL);
-        pthread_mutex_init(&(threads[i].lock), NULL);
+        proxy_mutex_init(&threads[i].lock);
         threads[i].work = NULL;
 
         pthread_create(&(threads[i].thread), &attr, proxy_new_thread, (void*) &(threads[i]));
@@ -221,17 +239,20 @@ out:
 
     /* Cancel any outstanding client threads */
     cancel_threads();
+    printf("Threads canceled\n");
+
     proxy_pool_destroy(thread_pool);
     for (i=0; i<PROXY_THREADS; i++) {
+        printf("Joining thread %d\n", i);
         pthread_join(threads[i].thread, NULL);
 
         pthread_cond_destroy(&(threads[i].cv));
         pthread_mutex_destroy(&(threads[i].lock));
-        threads[i].work = NULL;
     }
 
     proxy_backend_close();
     mysql_library_end();
+    proxy_threading_end();
 
     return EXIT_SUCCESS;
 }
