@@ -102,8 +102,10 @@ static void cancel_threads() {
         proxy_cond_signal(&(threads[i].cv));
         proxy_mutex_unlock(&(threads[i].lock));
 
-        /* Cancel the running thead */
-        pthread_cancel(threads[i].thread);
+        /* Try to acquire the lock again to ensure threads
+         * have exited and cleaned up */
+        proxy_mutex_lock(&(threads[i].lock));
+        proxy_mutex_unlock(&(threads[i].lock));
     }
 
     /* Return any locked threads to the pool */
