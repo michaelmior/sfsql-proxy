@@ -15,6 +15,12 @@
 #include <mysql.h>
 #include <pthread.h>
 
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define AT __FILE__ ":" TOSTRING(__LINE__)
+void __proxy_error(const char*loc, const char *fmt, ...);
+#define proxy_error(fmt, ...) __proxy_error(AT, fmt, ##__VA_ARGS__)
+
 #include "proxy_net.h"
 #include "proxy_backend.h"
 #include "proxy_pool.h"
@@ -45,12 +51,6 @@ typedef struct st_proxy_thread {
     proxy_work_t *work;
 } proxy_thread_t;
 proxy_thread_t threads[PROXY_THREADS];
-
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define AT __FILE__ ":" TOSTRING(__LINE__)
-void __proxy_error(const char*loc, const char *fmt, ...);
-#define proxy_error(fmt, ...) __proxy_error(AT, fmt, ##__VA_ARGS__)
 
 /* from client/sql_string.h */
 uint32 copy_and_convert(char *to, uint32 to_length, CHARSET_INFO *to_cs,

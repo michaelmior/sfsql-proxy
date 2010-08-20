@@ -85,7 +85,7 @@ static void server_run(int port) {
         /* Give work to thread and signal it to go */
         proxy_mutex_lock(&(thread->lock));
         thread->work = work;
-        pthread_cond_signal(&(thread->cv));
+        proxy_cond_signal(&(thread->cv));
         proxy_mutex_unlock(&(thread->lock));
     }
 
@@ -99,7 +99,7 @@ static void cancel_threads() {
     for (i=0; i<PROXY_THREADS; i++) {
         /* Make sure worker threads release their mutex */
         proxy_mutex_lock(&(threads[i].lock));
-        pthread_cond_signal(&(threads[i].cv));
+        proxy_cond_signal(&(threads[i].cv));
         proxy_mutex_unlock(&(threads[i].lock));
 
         /* Cancel the running thead */
@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
     /* Create the new threads */
     for (i=0; i<PROXY_THREADS; i++) {
         threads[i].id = i;
-        pthread_cond_init(&(threads[i].cv), NULL);
+        proxy_cond_init(&(threads[i].cv));
         proxy_mutex_init(&threads[i].lock);
         threads[i].work = NULL;
 
@@ -246,7 +246,7 @@ out:
         printf("Joining thread %d\n", i);
         pthread_join(threads[i].thread, NULL);
 
-        pthread_cond_destroy(&(threads[i].cv));
+        proxy_cond_destroy(&(threads[i].cv));
         proxy_mutex_destroy(&(threads[i].lock));
     }
 

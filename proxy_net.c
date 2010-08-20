@@ -187,7 +187,7 @@ void* proxy_new_thread(void *ptr) {
     while (1) {
         /* Wait for work to be available */
         proxy_mutex_lock(&(thread->lock));
-        pthread_cond_wait(&(thread->cv), &(thread->lock));
+        proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         printf("Thread %d signaled\n", thread->id);
 

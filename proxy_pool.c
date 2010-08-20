@@ -16,7 +16,7 @@ pool_t* proxy_pool_new(int size) {
     for (i=0; i<size; i++)
         proxy_mutex_init(&(new_pool->locks[i]));
 
-    pthread_cond_init(new_pool->avail_cv, NULL);
+    proxy_cond_init(new_pool->avail_cv);
     proxy_mutex_init(new_pool->avail_mutex);
 
     return new_pool;
@@ -27,7 +27,7 @@ static int pool_try_locks(pool_t *pool) {
 
     /* Check if any object in the pool is already available */
     for (i=0; i<pool->size; i++) {
-        if (pthread_mutex_trylock(&(pool->locks[i])) == 0)
+        if (proxy_mutex_trylock(&(pool->locks[i])) == 0)
             return i;
     }
 
@@ -44,12 +44,12 @@ int proxy_get_from_pool(pool_t *pool) {
     /* Wait for something to become available */
     while (1) {
         printf("No more threads :( I'll wait...\n");
-        pthread_mutex_lock(pool->avail_mutex);
-        pthread_cond_wait(pool->avail_cv, pool->avail_mutex);
+        proxy_mutex_lock(pool->avail_mutex);
+        proxy_cond_wait(pool->avail_cv, pool->avail_mutex);
 
         idx = pool_try_locks(pool);
 
-        pthread_mutex_unlock(pool->avail_mutex);
+        proxy_mutex_unlock(pool->avail_mutex);
 
         if (idx >= 0)
             return idx;
@@ -61,10 +61,10 @@ int proxy_pool_get_locked(pool_t *pool) {
     int i;
 
     for (i=0; i<pool->size; i++) {
-        if (pthread_mutex_trylock(&(pool->locks[i])) == EBUSY)
+        if (proxy_mutex_trylock(&(pool->locks[i])) == EBUSY)
             return i;
 
-        pthread_mutex_unlock(&(pool->locks[i]));
+        proxy_mutex_unlock(&(pool->locks[i]));
     }
 
     return -1;
@@ -74,11 +74,11 @@ void proxy_return_to_pool(pool_t *pool, int idx) {
     printf("You can have %d back\n", idx);
     
     /* Unlock the associated mutex */
-    pthread_mutex_unlock(&(pool->locks[idx]));
+    proxy_mutex_unlock(&(pool->locks[idx]));
 
     /* Signify availability in case someone is waiting */
     proxy_mutex_lock(pool->avail_mutex);
-    pthread_cond_signal(pool->avail_cv);
+    proxy_cond_signal(pool->avail_cv);
     proxy_mutex_unlock(pool->avail_mutex);
 }
 
@@ -95,7 +95,7 @@ void proxy_pool_destroy(pool_t *pool) {
     }
     free(pool->locks);
 
-    pthread_cond_destroy(pool->avail_cv);
+    proxy_cond_destroy(pool->avail_cv);
     free(pool->avail_cv);
     proxy_mutex_destroy(pool->avail_mutex);
     free(pool->avail_mutex);
