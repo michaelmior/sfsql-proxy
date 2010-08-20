@@ -56,7 +56,8 @@ int static inline __proxy_get_mutex(pthread_mutex_t *m, int(*func)(pthread_mutex
         case 0: 
             break; 
         case EBUSY: 
-            __proxy_error(loc, "Locking already locked mutex"); 
+            if (func != pthread_mutex_trylock)
+                __proxy_error(loc, "Locking already locked mutex"); 
             break; 
         case EINVAL: 
             __proxy_error(loc, "Locking uninitialized mutex"); 
