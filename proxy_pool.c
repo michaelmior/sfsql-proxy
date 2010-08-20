@@ -91,13 +91,13 @@ void proxy_pool_destroy(pool_t *pool) {
         proxy_mutex_trylock(&(pool->locks[i]));
         proxy_mutex_unlock(&(pool->locks[i]));
 
-        pthread_mutex_destroy(&(pool->locks[i]));
+        proxy_mutex_destroy(&(pool->locks[i]));
     }
     free(pool->locks);
 
     pthread_cond_destroy(pool->avail_cv);
     free(pool->avail_cv);
-    pthread_mutex_destroy(pool->avail_mutex);
+    proxy_mutex_destroy(pool->avail_mutex);
     free(pool->avail_mutex);
 
     /* Finally, free the pool itself */

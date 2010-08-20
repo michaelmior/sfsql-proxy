@@ -247,7 +247,7 @@ out:
         pthread_join(threads[i].thread, NULL);
 
         pthread_cond_destroy(&(threads[i].cv));
-        pthread_mutex_destroy(&(threads[i].lock));
+        proxy_mutex_destroy(&(threads[i].lock));
     }
 
     proxy_backend_close();

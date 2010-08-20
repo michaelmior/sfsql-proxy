@@ -24,6 +24,20 @@ pthread_mutexattr_t __proxy_mutexattr;
 #endif
 
 #ifdef DEBUG
+#define proxy_mutex_destroy(m) \
+    switch (pthread_mutex_destroy(m)) { \
+        case 0: \
+            break; \
+        case EBUSY: \
+            proxy_error("Destroying locked mutex"); \
+            break; \
+        case EINVAL: \
+            proxy_error("Destroying invalid mutex"); \
+            break; \
+    } 
+#endif
+
+#ifdef DEBUG
 #define __proxy_get_mutex(m, type) \
     switch (pthread_mutex_##type(m)) { \
         case 0: \
