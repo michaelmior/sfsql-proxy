@@ -1,9 +1,24 @@
 void proxy_threading_init();
 void proxy_threading_end();
 
+
 #ifdef DEBUG
 pthread_mutexattr_t __proxy_mutexattr;
-#define proxy_mutex_init(m) pthread_mutex_init(m, &__proxy_mutexattr)
+
+#define proxy_mutex_init(m) \
+    switch (pthread_mutex_init(m, &__proxy_mutexattr)) { \
+        case 0: \
+            break; \
+        case EAGAIN: \
+            proxy_error("No resources for initializing mutex"); \
+            break; \
+        case ENOMEM: \
+            proxy_error("No memory for initializing mutex"); \
+            break; \
+        case EPERM: \
+            proxy_error("Invalid privilege to initialize mutex"); \
+            break; \
+    }
 #else
 #define proxy_mutex_init(m) pthread_mutex_init(m, NULL) 
 #endif
