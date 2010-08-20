@@ -11,7 +11,7 @@ all: sfsql-proxy
 
 clean:
 	rm -f *.o
-	rm sfsql-proxy
+	rm -f sfsql-proxy
 
 $(OBJS): %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
