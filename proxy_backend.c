@@ -30,6 +30,7 @@
 
 static MYSQL *mysql_backend[BACKENDS];
 static pool_t *backend_pool;
+static my_bool backend_autocommit;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
@@ -98,7 +99,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
     return FALSE;
 }
 
-int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db) {
+int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db, my_bool autocommit) {
     int i;
     
     /* Initialize a pool for locking backend access */
@@ -128,7 +129,11 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
                     mysql_error(mysql_backend[i]));
             return -1;
         }
+
+        /* Set autocommit option if specified */
+        mysql_autocommit(mysql_backend[i], autocommit);
     }
+    backend_autocommit = autocommit;
 
     return 0;
 }

@@ -153,19 +153,23 @@ static void usage() {
     printf(
             "SnowFlock SQL proxy server - (C) Michael Mior <mmior@cs.toronto.edu>, 2010\n\n"
             "Options:\n"
-            "\t--help,         -?\tShow this message\n"
-            "\t--backend-host, -h\tHost to forward queries to\n"
-            "\t--backend-port, -p\tPort of the backend host\n"
-            "\t--backend-db,   -D\tName of database on the backend\n"
-            "\t--backend-user, -u\tUser for backend server\n"
+            "\t--help,         -?\tShow this message\n\n"
+            "Backend options:\n"
+            "\t--backend-host, -h\tHost to forward queries to (default: 127.0.0.1)\n"
+            "\t--backend-port, -p\tPort of the backend host (default: 3306)\n"
+            "\t--backend-db,   -D\tName of database on the backend (default: test)\n"
+            "\t--backend-user, -u\tUser for backend server (default: root)\n"
             "\t--backend-pass, -p\tPassword for backend user\n\n"
-            "\t--proxy-port,   -L\tPort for the proxy server to listen on\n"
+            "\t                -a\tDisable autocommit (default is enabled)\n\n"
+            "Proxy options:\n"
+            "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n"
     );
 }
 
 int main(int argc, char *argv[]) {
     int error, bport, pport, c, i;
     char *host, *db, *user, *pass;
+    my_bool autocommit = TRUE;
     pthread_attr_t attr;
 
     /* Set arguments to default values */
@@ -190,7 +194,7 @@ int main(int argc, char *argv[]) {
         };
 
         int opt = 0;
-        c = getopt_long(argc, argv, "?h:P:D:u:p:L:", long_options, &opt);
+        c = getopt_long(argc, argv, "?h:P:D:u:p:aAL:", long_options, &opt);
 
         if (c == -1)
             break;
@@ -213,6 +217,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 pass = strdup(optarg);
+                break;
+            case 'a':
+                autocommit = FALSE;
                 break;
             case 'L':
                 pport = atoi(optarg);
@@ -250,7 +257,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Connect to the backend server (default parameters for now) */
-    if ((error = proxy_backend_connect(host, bport, user, pass, db)))
+    if ((error = proxy_backend_connect(host, bport, user, pass, db, autocommit)))
         goto out;
 
     /* Start proxying */
