@@ -167,17 +167,17 @@ static void usage() {
 }
 
 int main(int argc, char *argv[]) {
-    int error, bport, pport, c, i;
-    char *host, *db, *user, *pass;
+    int error, pport, c, i;
+    proxy_backend_t backend;
     my_bool autocommit = TRUE;
     pthread_attr_t attr;
 
     /* Set arguments to default values */
-    host =  BACKEND_HOST;
-    db =    BACKEND_DB;
-    user =  BACKEND_USER;
-    pass =  BACKEND_PASS;
-    bport = BACKEND_PORT;
+    backend.host =  BACKEND_HOST;
+    backend.db =    BACKEND_DB;
+    backend.user =  BACKEND_USER;
+    backend.pass =  BACKEND_PASS;
+    backend.port =  BACKEND_PORT;
     pport = PROXY_PORT;
 
     /* Parse command-line options */
@@ -204,19 +204,19 @@ int main(int argc, char *argv[]) {
                 usage();
                 return EXIT_FAILURE;
             case 'h':
-                host = strdup(optarg);
+                backend.host = strdup(optarg);
                 break;
             case 'P':
-                bport = atoi(optarg);
+                backend.port = atoi(optarg);
                 break;
             case 'D':
-                db = strdup(optarg);
+                backend.db = strdup(optarg);
                 break;
             case 'u':
-                user = strdup(optarg);
+                backend.user = strdup(optarg);
                 break;
             case 'p':
-                pass = strdup(optarg);
+                backend.pass = strdup(optarg);
                 break;
             case 'a':
                 autocommit = FALSE;
@@ -257,7 +257,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Connect to the backend server (default parameters for now) */
-    if ((error = proxy_backend_connect(host, bport, user, pass, db, autocommit)))
+    if ((error = proxy_backend_connect(&backend, autocommit)))
         goto out;
 
     /* Start proxying */

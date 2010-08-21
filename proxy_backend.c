@@ -99,7 +99,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
     return FALSE;
 }
 
-int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db, my_bool autocommit) {
+int proxy_backend_connect(proxy_backend_t *backend, my_bool autocommit) {
     int i;
     
     /* Initialize a pool for locking backend access */
@@ -107,12 +107,12 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
 
     /* Set default parameters use empty strings
      * to specify NULL */
-    if (*user == '\0')
-        user = NULL;
-    if (*pass == '\0')
-        pass = NULL;
-    if (*db == '\0')
-        db = NULL;
+    if (*(backend->user) == '\0')
+        backend->user = NULL;
+    if (*(backend->pass) == '\0')
+        backend->pass = NULL;
+    if (*(backend->db) == '\0')
+        backend->db = NULL;
 
     /* Connect to all backends */
     for (i=0; i<BACKENDS; i++) {
@@ -124,7 +124,7 @@ int proxy_backend_connect(char *host, int port, char *user, char *pass, char *db
         }
 
         if (!mysql_real_connect(mysql_backend[i],
-                    host, user, pass, db, port, NULL, 0)) {
+                    backend->host, backend->user, backend->pass, backend->db, backend->port, NULL, 0)) {
             proxy_error("Failed to connect to MySQL backend: %s",
                     mysql_error(mysql_backend[i]));
             return -1;
