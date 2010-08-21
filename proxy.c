@@ -179,13 +179,13 @@ int main(int argc, char *argv[]) {
     /* Parse command-line options */
     while(1) {
         static struct option long_options[] = {
-            {"help",         optional_argument, 0, '?'},
-            {"backend-host", optional_argument, 0, 'h'},
-            {"backend-port", optional_argument, 0, 'P'},
-            {"backend-db",   optional_argument, 0, 'D'},
-            {"backend-user", optional_argument, 0, 'u'},
-            {"backend-pass", optional_argument, 0, 'p'},
-            {"proxy-port",   optional_argument, 0, 'L'},
+            {"help",         no_argument,       0, '?'},
+            {"backend-host", required_argument, 0, 'h'},
+            {"backend-port", required_argument, 0, 'P'},
+            {"backend-db",   required_argument, 0, 'D'},
+            {"backend-user", required_argument, 0, 'u'},
+            {"backend-pass", required_argument, 0, 'p'},
+            {"proxy-port",   required_argument, 0, 'L'},
             {0, 0, 0, 0}
         };
 
