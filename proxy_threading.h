@@ -106,7 +106,7 @@ int static inline __proxy_mutex_unlock(pthread_mutex_t *m, char *loc) {
             __proxy_error(loc, "Unlocking mutex with invalid pointer"); 
             break; 
         case EPERM: 
-            __proxy_error(loc, "Unlocking mutex without lock"); 
+            __proxy_error(loc, "Unlocking unowned mutex"); 
             break; 
     }
     return ret;
