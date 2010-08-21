@@ -1,3 +1,17 @@
+/* 
+ * proxy_threading.h
+ *
+ * Hide pthreads functions to provide useful debugging
+ *
+ * This file is subject to the terms and conditions of the GNU General
+ * Public License.  See the file "COPYING" in the main directory of
+ * this archive for more details.
+ *
+ * Copyright (C) 2010 by Michael Mior <mmior@cs.toronto.edu>
+ *
+ */
+
+
 #ifndef _proxy_threading_h
 #define _proxy_threading_h
 
