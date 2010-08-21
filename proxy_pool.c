@@ -95,7 +95,9 @@ int proxy_pool_get_locked(pool_t *pool) {
 void proxy_return_to_pool(pool_t *pool, int idx) {
     printf("You can have %d back\n", idx);
     
-    /* Unlock the associated mutex */
+    /* Unlock the associated mutex if locked */
+    if (proxy_mutex_trylock(&(pool->locks[idx])) == EBUSY)
+        proxy_error("Trying to free lock from already free pool");
     proxy_mutex_unlock(&(pool->locks[idx]));
 
     /* Signify availability in case someone is waiting */
