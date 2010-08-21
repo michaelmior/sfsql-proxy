@@ -159,7 +159,7 @@ static void usage() {
             "\t--backend-db,   -D\tName of database on the backend\n"
             "\t--backend-user, -u\tUser for backend server\n"
             "\t--backend-pass, -p\tPassword for backend user\n\n"
-            "\t--proxy-port, -L\tPort for the proxy server to listen on\n"
+            "\t--proxy-port,   -L\tPort for the proxy server to listen on\n"
     );
 }
 
