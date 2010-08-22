@@ -13,7 +13,7 @@
 #define _proxy_pool_h
 
 typedef struct st_pool {
-    int size;
+    int size, __alloc;
     my_bool *avail;
     pthread_mutex_t lock;
     pthread_cond_t *avail_cv;
@@ -21,6 +21,8 @@ typedef struct st_pool {
 } pool_t;
 
 pool_t* proxy_pool_new(int size);
+void proxy_pool_set_size(pool_t *pool, int size);
+void proxy_pool_remove(pool_t *pool, int idx);
 int proxy_get_from_pool(pool_t *pool);
 void proxy_return_to_pool(pool_t *pool, int idx);
 int proxy_pool_get_locked(pool_t *pool);

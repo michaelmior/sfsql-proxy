@@ -25,24 +25,72 @@
 static int pool_try_locks(pool_t *pool);
 
 pool_t* proxy_pool_new(int size) {
-    int i;
+    int i, alloc=1;
     pool_t *new_pool = (pool_t *) malloc(sizeof(pool_t));
 
     /* Allocate memory for the lock pool */
     new_pool->size = size;
-    new_pool->avail = (my_bool*) calloc(size, sizeof(my_bool));
+
+    /* Find the nearest power of two */
+    while (alloc < size)
+        alloc <<= 1;
+
+    new_pool->avail = (my_bool*) calloc(alloc, sizeof(my_bool));
     new_pool->avail_cv = (pthread_cond_t*) malloc(sizeof(pthread_cond_t));
     new_pool->avail_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
 
     /* Set up availability */
-    for (i=0; i<size; i++)
+    for (i=0; i<alloc; i++)
         new_pool->avail[i] = TRUE;
+
+    new_pool->__alloc = alloc;
 
     /* Initialize mutexes */
     proxy_cond_init(new_pool->avail_cv);
     proxy_mutex_init(new_pool->avail_mutex);
 
     return new_pool;
+}
+
+void proxy_pool_set_size(pool_t *pool, int size) {
+    int alloc=1, i;
+    my_bool *avail;
+
+    if (size == pool->size)
+        return;
+
+    proxy_mutex_lock(&(pool->lock));
+
+    /* Get the new allocated size */
+    while (alloc < size)
+        alloc <<= 1;
+
+    /* Allocate a new array and copy old availability */
+    if (alloc != pool->__alloc) {
+        avail = (my_bool*) calloc(alloc, sizeof(my_bool));
+
+        for (i=0; i<size; i++)
+            avail[i] = pool->avail[i];
+        free(pool->avail);
+        pool->avail = avail;
+    }
+
+    pool->size = size;
+
+    proxy_mutex_unlock(&(pool->lock));
+}
+
+void proxy_pool_remove(pool_t *pool, int idx) {
+    int i;
+
+    if (idx >= pool->size)
+        return;
+
+    proxy_pool_set_size(pool, pool->size-1);
+
+    /* Shift all elements */
+    for (i=idx; i<pool->size-1; i++)
+        pool->avail[i] = pool->avail[i+1];
 }
 
 static int pool_try_locks(pool_t *pool) {
