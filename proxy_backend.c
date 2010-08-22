@@ -28,7 +28,7 @@
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
 #define BACKENDS 10
 
-static MYSQL *mysql_backend[BACKENDS];
+static MYSQL **mysql_backend;
 static pool_t *backend_pool;
 static my_bool backend_autocommit;
 
@@ -129,6 +129,8 @@ int proxy_backend_connect(proxy_backend_t *backend, my_bool autocommit) {
     /* Initialize a pool for locking backend access */
     backend_pool = proxy_pool_new(BACKENDS);
 
+    mysql_backend = (MYSQL**) calloc(BACKENDS, sizeof(MYSQL*));
+
     /* Set default parameters use empty strings
      * to specify NULL */
     if (*(backend->user) == '\0')
@@ -213,4 +215,6 @@ void proxy_backend_close() {
     /* Close connection with backends */
     for (i=0; i<BACKENDS; i++)
         mysql_close(mysql_backend[i]);
+
+    free(mysql_backend);
 }
