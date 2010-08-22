@@ -34,6 +34,8 @@
 
 volatile sig_atomic_t run = 1;
 
+static void server_run(char *host, int port);
+
 /* Output error message */
 void __proxy_error(const char *loc, const char *fmt, ...) {
     va_list arg;
@@ -44,11 +46,12 @@ void __proxy_error(const char *loc, const char *fmt, ...) {
     fprintf(stderr, " at %s\n", loc);
 }
 
-static void server_run(int port) {
+static void server_run(char *host, int port) {
     int serverfd, clientfd;
     fd_set fds;
     unsigned int clientlen;
     struct sockaddr_in serveraddr, clientaddr;
+    struct hostent *hostinfo;
     proxy_work_t *work;
     proxy_thread_t *thread;
 
@@ -65,7 +68,20 @@ static void server_run(int port) {
     /* Intialize the server address */
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin_family = AF_INET;
-    serveraddr.sin_addr.s_addr = htonl(INADDR_ANY); //TODO: allow specification of binding address
+
+    /* Set the binding address */
+    if (host) {
+        hostinfo = gethostbyname(host);
+        if (!hostinfo) {
+            proxy_error("Invalid binding address %s\n", host);
+            return;
+        } else {
+            serveraddr.sin_addr = *(struct in_addr*) hostinfo->h_addr;
+        }
+    } else {
+        serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+
     serveraddr.sin_port = htons((unsigned short) port);
 
     /* Bind the socket and start accepting connections */
@@ -162,6 +178,7 @@ static void usage() {
             "\t--backend-pass, -p\tPassword for backend user\n\n"
             "\t                -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
+            "\t                -b\tBinding address (default is 0.0.0.0)\n"
             "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n"
     );
 }
@@ -170,6 +187,7 @@ int main(int argc, char *argv[]) {
     int error, pport, c, i;
     proxy_backend_t backend;
     my_bool autocommit = TRUE;
+    char *phost = NULL;
     pthread_attr_t attr;
 
     /* Set arguments to default values */
@@ -194,7 +212,7 @@ int main(int argc, char *argv[]) {
         };
 
         int opt = 0;
-        c = getopt_long(argc, argv, "?h:P:D:u:p:aAL:", long_options, &opt);
+        c = getopt_long(argc, argv, "?h:P:D:u:p:aAb:L:", long_options, &opt);
 
         if (c == -1)
             break;
@@ -220,6 +238,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'a':
                 autocommit = FALSE;
+                break;
+            case 'b':
+                phost = strdup(optarg);
                 break;
             case 'L':
                 pport = atoi(optarg);
@@ -261,8 +282,8 @@ int main(int argc, char *argv[]) {
         goto out;
 
     /* Start proxying */
-    printf("Starting proxy on port %d\n", pport);
-    server_run(pport);
+    printf("Starting proxy on %s:%d\n", phost ?: "0.0.0.0", pport);
+    server_run(phost, pport);
 
     /* Shutdown */
 out:
