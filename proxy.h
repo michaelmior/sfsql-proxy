@@ -44,6 +44,7 @@ void __proxy_error(const char*loc, const char *fmt, ...);
 #define BACKEND_USER  "root"
 #define BACKEND_PASS  "root"
 #define BACKEND_DB    "test"
+#define NUM_BACKENDS  10
 
 #define PROXY_PORT    4040
 #define PROXY_THREADS 10

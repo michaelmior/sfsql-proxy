@@ -20,7 +20,7 @@ typedef struct st_proxy_backend {
     char *db;
 } proxy_backend_t;
 
-int proxy_backend_connect(proxy_backend_t *backend, my_bool autocommit);
+int proxy_backend_connect(proxy_backend_t *backend, int num_backends, my_bool autocommit);
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length);
 void proxy_backend_close();
 

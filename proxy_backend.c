@@ -26,11 +26,11 @@
 #include <client_settings.h>
 
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
-#define BACKENDS 10
 
 static MYSQL **mysql_backend;
 static pool_t *backend_pool;
 static my_bool backend_autocommit;
+static int backend_num;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
@@ -123,13 +123,15 @@ int backend_connect(MYSQL **mysql, proxy_backend_t *backend, my_bool autocommit)
     return 0;
 }
 
-int proxy_backend_connect(proxy_backend_t *backend, my_bool autocommit) {
+int proxy_backend_connect(proxy_backend_t *backend, int num_backends, my_bool autocommit) {
     int i;
+
+    backend_num = num_backends;
     
     /* Initialize a pool for locking backend access */
-    backend_pool = proxy_pool_new(BACKENDS);
+    backend_pool = proxy_pool_new(backend_num);
 
-    mysql_backend = (MYSQL**) calloc(BACKENDS, sizeof(MYSQL*));
+    mysql_backend = (MYSQL**) calloc(backend_num, sizeof(MYSQL*));
 
     /* Set default parameters use empty strings
      * to specify NULL */
@@ -141,7 +143,7 @@ int proxy_backend_connect(proxy_backend_t *backend, my_bool autocommit) {
         backend->db = NULL;
 
     /* Connect to all backends */
-    for (i=0; i<BACKENDS; i++)
+    for (i=0; i<backend_num; i++)
         if (backend_connect(&(mysql_backend[i]), backend, autocommit) < 0)
             return -1;
 
@@ -213,7 +215,7 @@ void proxy_backend_close() {
     proxy_pool_destroy(backend_pool);
 
     /* Close connection with backends */
-    for (i=0; i<BACKENDS; i++)
+    for (i=0; i<backend_num; i++)
         mysql_close(mysql_backend[i]);
 
     free(mysql_backend);
