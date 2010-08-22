@@ -178,7 +178,7 @@ static void usage() {
             "\t--backend-pass, -p\tPassword for backend user\n\n"
             "\t                -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
-            "\t                -b\tBinding address (default is 0.0.0.0)\n"
+            "\t--proxy-host,   -b\tBinding address (default is 0.0.0.0)\n"
             "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n"
     );
 }
@@ -207,6 +207,7 @@ int main(int argc, char *argv[]) {
             {"backend-db",   required_argument, 0, 'D'},
             {"backend-user", required_argument, 0, 'u'},
             {"backend-pass", required_argument, 0, 'p'},
+            {"proxy-host",   required_argument, 0, 'b'},
             {"proxy-port",   required_argument, 0, 'L'},
             {0, 0, 0, 0}
         };
