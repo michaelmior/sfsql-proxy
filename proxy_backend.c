@@ -31,10 +31,13 @@ static MYSQL **mysql_backend;
 static pool_t *backend_pool;
 static my_bool backend_autocommit;
 static int backend_num;
+static char *backend_user;
+static char *backend_pass;
+static char *backend_db;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
-static int backend_connect(MYSQL **mysql, proxy_backend_t *backend, my_bool autocommit);
+static int backend_connect(MYSQL **mysql, proxy_backend_t *backend, char *user, char *pass, char *db, my_bool autocommit);
 
 /* derived from sql/client.c:cli_safe_read */
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
@@ -101,7 +104,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
 }
 
 /* Connect to a backend server with the given address and autocommit option */
-int backend_connect(MYSQL **mysql, proxy_backend_t *backend, my_bool autocommit) {
+int backend_connect(MYSQL **mysql, proxy_backend_t *backend, char *user, char* pass, char *db, my_bool autocommit) {
     *mysql = NULL;
     *mysql = mysql_init(NULL);
 
@@ -111,7 +114,7 @@ int backend_connect(MYSQL **mysql, proxy_backend_t *backend, my_bool autocommit)
     }
 
     if (!mysql_real_connect(*mysql,
-                backend->host, backend->user, backend->pass, backend->db, backend->port, NULL, 0)) {
+                backend->host, user, pass, db, backend->port, NULL, 0)) {
         proxy_error("Failed to connect to MySQL backend: %s",
                 mysql_error(*mysql));
         return -1;
@@ -123,10 +126,13 @@ int backend_connect(MYSQL **mysql, proxy_backend_t *backend, my_bool autocommit)
     return 0;
 }
 
-int proxy_backend_connect(proxy_backend_t *backend, int num_backends, my_bool autocommit) {
+int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
     int i;
 
-    backend_num = num_backends;
+    backend_user = user;
+    backend_pass = pass;
+    backend_db =   db;
+    backend_num =  num_backends;
     
     /* Initialize a pool for locking backend access */
     backend_pool = proxy_pool_new(backend_num);
@@ -135,16 +141,16 @@ int proxy_backend_connect(proxy_backend_t *backend, int num_backends, my_bool au
 
     /* Set default parameters use empty strings
      * to specify NULL */
-    if (*(backend->user) == '\0')
-        backend->user = NULL;
-    if (*(backend->pass) == '\0')
-        backend->pass = NULL;
-    if (*(backend->db) == '\0')
-        backend->db = NULL;
+    if (*user == '\0')
+        user = NULL;
+    if (*pass == '\0')
+        pass = NULL;
+    if (*db == '\0')
+        db = NULL;
 
     /* Connect to all backends */
     for (i=0; i<backend_num; i++)
-        if (backend_connect(&(mysql_backend[i]), backend, autocommit) < 0)
+        if (backend_connect(&(mysql_backend[i]), backend, user, pass, db, autocommit) < 0)
             return -1;
 
     backend_autocommit = autocommit;
