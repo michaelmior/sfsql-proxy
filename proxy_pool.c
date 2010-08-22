@@ -30,14 +30,15 @@ pool_t* proxy_pool_new(int size) {
 
     /* Allocate memory for the lock pool */
     new_pool->size = size;
-    new_pool->locks = (pthread_mutex_t*) calloc(size, sizeof(pthread_mutex_t));
+    new_pool->avail = (my_bool*) calloc(size, sizeof(my_bool));
     new_pool->avail_cv = (pthread_cond_t*) malloc(sizeof(pthread_cond_t));
     new_pool->avail_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
 
-    /* Initialize mutexes */
+    /* Set up availability */
     for (i=0; i<size; i++)
-        proxy_mutex_init(&(new_pool->locks[i]));
+        new_pool->avail[i] = TRUE;
 
+    /* Initialize mutexes */
     proxy_cond_init(new_pool->avail_cv);
     proxy_mutex_init(new_pool->avail_mutex);
 
@@ -46,20 +47,24 @@ pool_t* proxy_pool_new(int size) {
 
 static int pool_try_locks(pool_t *pool) {
     int i;
+    proxy_mutex_lock(&(pool->lock));
 
-    /* Check if any object in the pool is already available */
+    /* Check availability of items in the pool */
     for (i=0; i<pool->size; i++) {
-        if (proxy_mutex_trylock(&(pool->locks[i])) == 0)
+        if (pool->avail[i]) {
+            pool->avail[i] = FALSE;
+            proxy_mutex_unlock(&(pool->lock));
             return i;
+        }
     }
 
+    proxy_mutex_unlock(&(pool->lock));
     return -1;
 }
 
 int proxy_get_from_pool(pool_t *pool) {
     int idx;
 
-    /* See if any objects are available */
     if ((idx = pool_try_locks(pool)) >= 0)
         return idx;
 
@@ -82,23 +87,29 @@ int proxy_get_from_pool(pool_t *pool) {
 int proxy_pool_get_locked(pool_t *pool) {
     int i;
 
-    for (i=0; i<pool->size; i++) {
-        if (proxy_mutex_trylock(&(pool->locks[i])) == EBUSY)
-            return i;
+    proxy_mutex_lock(&(pool->lock));
 
-        proxy_mutex_unlock(&(pool->locks[i]));
+    for (i=0; i<pool->size; i++) {
+        if (!(pool->avail[i])) {
+            proxy_mutex_unlock(&(pool->lock));
+            return i;
+        }
     }
 
+    proxy_mutex_unlock(&(pool->lock));
     return -1;
 }
 
 void proxy_return_to_pool(pool_t *pool, int idx) {
     printf("You can have %d back\n", idx);
     
-    /* Unlock the associated mutex if locked */
-    if (proxy_mutex_trylock(&(pool->locks[idx])) != EBUSY)
+    /* Update the item availability */
+    proxy_mutex_lock(&(pool->lock));
+    if (pool->avail[idx])
         proxy_error("Trying to free lock from already free pool");
-    proxy_mutex_unlock(&(pool->locks[idx]));
+    else
+        pool->avail[idx] = TRUE;
+    proxy_mutex_unlock(&(pool->lock));
 
     /* Signify availability in case someone is waiting */
     proxy_mutex_lock(pool->avail_mutex);
@@ -107,17 +118,12 @@ void proxy_return_to_pool(pool_t *pool, int idx) {
 }
 
 void proxy_pool_destroy(pool_t *pool) {
-    int i;
+    /* Unlock the mutex if locked */
+    proxy_mutex_trylock(&(pool->lock));
+    proxy_mutex_unlock(&(pool->lock));
+    proxy_mutex_destroy(&(pool->lock));
 
-    /* Free all the mutexes */
-    for (i=0; i<pool->size; i++) {
-        /* Unlock the mutex if locked */
-        proxy_mutex_trylock(&(pool->locks[i]));
-        proxy_mutex_unlock(&(pool->locks[i]));
-
-        proxy_mutex_destroy(&(pool->locks[i]));
-    }
-    free(pool->locks);
+    free(pool->avail);
 
     proxy_cond_destroy(pool->avail_cv);
     free(pool->avail_cv);

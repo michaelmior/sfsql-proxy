@@ -14,7 +14,8 @@
 
 typedef struct st_pool {
     int size;
-    pthread_mutex_t *locks;
+    my_bool *avail;
+    pthread_mutex_t lock;
     pthread_cond_t *avail_cv;
     pthread_mutex_t *avail_mutex;
 } pool_t;
