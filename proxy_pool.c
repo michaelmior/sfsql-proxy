@@ -46,6 +46,7 @@ pool_t* proxy_pool_new(int size) {
     new_pool->__alloc = alloc;
 
     /* Initialize mutexes */
+    proxy_mutex_init(&(new_pool->lock));
     proxy_cond_init(new_pool->avail_cv);
     proxy_mutex_init(new_pool->avail_mutex);
 
@@ -95,6 +96,7 @@ void proxy_pool_remove(pool_t *pool, int idx) {
 
 static int pool_try_locks(pool_t *pool) {
     int i;
+
     proxy_mutex_lock(&(pool->lock));
 
     /* Check availability of items in the pool */
