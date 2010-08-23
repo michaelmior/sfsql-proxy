@@ -27,7 +27,7 @@
 
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
 
-static MYSQL **mysql_backend;
+static proxy_backend_t **backends;
 static pool_t *backend_pool;
 static my_bool backend_autocommit;
 static int backend_num;
@@ -38,7 +38,7 @@ static char *backend_db;
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
 void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
-static int backend_connect(MYSQL **mysql, proxy_backend_t *backend);
+static int backend_connect(proxy_backend_t *backend, int num);
 proxy_backend_t* backend_read_file(char *filename, int *num);
 
 /* derived from sql/client.c:cli_safe_read */
@@ -126,28 +126,33 @@ void backend_init(char *user, char *pass, char *db, int num_backends, my_bool au
     /* Initialize a pool for locking backend access */
     backend_pool = proxy_pool_new(backend_num);
     
-    mysql_backend = (MYSQL**) calloc(backend_num, sizeof(MYSQL*));
+    backends = (proxy_backend_t**) calloc(backend_num, sizeof(proxy_backend_t*));
 }
 
 /* Connect to a backend server with the given address and autocommit option */
-int backend_connect(MYSQL **mysql, proxy_backend_t *backend) {
-    *mysql = NULL;
-    *mysql = mysql_init(NULL);
+static int backend_connect(proxy_backend_t *backend, int num) {
+    MYSQL *mysql;
 
-    if (*mysql == NULL) {
+    mysql = backend->mysql = NULL;
+    mysql = mysql_init(NULL);
+
+    if (mysql == NULL) {
         proxy_error("Out of memory when allocating MySQL backend");
         return -1;
     }
 
-    if (!mysql_real_connect(*mysql,
+    if (!mysql_real_connect(mysql,
                 backend->host, backend_user, backend_pass, backend_db, backend->port, NULL, 0)) {
         proxy_error("Failed to connect to MySQL backend: %s",
-                mysql_error(*mysql));
+                mysql_error(mysql));
         return -1;
     }
 
     /* Set autocommit option if specified */
-    mysql_autocommit(*mysql, backend_autocommit);
+    mysql_autocommit(mysql, backend_autocommit);
+
+    backend->mysql = mysql;
+    backends[num] = backend;
 
     return 0;
 }
@@ -158,7 +163,7 @@ proxy_backend_t* backend_read_file(char *filename, int *num) {
     char *buf, *pch;
     long pos;
     int i, c=0;
-    proxy_backend_t *backends;
+    proxy_backend_t *new_backends;
 
     /* Get the end of the file */
     fseek(f, 0, SEEK_END);
@@ -184,19 +189,22 @@ proxy_backend_t* backend_read_file(char *filename, int *num) {
     }
 
     /* Allocate and read backends */
-    backends = (proxy_backend_t*) calloc(*num, sizeof(proxy_backend_t));
+    new_backends = (proxy_backend_t*) calloc(*num, sizeof(proxy_backend_t));
     i = 0;
     pch = strtok(buf, " :\r\n\t");
     while (pch != NULL) {
-        backends[i].host = strdup(pch);
+        new_backends[i].host = strdup(pch);
         pch = strtok(NULL, " :\r\n\t");
-        backends[i].port = atoi(pch);
+        new_backends[i].port = atoi(pch);
+
+        new_backends[i].mysql = NULL;
+
         pch = strtok(NULL, " :\r\n\t");
         i++;
     }
 
     free(buf);
-    return backends;
+    return new_backends;
 }
 
 int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
@@ -206,7 +214,7 @@ int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char
 
     /* Connect to all backends */
     for (i=0; i<backend_num; i++)
-        if (backend_connect(&(mysql_backend[i]), backend) < 0)
+        if (backend_connect(backend, i) < 0)
             return -1;
 
     backend_autocommit = autocommit;
@@ -222,7 +230,7 @@ int proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool
     backend_init(user, pass, db, num_backends, autocommit);
 
     for (i=0; i<num_backends; i++)
-        if (backend_connect(&(mysql_backend[i]), &(backends[i])))
+        if (backend_connect(&(backends[i]), i))
             return -1;
  
      return 0;
@@ -235,30 +243,31 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
 
     /* The call below will block until a backend is free  */
     int i, bi = proxy_get_from_pool(backend_pool);
-    MYSQL *backend = mysql_backend[bi];
+    proxy_backend_t *backend = backends[bi];
+    MYSQL *mysql = backend->mysql;
 
     /* XXX: need to sync with proxy? */
     printf("Sending query %s to backend %d\n", query, bi);
-    mysql_send_query(backend, query, length);
+    mysql_send_query(mysql, query, length);
 
     /* derived from sql/client.c:cli_read_query_result */
     /* read info and result header packets */
     for (i=0; i<2; i++) {
-        if ((pkt_len = backend_read_to_proxy(backend, proxy)) == packet_error) {
+        if ((pkt_len = backend_read_to_proxy(mysql, proxy)) == packet_error) {
             error = TRUE;
             goto out;
         }
 
         /* If the query doesn't return results, no more to do */
-        pos = (uchar*) backend->net.read_pos;
-        if (net_field_length(&pos) == 0 || backend->net.read_pos[0] == 255) {
+        pos = (uchar*) mysql->net.read_pos;
+        if (net_field_length(&pos) == 0 || mysql->net.read_pos[0] == 255) {
             error = FALSE;
             goto out; 
         }
     }
 
     /* read field info */
-    if (backend_read_rows(backend, proxy, 7)) {
+    if (backend_read_rows(mysql, proxy, 7)) {
         error = TRUE;
         goto out;
     }
@@ -271,7 +280,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
      * decide when to fetch rows. (Clients using mysql_use_result()
      * should still function, but with possible network overhead.
      * */
-    if (backend_read_rows(backend, proxy, backend->field_count)) {
+    if (backend_read_rows(mysql, proxy, mysql->field_count)) {
         error = TRUE;
         goto out;
     }
@@ -292,7 +301,7 @@ void proxy_backend_close() {
 
     /* Close connection with backends */
     for (i=0; i<backend_num; i++)
-        mysql_close(mysql_backend[i]);
+        mysql_close(backends[i]->mysql);
 
-    free(mysql_backend);
+    free(backends);
 }

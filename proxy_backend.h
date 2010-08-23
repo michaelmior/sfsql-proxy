@@ -15,6 +15,7 @@
 typedef struct st_proxy_backend {
     char *host;
     int port;
+    MYSQL *mysql;
 } proxy_backend_t;
 
 int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit);
