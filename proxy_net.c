@@ -31,7 +31,8 @@ static MYSQL* client_init(Vio *vio);
 void client_do_work(proxy_work_t *work);
 
 /* derived from sql/sql_connect.cc:check_connection */
-void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id) {
+/* XXX: not currently using thread ID */
+void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id __attribute__((unused))) {
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
     ulong server_caps, client_caps, pkt_len;
@@ -141,11 +142,17 @@ void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id
         }
 
         /* Ok, client. You're good to go */
-        proxy_send_ok(mysql, 0, 0, 0, 0);
+        proxy_send_ok(mysql, 0, 0, 0);
     }
 }
 
-my_bool proxy_check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len) {
+my_bool proxy_check_user(
+        char *user __attribute__((unused)),
+        uint user_len __attribute__((unused)),
+        char *passwd __attribute__((unused)),
+        uint passwd_len __attribute__((unused)),
+        char *db __attribute__((unused)),
+        uint db_len __attribute__((unused))) {
     /* XXX: Not doing auth. see sql/sql_connect.cc:check_user */
     return TRUE;
 }
@@ -313,7 +320,7 @@ int proxy_read_query(MYSQL *mysql) {
             break;
         case COM_PING:
             /* Yep, still here */
-            return proxy_send_ok(mysql, 0, 0, 0, 0) ? -1 : 0;
+            return proxy_send_ok(mysql, 0, 0, 0) ? -1 : 0;
             break;
 
         /* Commands below not implemented */
@@ -349,7 +356,7 @@ int proxy_read_query(MYSQL *mysql) {
 }
 
 /* derived from sql/protocol.cc:net_send_ok */
-my_bool proxy_send_ok(MYSQL *mysql, uint status, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
+my_bool proxy_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
     NET *net = &(mysql->net);
     uchar buff[MYSQL_ERRMSG_SIZE + 10], *pos;
 
