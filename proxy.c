@@ -187,19 +187,16 @@ static void usage() {
 }
 
 int main(int argc, char *argv[]) {
-    int error, pport, c, i, num_backends = NUM_BACKENDS;
+    int error, pport, c, i, num_backends=NUM_BACKENDS, ret=EXIT_SUCCESS;
     proxy_backend_t backend;
     my_bool autocommit = TRUE;
     char *user, *pass, *db, *phost, *backend_file;
     pthread_attr_t attr;
 
     /* Set arguments to default values */
-    backend.host =  BACKEND_HOST;
-    backend.port =  BACKEND_PORT;
-    user =          BACKEND_USER;
-    pass =          BACKEND_PASS;
-    db =            BACKEND_DB;
-    phost = backend_file = NULL;
+    backend.host = NULL;
+    backend.port = BACKEND_PORT;
+    user = pass = db = phost = backend_file = NULL;
     pport = PROXY_PORT;
 
     /* Parse command-line options */
@@ -260,13 +257,15 @@ int main(int argc, char *argv[]) {
                 break;
             default:
                 usage();
-                return EXIT_FAILURE;
+                ret = EXIT_FAILURE;
+                goto out_free;
         }
     }
 
     if (backend_file && (backend.host || backend.port > 0)) {
         usage();
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
+        goto out_free;
     }
 
     /* Threading initialization */
@@ -296,12 +295,24 @@ int main(int argc, char *argv[]) {
     }
 
     /* Connect to the backend server (default parameters for now) */
-    if (backend_file)
-        error = proxy_backends_connect(backend_file, user, pass, db, autocommit);
-    else
-        error = proxy_backend_connect(&backend, user, pass, db, num_backends, autocommit);
-    if (error)
+    if (backend_file) {
+        error = proxy_backends_connect(backend_file,
+                user ?: BACKEND_USER,
+                pass ?: BACKEND_PASS,
+                db ?:   BACKEND_DB,
+                autocommit);
+    } else {
+        backend.host = backend.host ?: strdup(BACKEND_HOST);
+        error = proxy_backend_connect(&backend,
+                user ?: BACKEND_USER,
+                pass ?: BACKEND_PASS,
+                db ?:   BACKEND_DB,
+                num_backends, autocommit);
+    }
+    if (error) {
+        ret = EXIT_FAILURE;
         goto out;
+    }
 
     /* Start proxying */
     printf("Starting proxy on %s:%d\n", phost ?: "0.0.0.0", pport);
@@ -328,5 +339,14 @@ out:
     mysql_library_end();
     proxy_threading_end();
 
-    return EXIT_SUCCESS;
+out_free:
+    /* Free additional memory */
+    free(backend.host);
+    free(user);
+    free(pass);
+    free(db);
+    free(backend_file);
+    free(phost);
+
+    return ret;
 }

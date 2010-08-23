@@ -29,6 +29,8 @@ CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
 static MYSQL* client_init(Vio *vio);
 void client_do_work(proxy_work_t *work);
+void client_destroy(proxy_thread_t *thread);
+void net_thread_destroy(void *ptr);
 
 /* derived from sql/sql_connect.cc:check_connection */
 /* XXX: not currently using thread ID */
@@ -181,8 +183,7 @@ static MYSQL* client_init(Vio *vio) {
     return mysql;
 }
 
-void client_destroy(void *ptr) {
-    proxy_thread_t *thread = (proxy_thread_t*) ptr;
+void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
 
     printf("Called client_destroy on thread %d\n", thread->id);
@@ -198,11 +199,16 @@ void client_destroy(void *ptr) {
             /* Clean up data structures */
             vio_delete(mysql->net.vio);
             mysql->net.vio = 0;
+            net_end(&(mysql->net));
             mysql_close(mysql);
         }
 
         free(thread->work);
     }
+}
+
+void net_thread_destroy(void *ptr) {
+    client_destroy((proxy_thread_t*) ptr);
 
     /* Free any remaining resources */
     mysql_thread_end();
@@ -211,7 +217,7 @@ void client_destroy(void *ptr) {
 void* proxy_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
 
-    pthread_cleanup_push(client_destroy, ptr);
+    pthread_cleanup_push(net_thread_destroy, ptr);
 
     while (1) {
         /* Wait for work to be available */
@@ -230,7 +236,7 @@ void* proxy_new_thread(void *ptr) {
 
         /* Handle client requests */
         client_do_work(thread->work);
-        free(thread->work);
+        client_destroy(thread);
         thread->work = NULL;
 
         /* Signify that we are available for work again */
