@@ -264,6 +264,11 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    if (backend_file && (backend.host || backend.port > 0)) {
+        usage();
+        return EXIT_FAILURE;
+    }
+
     /* Threading initialization */
     proxy_threading_init();
 
