@@ -176,7 +176,9 @@ static void usage() {
             "\t--backend-db,   -D\tName of database on the backend (default: test)\n"
             "\t--backend-user, -u\tUser for backend server (default: root)\n"
             "\t--backend-pass, -p\tPassword for backend user\n"
-            "\t--num-backends, -N\tNumber of backend connections\n"
+            "\t--backend-file, -f\tFile listing available backends\n"
+            "\t                  \t(cannot be specified with above options)\n"
+            "\t--num-backends, -N\tNumber connections per backend\n"
             "\t                -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
             "\t--proxy-host,   -b\tBinding address (default is 0.0.0.0)\n"
@@ -188,7 +190,7 @@ int main(int argc, char *argv[]) {
     int error, pport, c, i, num_backends = NUM_BACKENDS;
     proxy_backend_t backend;
     my_bool autocommit = TRUE;
-    char *user, *pass, *db, *phost;
+    char *user, *pass, *db, *phost, *backend_file;
     pthread_attr_t attr;
 
     /* Set arguments to default values */
@@ -197,7 +199,7 @@ int main(int argc, char *argv[]) {
     user =          BACKEND_USER;
     pass =          BACKEND_PASS;
     db =            BACKEND_DB;
-    phost = NULL;
+    phost = backend_file = NULL;
     pport = PROXY_PORT;
 
     /* Parse command-line options */
@@ -209,6 +211,7 @@ int main(int argc, char *argv[]) {
             {"backend-db",   required_argument, 0, 'D'},
             {"backend-user", required_argument, 0, 'u'},
             {"backend-pass", required_argument, 0, 'p'},
+            {"backend-file", required_argument, 0, 'f'},
             {"num-backends", required_argument, 0, 'N'},
             {"proxy-host",   required_argument, 0, 'b'},
             {"proxy-port",   required_argument, 0, 'L'},
@@ -216,7 +219,7 @@ int main(int argc, char *argv[]) {
         };
 
         int opt = 0;
-        c = getopt_long(argc, argv, "?h:P:D:u:p:N:aAb:L:", long_options, &opt);
+        c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:", long_options, &opt);
 
         if (c == -1)
             break;
@@ -239,6 +242,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 pass = strdup(optarg);
+                break;
+            case 'f':
+                backend_file = strdup(optarg);
                 break;
             case 'N':
                 num_backends = atoi(optarg);
@@ -285,7 +291,11 @@ int main(int argc, char *argv[]) {
     }
 
     /* Connect to the backend server (default parameters for now) */
-    if ((error = proxy_backend_connect(&backend, user, pass, db, num_backends, autocommit)))
+    if (backend_file)
+        error = proxy_backends_connect(backend_file, user, pass, db, autocommit);
+    else
+        error = proxy_backend_connect(&backend, user, pass, db, num_backends, autocommit);
+    if (error)
         goto out;
 
     /* Start proxying */

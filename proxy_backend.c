@@ -39,6 +39,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
 void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
 static int backend_connect(MYSQL **mysql, proxy_backend_t *backend);
+proxy_backend_t* backend_read_file(char *filename, int *num);
 
 /* derived from sql/client.c:cli_safe_read */
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
@@ -151,6 +152,53 @@ int backend_connect(MYSQL **mysql, proxy_backend_t *backend) {
     return 0;
 }
 
+/* Read a list of backends from file */
+proxy_backend_t* backend_read_file(char *filename, int *num) {
+    FILE *f = fopen(filename, "r");
+    char *buf, *pch;
+    long pos;
+    int i, c=0;
+    proxy_backend_t *backends;
+
+    /* Get the end of the file */
+    fseek(f, 0, SEEK_END);
+    pos = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    /* Read the entire file */
+    buf = (char*) malloc(pos);
+    fread(buf, pos, 1, f);
+    fclose(f);
+
+    /* Count number of non-empty lines */
+    *num = 0;
+    for (i=0; i<pos; i++) {
+        if (buf[i] == '\n') {
+            if (c) {
+                (*num)++;
+                c = 0;
+            }
+        } else if(buf[i] != '\r' && buf[i] != '\t' && buf[i] != ' ') {
+            c++;
+        }
+    }
+
+    /* Allocate and read backends */
+    backends = (proxy_backend_t*) calloc(*num, sizeof(proxy_backend_t));
+    i = 0;
+    pch = strtok(buf, " :\r\n\t");
+    while (pch != NULL) {
+        backends[i].host = strdup(pch);
+        pch = strtok(NULL, " :\r\n\t");
+        backends[i].port = atoi(pch);
+        pch = strtok(NULL, " :\r\n\t");
+        i++;
+    }
+
+    free(buf);
+    return backends;
+}
+
 int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
     int i;
 
@@ -165,6 +213,20 @@ int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char
 
     return 0;
 }
+
+int proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit) {
+    int num_backends, i;
+    proxy_backend_t *backends = NULL;
+
+    backends = backend_read_file(file, &num_backends);
+    backend_init(user, pass, db, num_backends, autocommit);
+
+    for (i=0; i<num_backends; i++)
+        if (backend_connect(&(mysql_backend[i]), &(backends[i])))
+            return -1;
+ 
+     return 0;
+ }
 
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     my_bool error = FALSE;
