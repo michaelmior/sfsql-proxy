@@ -37,7 +37,8 @@ static char *backend_db;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
-static int backend_connect(MYSQL **mysql, proxy_backend_t *backend, char *user, char *pass, char *db, my_bool autocommit);
+void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
+static int backend_connect(MYSQL **mysql, proxy_backend_t *backend);
 
 /* derived from sql/client.c:cli_safe_read */
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
@@ -103,42 +104,8 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
     return FALSE;
 }
 
-/* Connect to a backend server with the given address and autocommit option */
-int backend_connect(MYSQL **mysql, proxy_backend_t *backend, char *user, char* pass, char *db, my_bool autocommit) {
-    *mysql = NULL;
-    *mysql = mysql_init(NULL);
-
-    if (*mysql == NULL) {
-        proxy_error("Out of memory when allocating MySQL backend");
-        return -1;
-    }
-
-    if (!mysql_real_connect(*mysql,
-                backend->host, user, pass, db, backend->port, NULL, 0)) {
-        proxy_error("Failed to connect to MySQL backend: %s",
-                mysql_error(*mysql));
-        return -1;
-    }
-
-    /* Set autocommit option if specified */
-    mysql_autocommit(*mysql, autocommit);
-
-    return 0;
-}
-
-int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
-    int i;
-
-    backend_user = user;
-    backend_pass = pass;
-    backend_db =   db;
-    backend_num =  num_backends;
-    
-    /* Initialize a pool for locking backend access */
-    backend_pool = proxy_pool_new(backend_num);
-
-    mysql_backend = (MYSQL**) calloc(backend_num, sizeof(MYSQL*));
-
+/* Set up backend data structures */
+void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
     /* Set default parameters use empty strings
      * to specify NULL */
     if (*user == '\0')
@@ -148,9 +115,50 @@ int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char
     if (*db == '\0')
         db = NULL;
 
+    /* Save connection info */
+    backend_user = user;
+    backend_pass = pass;
+    backend_db =   db;
+    backend_num =  num_backends;
+    backend_autocommit = autocommit;
+
+    /* Initialize a pool for locking backend access */
+    backend_pool = proxy_pool_new(backend_num);
+    
+    mysql_backend = (MYSQL**) calloc(backend_num, sizeof(MYSQL*));
+}
+
+/* Connect to a backend server with the given address and autocommit option */
+int backend_connect(MYSQL **mysql, proxy_backend_t *backend) {
+    *mysql = NULL;
+    *mysql = mysql_init(NULL);
+
+    if (*mysql == NULL) {
+        proxy_error("Out of memory when allocating MySQL backend");
+        return -1;
+    }
+
+    if (!mysql_real_connect(*mysql,
+                backend->host, backend_user, backend_pass, backend_db, backend->port, NULL, 0)) {
+        proxy_error("Failed to connect to MySQL backend: %s",
+                mysql_error(*mysql));
+        return -1;
+    }
+
+    /* Set autocommit option if specified */
+    mysql_autocommit(*mysql, backend_autocommit);
+
+    return 0;
+}
+
+int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
+    int i;
+
+    backend_init(user, pass, db, num_backends, autocommit);
+
     /* Connect to all backends */
     for (i=0; i<backend_num; i++)
-        if (backend_connect(&(mysql_backend[i]), backend, user, pass, db, autocommit) < 0)
+        if (backend_connect(&(mysql_backend[i]), backend) < 0)
             return -1;
 
     backend_autocommit = autocommit;
