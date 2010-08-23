@@ -12,7 +12,7 @@
 #ifndef _proxy_pool_h
 #define _proxy_pool_h
 
-typedef struct st_pool {
+typedef struct {
     int size, __alloc;
     my_bool *avail;
     pthread_mutex_t lock;

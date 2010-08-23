@@ -51,13 +51,13 @@ void __proxy_error(const char*loc, const char *fmt, ...);
 
 pool_t *thread_pool;
 
-typedef struct st_proxy_work {
+typedef struct {
     int clientfd;
     struct sockaddr_in *addr;
     MYSQL *proxy;
 } proxy_work_t;
 
-typedef struct st_proxy_thread {
+typedef struct {
     int id;
     pthread_t thread;
     pthread_cond_t cv;
