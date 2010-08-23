@@ -34,12 +34,13 @@ static int backend_num;
 static char *backend_user;
 static char *backend_pass;
 static char *backend_db;
+static char *backend_file;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
-void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
+static void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
 static int backend_connect(proxy_backend_t *backend, int num);
-proxy_backend_t* backend_read_file(char *filename, int *num);
+static proxy_backend_t* backend_read_file(char *filename, int *num);
 
 /* derived from sql/client.c:cli_safe_read */
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
@@ -106,7 +107,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
 }
 
 /* Set up backend data structures */
-void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
+static void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
     /* Set default parameters use empty strings
      * to specify NULL */
     if (*user == '\0')
@@ -158,7 +159,7 @@ static int backend_connect(proxy_backend_t *backend, int num) {
 }
 
 /* Read a list of backends from file */
-proxy_backend_t* backend_read_file(char *filename, int *num) {
+static proxy_backend_t* backend_read_file(char *filename, int *num) {
     FILE *f = fopen(filename, "r");
     char *buf, *pch;
     long pos;
@@ -225,6 +226,8 @@ int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char
 int proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit) {
     int num_backends, i;
     proxy_backend_t *backends = NULL;
+
+    backend_file = file;
 
     backends = backend_read_file(file, &num_backends);
     backend_init(user, pass, db, num_backends, autocommit);
