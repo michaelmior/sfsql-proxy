@@ -10,8 +10,8 @@
 
 MYSQL_SRC_PATH = /apps/mysql-5.1.49
 MYSQL_CONFIG = $(MYSQL_SRC_PATH)/scripts/mysql_config
-MYSQL_CFLAGS = $(shell $(MYSQL_CONFIG) --cflags) -I$(MYSQL_SRC_PATH)/include -I$(MYSQL_SRC_PATH)/libmysql_r
-MYSQL_LIBS = $(shell $(MYSQL_CONFIG) --libs_r) -L$(MYSQL_SRC_PATH)/libmysql_r/.libs
+MYSQL_CFLAGS = -I$(MYSQL_SRC_PATH)/include -I$(MYSQL_SRC_PATH)/libmysql_r $(shell $(MYSQL_CONFIG) --cflags)
+MYSQL_LIBS = -lmysqlclient_r -L$(MYSQL_SRC_PATH)/libmysql_r/.libs $(shell $(MYSQL_CONFIG) --libs_r)
 CFLAGS = $(MYSQL_CFLAGS) -g -O0 -Werror -Wall -Wextra -D_GNU_SOURCE -DDEBUG
 LIBS = $(MYSQL_LIBS)
 
