@@ -75,9 +75,6 @@ static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
         return (packet_error);
     }
 
-    /* Flush the write buffer */
-    net_flush(&(proxy->net));
-
     return pkt_len;
 }
 
@@ -85,7 +82,7 @@ static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
     uchar *cp;
     uint field;
-    ulong pkt_len = 8, len;
+    ulong pkt_len = 8, len, total_len=0;
 
     /* Read until EOF (254) marker reached */
     while (*(cp = backend->net.read_pos) != 254 || pkt_len >= 8) {
@@ -100,7 +97,17 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
         /* Read and forward the row to the proxy */
         if ((pkt_len = backend_read_to_proxy(backend, proxy)) == packet_error)
             return TRUE;
+
+        total_len += pkt_len;
+        if (total_len >= MAX_PACKET_LENGTH) {
+            total_len = 0;
+            /* Flush the write buffer */
+            net_flush(&(proxy->net));
+        }
     }
+
+    /* Final flush */
+    net_flush(&(proxy->net));
 
     /* success */
     return FALSE;
@@ -268,6 +275,9 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
             goto out; 
         }
     }
+
+    /* Flush the write buffer */
+    net_flush(&(proxy->net));
 
     /* read field info */
     if (backend_read_rows(mysql, proxy, 7)) {
