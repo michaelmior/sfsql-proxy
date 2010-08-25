@@ -141,6 +141,11 @@ static void backend_init(char *user, char *pass, char *db, int num_backends, my_
 static int backend_connect(proxy_backend_t *backend, int num) {
     MYSQL *mysql;
 
+    /* Allocate the new backend */
+    backends[num] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
+    backends[num]->host = strdup(backend->host);
+    backends[num]->port = backend->port;
+
     mysql = backend->mysql = NULL;
     mysql = mysql_init(NULL);
 
@@ -159,8 +164,7 @@ static int backend_connect(proxy_backend_t *backend, int num) {
     /* Set autocommit option if specified */
     mysql_autocommit(mysql, backend_autocommit);
 
-    backend->mysql = mysql;
-    backends[num] = backend;
+    backends[num]->mysql = mysql;
 
     return 0;
 }
@@ -313,8 +317,11 @@ void proxy_backend_close() {
     proxy_pool_destroy(backend_pool);
 
     /* Close connection with backends */
-    for (i=0; i<backend_num; i++)
+    for (i=0; i<backend_num; i++) {
         mysql_close(backends[i]->mysql);
+        free(backends[i]->host);
+        free(backends[i]);
+    }
 
     free(backends);
 }
