@@ -29,3 +29,6 @@ $(OBJS): %.o: %.c $(HEADERS)
 
 sfsql-proxy: $(OBJS) $(HEADERS)
 	$(CC) $(CFLAGS) $(LIBS) $(OBJS) -o sfsql-proxy
+
+docs: doxygen.cfg *.c *.h
+	doxygen doxygen.cfg

@@ -3,3 +3,4 @@ tags
 .*\.i$
 .*\.log$
 sfsql-proxy
+docs/.*

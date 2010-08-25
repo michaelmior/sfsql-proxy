@@ -25,24 +25,33 @@
 #include <sql_common.h>
 #include <client_settings.h>
 
-#define MAX_PACKET_LENGTH (256L*256L*256L-1)
+#define MAX_PACKET_LENGTH (256L*256L*256L-1) /** Maximum TCP packet length (from sql/net_serv.cc) */
 
-static proxy_backend_t **backends;
-static pool_t *backend_pool;
-static my_bool backend_autocommit;
-static int backend_num;
-static char *backend_user;
-static char *backend_pass;
-static char *backend_db;
-static char *backend_file;
+static proxy_backend_t **backends; /** Array of backends currently available */
+static pool_t *backend_pool;       /** Lock pool for controlling backend access */
+static my_bool backend_autocommit; /** Global autocommit option */
+static int backend_num;            /** Total number of backends */
+static char *backend_user;         /** Username for all backends */
+static char *backend_pass;         /** Password for all backends */
+static char *backend_db;           /** Database for all backends */
+static char *backend_file;         /** Filename where backends were read from */
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
 static void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
-static int backend_connect(proxy_backend_t *backend, int num);
+static my_bool backend_connect(proxy_backend_t *backend, int num);
 static proxy_backend_t* backend_read_file(char *filename, int *num);
 
-/* derived from sql/client.c:cli_safe_read */
+/**
+ * Read a MySQL packet from the backend and forward to the client.
+ *
+ * This code is derived from sql/client.c:cli_safe_read
+ *
+ * \param backend Backend to read from.
+ * \param proxy   Client to write to.
+ *
+ * \return Length of the packet which was read.
+ **/
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
     NET *net = &(backend->net);
     ulong pkt_len;
@@ -78,7 +87,18 @@ static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
     return pkt_len;
 }
 
-/* derived from sql/client.c:cli_read_rows */
+/**
+ * After a query is sent to the backend, read resulting rows
+ * and forward to the client connection.
+ *
+ * This code is derived from sql/client.c:cli_read_rows
+ *
+ * \param backend Backend where results are being read from.
+ * \param proxy   Client where results are written to.
+ * \param fields  Number of fields in the result set.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
     uchar *cp;
     uint field;
@@ -113,7 +133,15 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
     return FALSE;
 }
 
-/* Set up backend data structures */
+/**
+ *  Set up backend data structures.
+ *
+ *  \param user         Username for all backends.
+ *  \param pass         Password for all backends.
+ *  \param db           Database for all backends.
+ *  \param num_backends Total number of backends.
+ *  \param autocommit   Autocommit option to set on all backends.
+ **/
 static void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
     /* Set default parameters use empty strings
      * to specify NULL */
@@ -137,8 +165,15 @@ static void backend_init(char *user, char *pass, char *db, int num_backends, my_
     backends = (proxy_backend_t**) calloc(backend_num, sizeof(proxy_backend_t*));
 }
 
-/* Connect to a backend server with the given address and autocommit option */
-static int backend_connect(proxy_backend_t *backend, int num) {
+/**
+ * Connect to a backend server with the given address.
+ *
+ * \param backend Address information of the backend.
+ * \param num     Index where the new backend should be stored in ::backends.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+static my_bool backend_connect(proxy_backend_t *backend, int num) {
     MYSQL *mysql;
 
     /* Allocate the new backend */
@@ -151,14 +186,14 @@ static int backend_connect(proxy_backend_t *backend, int num) {
 
     if (mysql == NULL) {
         proxy_error("Out of memory when allocating MySQL backend");
-        return -1;
+        return TRUE;
     }
 
     if (!mysql_real_connect(mysql,
                 backend->host, backend_user, backend_pass, backend_db, backend->port, NULL, 0)) {
         proxy_error("Failed to connect to MySQL backend: %s",
                 mysql_error(mysql));
-        return -1;
+        return TRUE;
     }
 
     /* Set autocommit option if specified */
@@ -166,10 +201,17 @@ static int backend_connect(proxy_backend_t *backend, int num) {
 
     backends[num]->mysql = mysql;
 
-    return 0;
+    return FALSE;
 }
 
-/* Read a list of backends from file */
+/**
+ *  Read a list of backends from file.
+ *
+ *  \param filename Filename to read from.
+ *  \param num      A pointer where the number of found backends will be stored.
+ *
+ *  \return An array of ::proxy_backend_t structs representing the read backends.
+ **/
 static proxy_backend_t* backend_read_file(char *filename, int *num) {
     FILE *f = fopen(filename, "r");
     char *buf, *pch;
@@ -219,7 +261,19 @@ static proxy_backend_t* backend_read_file(char *filename, int *num) {
     return new_backends;
 }
 
-int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
+/**
+ * Open a number of connections to a single backend.
+ *
+ * \param backend      Backend connection information.
+ * \param user         Username to use when connecting to the backend.
+ * \param pass         Password to use when connecting to the backend.
+ * \param db           Database to be selected after connecting.
+ * \param num_backends Number of connections to open.
+ * \param autocommit   Whether autocommit mode should be enabled on backends.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+my_bool proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
     int i;
 
     backend_init(user, pass, db, num_backends, autocommit);
@@ -227,14 +281,25 @@ int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char
     /* Connect to all backends */
     for (i=0; i<backend_num; i++)
         if (backend_connect(backend, i) < 0)
-            return -1;
+            return TRUE;
 
     backend_autocommit = autocommit;
 
-    return 0;
+    return FALSE;
 }
 
-int proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit) {
+/**
+ * Connect to all backends in a specified file.
+ *
+ * \param file       Filename of a file which contains a list of backends in the format host:port.
+ * \param user       Username to use when connecting to the backend.
+ * \param pass       Password to use when connecting to the backend.
+ * \param db         Database to be selected after connecting.
+ * \param autocommit Whether autocommit mode should be enabled on backends.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+my_bool proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit) {
     int num_backends, i;
     proxy_backend_t *backends = NULL;
 
@@ -250,6 +315,15 @@ int proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool
      return 0;
  }
 
+/**
+ * Send a query to the backend and return the results to the client.
+ *
+ * \param proxy  MySQL object corresponding to the client connection.
+ * \param query  A query string received from the client.
+ * \param length Length of the query string.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
@@ -308,8 +382,10 @@ out:
     return error;
 }
 
-/* Close the open connections to the backend
- * and destroy mutexes */
+/**
+ * Close the open connections to the backend
+ * and destroy mutexes.
+ **/
 void proxy_backend_close() {
     int i;
 

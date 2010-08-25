@@ -24,6 +24,13 @@
 
 static int pool_try_locks(pool_t *pool);
 
+/**
+ * Create a new lock pool with a specified size.
+ *
+ * \param size Size of the pool to create.
+ *
+ * \return Newly created pool.
+ **/
 pool_t* proxy_pool_new(int size) {
     int i, alloc=1;
     pool_t *new_pool = (pool_t *) malloc(sizeof(pool_t));
@@ -53,6 +60,12 @@ pool_t* proxy_pool_new(int size) {
     return new_pool;
 }
 
+/**
+ * Modify the size of an existing pool, allocating memory as necessary.
+ *
+ * \param pool Pool to resize.
+ * \param size New size of the pool.
+ **/
 void proxy_pool_set_size(pool_t *pool, int size) {
     int alloc=1, i;
     my_bool *avail;
@@ -81,6 +94,12 @@ void proxy_pool_set_size(pool_t *pool, int size) {
     proxy_mutex_unlock(&(pool->lock));
 }
 
+/**
+ * Remove an item from a pool and resize accordingly.
+ *
+ * \param pool Pool that the item should be removed from.
+ * \param idx  Index of the item to remove.
+ **/
 void proxy_pool_remove(pool_t *pool, int idx) {
     int i;
 
@@ -94,6 +113,13 @@ void proxy_pool_remove(pool_t *pool, int idx) {
         pool->avail[i] = pool->avail[i+1];
 }
 
+/**
+ * Try to find an available item in the pool.
+ *
+ * \param pool Pool to check.
+ *
+ * \return Index of an available item, or negative if no items are available.
+ **/
 static int pool_try_locks(pool_t *pool) {
     int i;
 
@@ -112,6 +138,13 @@ static int pool_try_locks(pool_t *pool) {
     return -1;
 }
 
+/**
+ * Get an available item from a pool, waiting if necessary.
+ *
+ * \param pool Pool to check.
+ *
+ * \return Index of an available item in the pool.
+ **/
 int proxy_get_from_pool(pool_t *pool) {
     int idx;
 
@@ -133,7 +166,13 @@ int proxy_get_from_pool(pool_t *pool) {
     }
 }
 
-/* Get the next item in the pool which is currently locked */
+/**
+ * Get the next item in a pool which is currently locked.
+ *
+ * \param pool Pool to check.
+ *
+ * \return Index of a locked item, or negative if no items are locked.
+ **/
 int proxy_pool_get_locked(pool_t *pool) {
     int i;
 
@@ -150,6 +189,12 @@ int proxy_pool_get_locked(pool_t *pool) {
     return -1;
 }
 
+/**
+ * Return a locked item to the pool.
+ *
+ * \param pool Pool the item should be returned to.
+ * \param idx  Index of the item to return
+ **/
 void proxy_return_to_pool(pool_t *pool, int idx) {
     printf("You can have %d back\n", idx);
     
@@ -167,6 +212,11 @@ void proxy_return_to_pool(pool_t *pool, int idx) {
     proxy_mutex_unlock(pool->avail_mutex);
 }
 
+/**
+ * Free all memory and mutexes associated with the pool.
+ *
+ * \param pool Pool to destroy.
+ **/
 void proxy_pool_destroy(pool_t *pool) {
     /* Unlock the mutex if locked */
     proxy_mutex_trylock(&(pool->lock));

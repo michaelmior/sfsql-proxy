@@ -22,6 +22,9 @@
 
 #include "proxy.h"
 
+/**
+ * Initialize threading data structures.
+ **/
 void proxy_threading_init() {
 #ifdef DEBUG
     pthread_mutexattr_init(&__proxy_mutexattr);
@@ -29,6 +32,9 @@ void proxy_threading_init() {
 #endif
 }
 
+/**
+ * Free threading data structures.
+ **/
 void proxy_threading_end() {
 #ifdef DEBUG
     pthread_mutexattr_destroy(&__proxy_mutexattr);

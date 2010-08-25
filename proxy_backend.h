@@ -12,14 +12,16 @@
 #ifndef _proxy_backend_h
 #define _proxy_backend_h
 
+/**
+ * Connection information for backends */
 typedef struct st_proxy_backend {
     char *host;
     int port;
     MYSQL *mysql;
 } proxy_backend_t;
 
-int proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit);
-int proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit);
+my_bool proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit);
+my_bool proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit);
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length);
 void proxy_backend_close();
 

@@ -12,6 +12,9 @@
 #ifndef _proxy_pool_h
 #define _proxy_pool_h
 
+/**
+ * Data structure for lock pool implemenation
+ * with list of availability of a set of items. */
 typedef struct {
     int size, __alloc;
     my_bool *avail;

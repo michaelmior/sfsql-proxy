@@ -39,24 +39,30 @@ void __proxy_error(const char*loc, const char *fmt, ...);
 #include "proxy_pool.h"
 #include "proxy_threading.h"
 
-#define BACKEND_HOST  "127.0.0.1"
-#define BACKEND_PORT  3306
-#define BACKEND_USER  "root"
-#define BACKEND_PASS  "root"
-#define BACKEND_DB    "test"
-#define NUM_BACKENDS  10
+#define BACKEND_HOST  "127.0.0.1" /** Default backend host */
+#define BACKEND_PORT  3306        /** Default backend port */
+#define BACKEND_USER  "root"      /** Default backend user */
+#define BACKEND_PASS  "root"      /** Default backend password */
+#define BACKEND_DB    "test"      /** Default backend database */
+#define NUM_BACKENDS  10          /** Default number of backends */
 
-#define PROXY_PORT    4040
-#define PROXY_THREADS 10
+#define PROXY_PORT    4040        /** Default port to listen on for incoming connections */
+#define PROXY_THREADS 10          /** Default number of threads started to do client work */
 
 pool_t *thread_pool;
 
+/**
+ * All information needed by threads
+ * to connect to clients and begin working. */
 typedef struct {
     int clientfd;
     struct sockaddr_in *addr;
     MYSQL *proxy;
 } proxy_work_t;
 
+/**
+ * Data structures needed for thread pool
+ * implementation and signaling of new work. */
 typedef struct {
     int id;
     pthread_t thread;
@@ -66,7 +72,9 @@ typedef struct {
 } proxy_thread_t;
 proxy_thread_t threads[PROXY_THREADS];
 
-/* from client/sql_string.h */
+/**
+ * Copied from client/sql_string.h since this
+ * function is not included in the client library. */
 uint32 copy_and_convert(char *to, uint32 to_length, CHARSET_INFO *to_cs,
             const char *from, uint32 from_length,
             CHARSET_INFO *from_cs, uint *errors);
