@@ -318,6 +318,11 @@ void client_do_work(proxy_work_t *work) {
     /* from sql/sql_connect.cc:handle_one_connection */
     while (!work->proxy->net.error && work->proxy->net.vio != 0) {
         error = proxy_read_query(work->proxy);
+
+        /* One more flush the write buffer to make
+         * sure client has everything */
+        net_flush(&(work->proxy->net));
+
         if (error != 0) {
             if (error < 0)
                 proxy_error("Error in processing client query, disconnecting");
