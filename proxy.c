@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 
     /* Set arguments to default values */
     backend.host = NULL;
-    backend.port = BACKEND_PORT;
+    backend.port = 0;
     user = pass = db = phost = backend_file = NULL;
     pport = PROXY_PORT;
 
@@ -323,6 +323,7 @@ int main(int argc, char *argv[]) {
                 autocommit);
     } else {
         backend.host = backend.host ?: strdup(BACKEND_HOST);
+        backend.port = backend.port ?: BACKEND_PORT;
         error = proxy_backend_connect(&backend,
                 user ?: BACKEND_USER,
                 pass ?: BACKEND_PASS,
