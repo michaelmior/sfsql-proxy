@@ -85,6 +85,10 @@ void proxy_pool_set_size(pool_t *pool, int size) {
 
         for (i=0; i<size; i++)
             avail[i] = pool->avail[i];
+
+        for (i=size; i<alloc; i++)
+            avail[i] = TRUE;
+
         free(pool->avail);
         pool->avail = avail;
     }
