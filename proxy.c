@@ -212,6 +212,7 @@ int main(int argc, char *argv[]) {
     my_bool autocommit = TRUE;
     char *user, *pass, *db, *phost, *backend_file;
     pthread_attr_t attr;
+    struct sigaction new_action, old_action;
 
     /* Set arguments to default values */
     backend.host = NULL;
@@ -292,7 +293,14 @@ int main(int argc, char *argv[]) {
     proxy_threading_init();
 
     /* Install signal handler */
-    signal(SIGINT, catch_sig);
+    new_action.sa_handler = catch_sig;
+    sigemptyset(&new_action.sa_mask);
+    sigaddset(&new_action.sa_mask, SIGINT);
+    new_action.sa_flags = 0;
+
+    sigaction(SIGINT, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction(SIGINT, &new_action, NULL);
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
