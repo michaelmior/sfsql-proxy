@@ -27,12 +27,14 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <getopt.h>
+#include <sysexits.h>
 
 #include "proxy.h"
 
 #define QUEUE_LENGTH  10
 
 volatile sig_atomic_t run = 1;
+static char BUF[BUFSIZ];
 
 static void server_run(char *host, int port);
 
@@ -102,7 +104,7 @@ static void server_run(char *host, int port) {
     }
 
     if (listen(serverfd, QUEUE_LENGTH) < 0) {
-        proxy_error("Error listening on server socket: %s", strerror(errno));
+        proxy_error("Error listening on server socket: %s", errstr);
         return;
     }
 
@@ -118,7 +120,7 @@ static void server_run(char *host, int port) {
         clientfd = accept(serverfd, (struct sockaddr*) &clientaddr, &clientlen);
         if (clientfd < 0) {
             if (errno != EINTR)
-                proxy_error("Error accepting client connection: %s", strerror(errno));
+                proxy_error("Error accepting client connection: %s", errstr);
             continue;
         }
 
@@ -245,7 +247,8 @@ int main(int argc, char *argv[]) {
         switch(c) {
             case '?':
                 usage();
-                return EXIT_FAILURE;
+                ret = EXIT_SUCCESS;
+                goto out_free;
             case 'h':
                 backend.host = strdup(optarg);
                 break;
@@ -278,15 +281,21 @@ int main(int argc, char *argv[]) {
                 break;
             default:
                 usage();
-                ret = EXIT_FAILURE;
+                ret = EX_USAGE;
                 goto out_free;
         }
     }
 
-    if (backend_file && (backend.host || backend.port > 0)) {
-        usage();
-        ret = EXIT_FAILURE;
-        goto out_free;
+    if (backend_file) {
+        if (backend.host || backend.port > 0) {
+            usage();
+            ret = EX_USAGE;
+            goto out_free;
+        } else if (access(backend_file, R_OK)) {
+            proxy_error("Error accessing backend file:%s", errstr);
+            ret = EX_NOINPUT;
+            goto out_free;
+        }
     }
 
     /* Threading initialization */

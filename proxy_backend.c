@@ -25,6 +25,8 @@
 #include <sql_common.h>
 #include <client_settings.h>
 
+static char BUF[BUFSIZ];
+
 #define MAX_PACKET_LENGTH (256L*256L*256L-1) /** Maximum TCP packet length (from sql/net_serv.cc) */
 
 static proxy_backend_t **backends = NULL; /** Array of backends currently available */
@@ -224,7 +226,7 @@ static proxy_backend_t** backend_read_file(char *filename, int *num) {
     /* Open the file */
     f = fopen(filename, "r");
     if (!f) {
-        proxy_error("Couldn't open backend file %s:%s", filename, strerror(errno));
+        proxy_error("Couldn't open backend file %s:%s", filename, errstr);
         return NULL;
     }
 

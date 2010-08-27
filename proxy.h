@@ -33,6 +33,7 @@
 #define AT __FILE__ ":" TOSTRING(__LINE__)
 void __proxy_error(const char*loc, const char *fmt, ...);
 #define proxy_error(fmt, ...) __proxy_error(AT, fmt, ##__VA_ARGS__)
+#define errstr strerror_r(errno, BUF, BUFSIZ)
 
 #include "proxy_net.h"
 #include "proxy_backend.h"

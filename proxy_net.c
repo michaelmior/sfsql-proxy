@@ -217,6 +217,7 @@ static MYSQL* client_init(Vio *vio) {
  **/
 void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
+    char BUF[BUFSIZ];
 
     printf("Called client_destroy on thread %d\n", thread->id);
 
@@ -226,7 +227,7 @@ void client_destroy(proxy_thread_t *thread) {
             /* XXX: may need to send error before closing connection */
             /* derived from sql/sql_mysqld.cc:close_connection */
             if (vio_close(mysql->net.vio) < 0)
-                proxy_error("Error closing client connection: %s", strerror(errno));
+                proxy_error("Error closing client connection: %s", errstr);
 
             /* Clean up data structures */
             vio_delete(mysql->net.vio);
