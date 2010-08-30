@@ -305,6 +305,9 @@ void client_do_work(proxy_work_t *work) {
     int error;
     Vio *vio_tmp;
 
+    if (!work)
+        return;
+
     /* derived from sql/mysqld.cc:handle_connections_sockets */
     vio_tmp = vio_new(work->clientfd, VIO_TYPE_TCPIP, 0);
     vio_keepalive(vio_tmp, TRUE);
@@ -350,6 +353,11 @@ int proxy_read_query(MYSQL *mysql) {
     ulong pkt_len;
     char *packet = 0;
     enum enum_server_command command;
+
+    if (!mysql) {
+        proxy_error("Invalid MySQL object for reading query");
+        return -1;
+    }
 
     /* Start a new transaction and read the incoming packet */
     net_new_transaction(net);
