@@ -45,7 +45,7 @@ void net_thread_destroy(void *ptr);
 void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
-    ulong server_caps, client_caps, pkt_len;
+    ulong server_caps, client_caps, pkt_len=0;
     struct rand_struct rand; /* XXX: reuse this */
     uint16 port = PROXY_PORT;
     CHARSET_INFO *charset;

@@ -244,7 +244,7 @@ well_formed_copy_nchars(CHARSET_INFO *to_cs,
           0x01 -> 0x0001
         */
         uint pad_length= to_cs->mbminlen - from_offset;
-        bzero(to, pad_length);
+        memset(to, '\0', pad_length);
         memmove(to + pad_length, from, from_offset);
         nchars--;
         from+= from_offset;

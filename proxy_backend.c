@@ -212,8 +212,8 @@ static my_bool backend_connect(proxy_backend_t *backend) {
 static proxy_backend_t** backend_read_file(char *filename, int *num) {
     FILE *f;
     char *buf, *pch;
-    long pos;
-    int i, c=0;
+    ulong pos;
+    uint i, c=0;
     proxy_backend_t **new_backends;
 
     /* This case might happen when user sends SIGUSR1
@@ -237,7 +237,16 @@ static proxy_backend_t** backend_read_file(char *filename, int *num) {
 
     /* Read the entire file */
     buf = (char*) malloc(pos);
-    fread(buf, pos, 1, f);
+    if (fread(buf, pos, 1, f) != pos) {
+        fclose(f);
+        if (ferror(f))
+            proxy_error("Error reading from backend file %s:%s", filename, errstr);
+        else if (feof(f))
+            proxy_error("End of file when reading backends from %s", filename);
+        else
+            proxy_error("Unknown error reading backend file %s", filename);
+        return NULL;
+    }
     fclose(f);
 
     /* Count number of non-empty lines */
@@ -320,7 +329,7 @@ my_bool proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, 
  * \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit) {
-    int num_backends, i;
+    int num_backends=-1, i;
 
     backend_file = file;
 

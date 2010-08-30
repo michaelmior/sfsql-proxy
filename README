@@ -1,0 +1,5 @@
+The sfsql-proxy server is a MySQL proxy server designed to support cloning of virtual machines running the MySQL server. It is being developed by the systems group at the University of Toronto (http://sysweb.cs.toronto.edu/).
+
+This software is released under the GPLv2 (see COPYING)
+
+For more information, contact Michael Mior <mmior@cs.toronto.edu>
