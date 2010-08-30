@@ -2,5 +2,8 @@ tags
 .*\.o$
 .*\.i$
 .*\.log$
+.*\.orig
+.*\.txt
 sfsql-proxy
 docs/.*
+(.*/)?.deps
