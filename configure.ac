@@ -6,7 +6,7 @@ AC_INIT([sfsql-proxy], [0.1], [mmior@cs.toronto.edu])
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([proxy.c])
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE(-Wall -Werror -W 1.11)
@@ -20,6 +20,7 @@ AC_GNU_SOURCE
 # Checks for libraries.
 ACX_PTHREAD
 AC_CHECK_LIB(mysqlclient_r, mysql_real_connect)
+AM_PATH_CHECK()
 
 # Checks for header files.
 AC_HEADER_STDC

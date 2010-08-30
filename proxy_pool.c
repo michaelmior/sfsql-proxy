@@ -33,7 +33,12 @@ static int pool_try_locks(pool_t *pool);
  **/
 pool_t* proxy_pool_new(int size) {
     int i, alloc=1;
-    pool_t *new_pool = (pool_t *) malloc(sizeof(pool_t));
+    pool_t *new_pool;
+
+    if (size <= 0)
+        return NULL;
+
+    new_pool = (pool_t *) malloc(sizeof(pool_t));
 
     /* Allocate memory for the lock pool */
     new_pool->size = size;
@@ -83,14 +88,15 @@ void proxy_pool_set_size(pool_t *pool, int size) {
     if (alloc != pool->__alloc) {
         avail = (my_bool*) calloc(alloc, sizeof(my_bool));
 
-        for (i=0; i<size; i++)
+        for (i=0; i<pool->size; i++)
             avail[i] = pool->avail[i];
 
-        for (i=size; i<alloc; i++)
+        for (i=pool->size; i<alloc; i++)
             avail[i] = TRUE;
 
         free(pool->avail);
         pool->avail = avail;
+        pool->__alloc = alloc;
     }
 
     pool->size = size;

@@ -1,4 +1,4 @@
-SUBDIRS = .
+SUBDIRS = . tests
 
 EXTRA_DIST = \
 	doxygen.cfg
