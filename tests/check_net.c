@@ -103,9 +103,9 @@ START_TEST (test_net_handshake) {
             i = sizeof(struct sockaddr_un);
             fail_unless((ns = accept(s, (struct sockaddr*) &sa, &i)) > 0);
 
-            fail_unless(compare_to_file(PACKET_DIR "/handshake-greeting.cap", ns) == 0);
-            fail_unless(send_file(PACKET_DIR "/handshake-auth.cap", ns) == 0);
-            fail_unless(compare_to_file(PACKET_DIR "/handshake-ok.cap", ns) == 0);
+            fail_unless(compare_to_file("net/handshake-greeting.cap", ns) == 0);
+            fail_unless(send_file("net/handshake-auth.cap", ns) == 0);
+            fail_unless(compare_to_file("net/handshake-ok.cap", ns) == 0);
 
             close(s);
             close(ns);

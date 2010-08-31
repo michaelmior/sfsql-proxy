@@ -18,6 +18,10 @@ START_TEST (test_pool_new) {
     fail_unless(pool->avail[0] == TRUE);
 } END_TEST
 
+START_TEST (test_pool_destroy_null) {
+    proxy_pool_destroy(NULL);
+} END_TEST
+
 START_TEST (test_pool_new_empty) {
     pool_t *pool;
 
@@ -78,6 +82,21 @@ START_TEST (test_pool_get_locked) {
     fail_unless(i == 0);
 } END_TEST
 
+START_TEST(test_pool_is_free) {
+    int i;
+
+    proxy_pool_lock(pool);
+
+    fail_unless(proxy_pool_is_free(pool, 0));
+    fail_unless(!proxy_pool_is_free(pool, 2));
+
+    i = proxy_pool_get(pool);
+    fail_unless(!proxy_pool_is_free(pool, i));
+    proxy_pool_return(pool, i);
+
+    proxy_pool_unlock(pool);
+} END_TEST
+
 START_TEST (test_pool_return) {
     int i;
 
@@ -93,6 +112,7 @@ Suite *pool_suite(void) {
     TCase *tc_alloc = tcase_create("Allocation");
     tcase_add_checked_fixture(tc_alloc, setup, teardown);
     tcase_add_test(tc_alloc, test_pool_new);
+    tcase_add_test(tc_alloc, test_pool_destroy_null);
     tcase_add_test(tc_alloc, test_pool_new_empty);
     suite_add_tcase(s, tc_alloc);
 
@@ -107,6 +127,7 @@ Suite *pool_suite(void) {
     tcase_add_checked_fixture(tc_lock, setup, teardown);
     tcase_add_test(tc_lock, test_pool_get);
     tcase_add_test(tc_lock, test_pool_get_locked);
+    tcase_add_test(tc_lock, test_pool_is_free);
     tcase_add_test(tc_lock, test_pool_return);
     suite_add_tcase(s, tc_lock);
 

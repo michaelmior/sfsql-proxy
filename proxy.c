@@ -167,6 +167,9 @@ static void catch_sig(int sig) {
             cancel_threads();
 
             break;
+        case SIGUSR1:
+            proxy_backends_update();
+            break;
     }
 }
 
@@ -290,11 +293,18 @@ int main(int argc, char *argv[]) {
     new_action.sa_handler = catch_sig;
     sigemptyset(&new_action.sa_mask);
     sigaddset(&new_action.sa_mask, SIGINT);
+    sigaddset(&new_action.sa_mask, SIGUSR1);
     new_action.sa_flags = 0;
 
+    /* Handle signal for stopping server */
     sigaction(SIGINT, NULL, &old_action);
     if (old_action.sa_handler != SIG_IGN)
         sigaction(SIGINT, &new_action, NULL);
+
+    /* Handle signal for reloading backend file */
+    sigaction(SIGUSR1, NULL, &old_action);
+    if (old_action.sa_handler != SIG_IGN)
+        sigaction(SIGUSR1, &new_action, NULL);
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);

@@ -24,10 +24,13 @@ typedef struct {
 } pool_t;
 
 pool_t* proxy_pool_new(int size);
+void proxy_pool_lock(pool_t *pool);
+void proxy_pool_unlock(pool_t *pool);
 void proxy_pool_set_size(pool_t *pool, int size);
 void proxy_pool_remove(pool_t *pool, int idx);
 int proxy_pool_get(pool_t *pool);
 void proxy_pool_return(pool_t *pool, int idx);
+my_bool proxy_pool_is_free(pool_t *pool, int idx);
 int proxy_pool_get_locked(pool_t *pool);
 void proxy_pool_destroy(pool_t *pool);
 
