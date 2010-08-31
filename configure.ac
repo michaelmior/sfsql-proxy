@@ -10,6 +10,7 @@ AC_CONFIG_FILES([Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE(-Wall -Werror -W 1.11)
+AC_LANG([C])
 
 # Checks for programs.
 AC_PROG_CC
