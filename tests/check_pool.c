@@ -63,7 +63,7 @@ START_TEST (test_pool_remove) {
 START_TEST (test_pool_get) {
     int i;
 
-    i = proxy_get_from_pool(pool);
+    i = proxy_pool_get(pool);
 
     fail_unless(i == 0);
     fail_unless(pool->avail[0] == FALSE);
@@ -72,7 +72,7 @@ START_TEST (test_pool_get) {
 START_TEST (test_pool_get_locked) {
     int i;
 
-    proxy_get_from_pool(pool);
+    proxy_pool_get(pool);
     i = proxy_pool_get_locked(pool);
 
     fail_unless(i == 0);
@@ -81,8 +81,8 @@ START_TEST (test_pool_get_locked) {
 START_TEST (test_pool_return) {
     int i;
 
-    i = proxy_get_from_pool(pool);
-    proxy_return_to_pool(pool, i);
+    i = proxy_pool_get(pool);
+    proxy_pool_return(pool, i);
 
     fail_unless(pool->avail[i] == TRUE);
 } END_TEST

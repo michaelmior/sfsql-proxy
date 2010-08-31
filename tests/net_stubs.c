@@ -41,4 +41,4 @@ my_bool __wrap_proxy_backend_query(MYSQL *proxy, const char *query, ulong length
 }
 
 /* Don't need to touch the pool here */
-void __wrap_proxy_return_to_pool(pool_t *pool, int idx) {}
+void __wrap_proxy_pool_return(pool_t *pool, int idx) {}

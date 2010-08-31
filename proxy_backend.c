@@ -361,7 +361,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     uchar *pos;
 
     /* The call below will block until a backend is free  */
-    int i, bi = proxy_get_from_pool(backend_pool);
+    int i, bi = proxy_pool_get(backend_pool);
     proxy_backend_t *backend = backends[bi];
     MYSQL *mysql = backend->mysql;
 
@@ -409,7 +409,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
 
 out:
     /* Make the backend available again */
-    proxy_return_to_pool(backend_pool, bi);
+    proxy_pool_return(backend_pool, bi);
     return error;
 }
 

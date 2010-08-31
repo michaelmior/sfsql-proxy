@@ -155,7 +155,7 @@ static int pool_try_locks(pool_t *pool) {
  *
  * \return Index of an available item in the pool.
  **/
-int proxy_get_from_pool(pool_t *pool) {
+int proxy_pool_get(pool_t *pool) {
     int idx;
 
     if ((idx = pool_try_locks(pool)) >= 0)
@@ -205,7 +205,7 @@ int proxy_pool_get_locked(pool_t *pool) {
  * \param pool Pool the item should be returned to.
  * \param idx  Index of the item to return
  **/
-void proxy_return_to_pool(pool_t *pool, int idx) {
+void proxy_pool_return(pool_t *pool, int idx) {
     printf("You can have %d back\n", idx);
     
     /* Update the item availability */

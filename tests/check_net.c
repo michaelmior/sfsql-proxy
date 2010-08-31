@@ -97,7 +97,7 @@ START_TEST (test_net_handshake) {
 
             /* Try to handshake */
             mysql = client_init(NULL);
-            proxy_handshake(mysql, &addr, 0);
+            proxy_net_handshake(mysql, &addr, 0);
             exit(0);
         default:
             i = sizeof(struct sockaddr_un);

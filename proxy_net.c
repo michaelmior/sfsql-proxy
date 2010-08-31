@@ -31,6 +31,7 @@ MYSQL* client_init(Vio *vio);
 void client_do_work(proxy_work_t *work);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
+my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
 
 /**
  * Perform client authentication.
@@ -42,7 +43,7 @@ void net_thread_destroy(void *ptr);
  * \param clientaddr Address of the newly connected client.
  * \param thread_id Identifier of the thread handling the connection.
  **/
-void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
+void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
     ulong server_caps, client_caps, pkt_len=0;
@@ -143,7 +144,7 @@ void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__
         }
 
         /* Authenticate the user */
-        if (proxy_check_user(user, user_len, passwd, passwd_len, db, db_len)) {
+        if (check_user(user, user_len, passwd, passwd_len, db, db_len)) {
             if (db && db[0]) {
                 /* XXX: need to set DB here eventually */
             }
@@ -152,7 +153,7 @@ void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__
         }
 
         /* Ok, client. You're good to go */
-        proxy_send_ok(mysql, 0, 0, 0);
+        proxy_net_send_ok(mysql, 0, 0, 0);
     }
 }
 
@@ -168,7 +169,7 @@ void proxy_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__
  *
  * \return TRUE if the client is authorized, FALSE otherwise.
  **/
-my_bool proxy_check_user(
+my_bool check_user(
         __attribute__((unused)) char *user,
         __attribute__((unused)) uint user_len,
         __attribute__((unused)) char *passwd,
@@ -260,7 +261,7 @@ void net_thread_destroy(void *ptr) {
  * \param ptr A pointer to a #proxy_thread_t struct which
  *            contains information on available work
  **/
-void* proxy_new_thread(void *ptr) {
+void* proxy_net_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
 
     pthread_cleanup_push(net_thread_destroy, ptr);
@@ -286,7 +287,7 @@ void* proxy_new_thread(void *ptr) {
         thread->work = NULL;
 
         /* Signify that we are available for work again */
-        proxy_return_to_pool(thread_pool, thread->id);
+        proxy_pool_return(thread_pool, thread->id);
         proxy_mutex_unlock(&(thread->lock));
     }
 
@@ -317,11 +318,11 @@ void client_do_work(proxy_work_t *work) {
         return;
 
     /* Perform "authentication" (credentials not checked) */
-    proxy_handshake(work->proxy, work->addr, 0);
+    proxy_net_handshake(work->proxy, work->addr, 0);
 
     /* from sql/sql_connect.cc:handle_one_connection */
     while (!work->proxy->net.error && work->proxy->net.vio != 0) {
-        error = proxy_read_query(work->proxy);
+        error = proxy_net_read_query(work->proxy);
 
         /* One more flush the write buffer to make
          * sure client has everything */
@@ -348,7 +349,7 @@ void client_do_work(proxy_work_t *work) {
  * \return Positive to disconnect without error,
  *         negative for errors, 0 to keep going
  **/
-int proxy_read_query(MYSQL *mysql) {
+int proxy_net_read_query(MYSQL *mysql) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -398,7 +399,7 @@ int proxy_read_query(MYSQL *mysql) {
             break;
         case COM_PING:
             /* Yep, still here */
-            return proxy_send_ok(mysql, 0, 0, 0) ? -1 : 0;
+            return proxy_net_send_ok(mysql, 0, 0, 0) ? -1 : 0;
             break;
 
         /* Commands below not implemented */
@@ -445,7 +446,7 @@ int proxy_read_query(MYSQL *mysql) {
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
+my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
     NET *net = &(mysql->net);
     uchar buff[MYSQL_ERRMSG_SIZE + 10], *pos;
 

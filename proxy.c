@@ -116,7 +116,7 @@ static void server_run(char *host, int port) {
         work->proxy = NULL;
 
         /* Pick a thread to execute the work */
-        thread = &(threads[proxy_get_from_pool(thread_pool)]);
+        thread = &(threads[proxy_pool_get(thread_pool)]);
 
         /* Give work to thread and signal it to go */
         proxy_mutex_lock(&(thread->lock));
@@ -150,7 +150,7 @@ static void cancel_threads() {
 
     /* Return any locked threads to the pool */
     while ((i = proxy_pool_get_locked(thread_pool)) >= 0)
-        proxy_return_to_pool(thread_pool, i);
+        proxy_pool_return(thread_pool, i);
 }
 
 /**
@@ -313,7 +313,7 @@ int main(int argc, char *argv[]) {
         proxy_mutex_init(&threads[i].lock);
         threads[i].work = NULL;
 
-        pthread_create(&(threads[i].thread), &attr, proxy_new_thread, (void*) &(threads[i]));
+        pthread_create(&(threads[i].thread), &attr, proxy_net_new_thread, (void*) &(threads[i]));
     }
 
     /* Connect to the backend server (default parameters for now) */
