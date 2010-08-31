@@ -18,7 +18,6 @@ include_HEADERS = \
 	proxy_pool.h \
 	proxy_threading.h
 
-docs:
-	@cd $(top_srcdir); \
-	(cat doxygen.cfg; echo PROJECT_NUMBER=$(PACKAGE_VERSION)) | doxygen - ; \
-	cd $(top_builddir)
+include $(top_srcdir)/doxygen.am
+MOSTLYCLEANFILES = $(DX_CLEANFILES)
+doc: doxygen-doc

@@ -38,6 +38,17 @@ AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname
 AC_FUNC_MALLOC
 AC_FUNC_FORK
 
+# Doxygen support
+DX_HTML_FEATURE(ON)
+DX_CHM_FEATURE(OFF)
+DX_CHI_FEATURE(OFF)
+DX_MAN_FEATURE(OFF)
+DX_RTF_FEATURE(OFF)
+DX_XML_FEATURE(OFF)
+DX_PDF_FEATURE(OFF)
+DX_PS_FEATURE(OFF)
+DX_INIT_DOXYGEN([$PACKAGE_NAME], [doxygen.cfg], [doc])
+
 # Configure MySQL
 MYSQL_CFLAGS=""
 MYSQL_LIBS=""
