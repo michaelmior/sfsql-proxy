@@ -2,9 +2,10 @@ tags
 .*\.o$
 .*\.i$
 .*\.log$
-.*\.orig
-.*\.txt
-.*\.patch
+.*\.orig$
+.*\.rej$
+.*\.txt$
+.*\.patch$
 sfsql-proxy
 docs/.*
 autom4te.cache/.*
