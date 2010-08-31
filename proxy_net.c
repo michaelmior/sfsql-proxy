@@ -27,7 +27,7 @@
 extern CHARSET_INFO *default_charset_info; /** Exposes the default charset in the client library */
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
-static MYSQL* client_init(Vio *vio);
+MYSQL* client_init(Vio *vio);
 void client_do_work(proxy_work_t *work);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
@@ -186,7 +186,7 @@ my_bool proxy_check_user(
  *
  * \return A MYSQL structure ready to communicate with the client, or NULL on error.
  **/
-static MYSQL* client_init(Vio *vio) {
+MYSQL* client_init(Vio *vio) {
     MYSQL *mysql;
     NET *net;
 
