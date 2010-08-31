@@ -10,7 +10,6 @@ AC_CONFIG_FILES([Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE(-Wall -Werror -W 1.11)
-LT_INIT
 
 # Checks for programs.
 AC_PROG_CC
@@ -35,8 +34,9 @@ AC_TYPE_SIZE_T
 AC_C_INLINE
 
 # Checks for library functions.
-AC_CHECK_FUNCS([select socket strerror gethostbyname])
+AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname])
 AC_FUNC_MALLOC
+AC_FUNC_FORK
 
 # Configure MySQL
 MYSQL_CFLAGS=""
