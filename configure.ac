@@ -1,8 +1,8 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ([2.65])
-AC_INIT([sfsql-proxy], [0.1], [mmior@cs.toronto.edu])
+AC_PREREQ(2.65)
+AC_INIT([sfsql-proxy],[0.1],[mmior@cs.toronto.edu])
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([proxy.c])
 AC_CONFIG_HEADERS([config.h])
@@ -15,7 +15,7 @@ AC_LANG([C])
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
-AC_GNU_SOURCE
+AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC_C99
 AX_CFLAGS_GCC_OPTION(-Wall)
 AX_CFLAGS_GCC_OPTION(-Werror)
@@ -61,7 +61,7 @@ MYSQL_LIBS=""
 
 AC_MSG_CHECKING(for MySQL support)
 AC_ARG_WITH(mysql,
-    AC_HELP_STRING([--with-mysql@<:@=PATH@:>@],[Include MySQL support. PATH is the path to 'mysql_config']),
+    AS_HELP_STRING([--with-mysql@<:@=PATH@:>@],[Include MySQL support. PATH is the path to 'mysql_config']),
     [WITH_MYSQL=$withval],[WITH_MYSQL=yes])
 
 if test "$WITH_MYSQL" = "no"; then
