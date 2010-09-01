@@ -6,7 +6,8 @@ proxy_backend_t **backend_read_file(char *filename, int *num);
 START_TEST (test_backend_read_no_filename) {
     int num;
 
-    freopen("/dev/null", "w", stderr);
+    FILE *null = fopen("/dev/null", "w");
+    if (null) { fclose(stderr); stderr = null; }
 
     fail_unless(backend_read_file(NULL, &num) == NULL);
     fail_unless(num < 0);
@@ -15,7 +16,8 @@ START_TEST (test_backend_read_no_filename) {
 START_TEST (test_backend_read_not_exists) {
     int num;
 
-    freopen("/dev/null", "w", stderr);
+    FILE *null = fopen("/dev/null", "w");
+    if (null) { fclose(stderr); stderr = null; }
 
     fail_unless(backend_read_file("backend/NOTHING.txt", &num) == NULL);
     fail_unless(num < 0);

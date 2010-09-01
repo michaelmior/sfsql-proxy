@@ -7,6 +7,8 @@
 #include <sys/un.h>
 #include <signal.h>
 
+MYSQL* client_init(Vio *vio);
+
 int send_file(char *filename, int sd) {
     FILE *fp;
     ulong size;
@@ -36,8 +38,7 @@ int send_file(char *filename, int sd) {
 
 int compare_to_file(char *filename, int sd) {
     FILE *fp;
-    ulong size, c;
-    int n, i;
+    ulong size, c, i, n;
     char *buf1, *buf2, *pos1, *pos2;
 
     fp = fopen(filename, "r");
@@ -56,7 +57,7 @@ int compare_to_file(char *filename, int sd) {
     pos2 = buf2;
     while (c > 0) {
         n = fread(pos1, 1, size, fp);
-        if (read(sd, pos2, n) != n)
+        if (read(sd, pos2, n) != (int)n)
             return -1;
         c -= n;
         pos1 += n;
@@ -74,9 +75,9 @@ int compare_to_file(char *filename, int sd) {
 START_TEST (test_net_handshake) {
     struct sockaddr_un sa;
     struct sockaddr_in addr;
-    int s, ns, i, pid, size;
+    int s, ns, pid;
+    socklen_t i;
     MYSQL *mysql;
-    char buf[65];
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -96,7 +97,7 @@ START_TEST (test_net_handshake) {
             addr.sin_port = 0;
 
             /* Try to handshake */
-            mysql = client_init(NULL);
+            mysql = client_init((Vio*) NULL);
             proxy_net_handshake(mysql, &addr, 0);
             exit(0);
         default:

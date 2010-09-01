@@ -26,3 +26,4 @@ depcomp
 config\.h.*
 (.*/)?Makefile
 (.*/)?Makefile.in
+tests/check_.*[^\.][^c]$

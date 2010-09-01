@@ -329,17 +329,17 @@ int main(int argc, char *argv[]) {
     /* Connect to the backend server (default parameters for now) */
     if (backend_file) {
         error = proxy_backends_connect(backend_file,
-                user ?: BACKEND_USER,
-                pass ?: BACKEND_PASS,
-                db ?:   BACKEND_DB,
+                user ? user : BACKEND_USER,
+                pass ? pass : BACKEND_PASS,
+                db   ? db   : BACKEND_DB,
                 autocommit);
     } else {
-        backend.host = backend.host ?: strdup(BACKEND_HOST);
-        backend.port = backend.port ?: BACKEND_PORT;
+        backend.host = backend.host ? backend.host : strdup(BACKEND_HOST);
+        backend.port = backend.port ? backend.port : BACKEND_PORT;
         error = proxy_backend_connect(&backend,
-                user ?: BACKEND_USER,
-                pass ?: BACKEND_PASS,
-                db ?:   BACKEND_DB,
+                user ? user : BACKEND_USER,
+                pass ? pass : BACKEND_PASS,
+                db   ? db   : BACKEND_DB,
                 num_backends, autocommit);
     }
     if (error) {
@@ -348,7 +348,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Start proxying */
-    printf("Starting proxy on %s:%d\n", phost ?: "0.0.0.0", pport);
+    printf("Starting proxy on %s:%d\n", phost ? phost : "0.0.0.0", pport);
     server_run(phost, pport);
 
     /* Shutdown */

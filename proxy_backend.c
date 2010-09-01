@@ -276,7 +276,7 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     new_backends = (proxy_backend_t**) calloc(*num, sizeof(proxy_backend_t*));
     i = 0;
     pch = strtok(buf, " :\r\n\t");
-    while (pch != NULL && i<*num) {
+    while (pch != NULL && (int)i<*num) {
         new_backends[i] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
         new_backends[i]->freed = FALSE;
 

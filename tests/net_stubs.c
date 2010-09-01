@@ -32,7 +32,7 @@ my_bool __wrap_my_net_init(NET *net, Vio *vio) {
     return FALSE;
 }
 
-my_bool __wrap_proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
+my_bool __wrap_proxy_backend_query(__attribute__((unused)) MYSQL *proxy, const char *query, __attribute__((unused)) ulong length) {
     /* For now, this function does nothing.
      * In the future, we can check that
      * client queries are properly received. */
@@ -41,4 +41,4 @@ my_bool __wrap_proxy_backend_query(MYSQL *proxy, const char *query, ulong length
 }
 
 /* Don't need to touch the pool here */
-void __wrap_proxy_pool_return(pool_t *pool, int idx) {}
+void __wrap_proxy_pool_return(__attribute__((unused)) pool_t *pool, __attribute__((unused)) int idx) {}

@@ -9,18 +9,23 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
-AM_INIT_AUTOMAKE(-Wall -Werror -W 1.11)
+AM_INIT_AUTOMAKE(1.11)
 AC_LANG([C])
 
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_GNU_SOURCE
+AC_PROG_CC_C99
+AX_CFLAGS_GCC_OPTION(-Wall)
+AX_CFLAGS_GCC_OPTION(-Werror)
+AX_CFLAGS_GCC_OPTION(-Wextra)
+AX_CFLAGS_GCC_OPTION(-pedantic)
 
 # Checks for libraries.
 ACX_PTHREAD
 AC_CHECK_LIB(mysqlclient_r, mysql_real_connect)
-AM_PATH_CHECK()
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for header files.
 AC_HEADER_STDC
