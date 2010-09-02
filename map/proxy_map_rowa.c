@@ -20,6 +20,8 @@
  *
  */
 
+#include <stdlib.h>
+
 #include "proxy_map.h"
 
 #define SELECT "SELECT"
