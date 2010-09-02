@@ -21,4 +21,4 @@ check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
 
 check_map_SOURCES = check_map.c $(top_srcdir)/map/proxy_map.h
 check_map_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@
-check_map_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ -ldl
+check_map_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ -lltdl

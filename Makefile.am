@@ -3,6 +3,7 @@ SUBDIRS = . map tests
 EXTRA_DIST = \
 	doxygen.cfg
 
+#ACLOCAL_AMFLAGS = -I libltdl/m4
 ACLOCAL_AMFLAGS = -I m4
 
 bin_PROGRAMS = sfsql-proxy

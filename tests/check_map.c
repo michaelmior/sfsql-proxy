@@ -26,29 +26,31 @@
 #include "../map/proxy_map.h"
 
 #include <stdlib.h>
-#include <dlfcn.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <ltdl.h>
 
 proxy_map_query_t func = NULL;
-void *handle;
+lt_dlhandle handle;
 
 void setup_rowa() {
-    if (!(handle = dlopen("../map/" LT_OBJDIR "libproxymap-rowa.so", RTLD_NOW))) {
+    fail_unless(lt_dlinit() == 0);
+
+    if (!(handle = lt_dlopenext("../map/" LT_OBJDIR "libproxymap-rowa"))) {
         func = NULL;
         return;
     }
 
-    func = (proxy_map_query_t) (intptr_t) dlsym(handle, "proxy_map_query");
+    func = (proxy_map_query_t) (intptr_t) lt_dlsym(handle, "proxy_map_query");
 
-    if (dlerror() != NULL) {
+    if (lt_dlerror() != NULL) {
         func = NULL;
         return;
     }
 }
 
 void teardown() {
-    dlclose(handle);
+    lt_dlexit();
 }
 
 START_TEST (test_rowa_select) {

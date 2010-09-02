@@ -9,9 +9,12 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile map/Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
+AC_CONFIG_AUX_DIR([libltdl/config])
+
 AM_INIT_AUTOMAKE(1.11 no-define)
 AC_LANG([C])
 
+#LT_CONFIG_LTDL_DIR([libltdl])
 LT_INIT([shared, dlopen])
 
 # Checks for programs.
@@ -47,6 +50,7 @@ AC_FUNC_MALLOC
 AC_FUNC_FORK
 
 # Doxygen support
+DX_INIT_DOXYGEN([$PACKAGE_NAME], [doxygen.cfg], [doc])
 DX_HTML_FEATURE(ON)
 DX_CHM_FEATURE(OFF)
 DX_CHI_FEATURE(OFF)
@@ -55,7 +59,6 @@ DX_RTF_FEATURE(OFF)
 DX_XML_FEATURE(OFF)
 DX_PDF_FEATURE(OFF)
 DX_PS_FEATURE(OFF)
-DX_INIT_DOXYGEN([$PACKAGE_NAME], [doxygen.cfg], [doc])
 
 # Configure MySQL
 MYSQL_CFLAGS=""
@@ -121,6 +124,10 @@ if test "$with_debug" = "yes"; then
   CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 fi
 
-AC_DEFINE_UNQUOTED([TESTS_DIR], ["$srcdir/tests/"], [Directory where test files are stored])
+# Set correct directory for test files
+AS_IF([test "x$srcdir" = x.],
+      [TESTS_DIR=""],
+      [TESTS_DIR="$srcdir/tests/"])
+AC_DEFINE_UNQUOTED([TESTS_DIR], ["$TESTS_DIR"], [Directory for test files])
 
 AC_OUTPUT
