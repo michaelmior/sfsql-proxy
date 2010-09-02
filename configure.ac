@@ -6,11 +6,13 @@ AC_INIT([sfsql-proxy],[0.1],[mmior@cs.toronto.edu])
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([proxy.c])
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_FILES([Makefile tests/Makefile])
+AC_CONFIG_FILES([Makefile map/Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
 AM_INIT_AUTOMAKE(1.11)
 AC_LANG([C])
+
+LT_INIT([shared, dlopen])
 
 # Checks for programs.
 AC_PROG_CC

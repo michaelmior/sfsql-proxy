@@ -6,6 +6,8 @@ tags
 .*\.rej$
 .*\.txt$
 .*\.patch$
+.*\.la$
+.*\.lo$
 sfsql-proxy
 docs/.*
 autom4te.cache/.*
@@ -27,3 +29,4 @@ config\.h.*
 (.*/)?Makefile
 (.*/)?Makefile.in
 tests/check_.*[^\.][^c]$
+(.*/)?\.libs/.*

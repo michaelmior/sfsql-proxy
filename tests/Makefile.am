@@ -1,7 +1,7 @@
 ## Process this file automake to produce Makefile.in
 
-TESTS = check_pool check_net check_backend
-check_PROGRAMS = check_pool check_net check_backend
+TESTS = check_pool check_net check_backend check_map
+check_PROGRAMS = check_pool check_net check_backend check_map
 
 check_pool_SOURCES = check_pool.c $(top_builddir)/proxy_pool.c $(top_builddir)/proxy_pool.h
 check_pool_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@
@@ -18,3 +18,7 @@ check_net_LDFLAGS = \
 check_backend_SOURCES = check_backend.c $(top_builddir)/proxy_backend.c $(top_builddir)/proxy_backend.h $(top_builddir)/proxy_pool.c
 check_backend_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@
 check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
+
+check_map_SOURCES = check_map.c $(top_builddir)/map/proxy_map.h
+check_map_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@
+check_map_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ -ldl
