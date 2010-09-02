@@ -41,7 +41,7 @@ START_TEST (test_backend_read_not_exists) {
     FILE *null = fopen("/dev/null", "w");
     if (null) { fclose(stderr); stderr = null; }
 
-    fail_unless(backend_read_file("backend/NOTHING.txt", &num) == NULL);
+    fail_unless(backend_read_file(TESTS_DIR "backend/NOTHING.txt", &num) == NULL);
     fail_unless(num < 0);
 } END_TEST
 
@@ -49,7 +49,7 @@ START_TEST (test_backend_read_empty_file) {
     int num;
     proxy_backend_t **backends;
 
-    backends = backend_read_file("backend/backends-empty.txt", &num);
+    backends = backend_read_file(TESTS_DIR "backend/backends-empty.txt", &num);
 
     fail_unless(backends == NULL);
     fail_unless(num == 0);
@@ -59,7 +59,7 @@ START_TEST (test_backend_read_file) {
     int num;
     proxy_backend_t **backends;
 
-    backends = backend_read_file("backend/backends.txt", &num);
+    backends = backend_read_file(TESTS_DIR "backend/backends.txt", &num);
 
     fail_unless(num == 2);
 

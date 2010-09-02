@@ -38,6 +38,8 @@ int send_file(char *filename, int sd) {
     char *buf;
 
     fp = fopen(filename, "r");
+    if (!fp)
+        return -1;
 
     /* Get packet size */
     fseek(fp, 0L, SEEK_END);
@@ -102,6 +104,7 @@ START_TEST (test_net_handshake) {
     MYSQL *mysql;
 
     signal(SIGPIPE, SIG_IGN);
+    remove(SOCK_NAME);
 
     /* Set up client connection */
     sa.sun_family = AF_UNIX;
@@ -126,9 +129,9 @@ START_TEST (test_net_handshake) {
             i = sizeof(struct sockaddr_un);
             fail_unless((ns = accept(s, (struct sockaddr*) &sa, &i)) > 0);
 
-            fail_unless(compare_to_file("net/handshake-greeting.cap", ns) == 0);
-            fail_unless(send_file("net/handshake-auth.cap", ns) == 0);
-            fail_unless(compare_to_file("net/handshake-ok.cap", ns) == 0);
+            fail_unless(compare_to_file(TESTS_DIR "net/handshake-greeting.cap", ns) == 0);
+            fail_unless(send_file(TESTS_DIR "net/handshake-auth.cap", ns) == 0);
+            fail_unless(compare_to_file(TESTS_DIR "net/handshake-ok.cap", ns) == 0);
 
             close(s);
             close(ns);

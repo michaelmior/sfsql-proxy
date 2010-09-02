@@ -9,7 +9,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile map/Makefile tests/Makefile])
 AC_CONFIG_MACRO_DIR([m4])
 
-AM_INIT_AUTOMAKE(1.11)
+AM_INIT_AUTOMAKE(1.11 no-define)
 AC_LANG([C])
 
 LT_INIT([shared, dlopen])
@@ -120,5 +120,7 @@ AC_ARG_WITH(debug,
 if test "$with_debug" = "yes"; then
   CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 fi
+
+AC_DEFINE_UNQUOTED([TESTS_DIR], ["$srcdir/tests/"], [Directory where test files are stored])
 
 AC_OUTPUT

@@ -20,6 +20,8 @@
  *
  */
 
+#include "../config.h"
+
 #include <check.h>
 #include "../map/proxy_map.h"
 
@@ -32,7 +34,7 @@ proxy_map_query_t func = NULL;
 void *handle;
 
 void setup_rowa() {
-    if (!(handle = dlopen("../map/.libs/libproxymap-rowa.so", RTLD_NOW))) {
+    if (!(handle = dlopen("../map/" LT_OBJDIR "libproxymap-rowa.so", RTLD_NOW))) {
         func = NULL;
         return;
     }

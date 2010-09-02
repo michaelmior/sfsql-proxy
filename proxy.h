@@ -15,6 +15,14 @@
 #define _proxy_h
 
 #include <my_global.h>
+
+#undef PACKAGE_BUGREPORT
+#undef PACKAGE_NAME
+#undef PACKAGE_STRING
+#undef PACKAGE_TARNAME
+#undef PACKAGE_VERSION
+#include "config.h"
+
 #include <my_sys.h>
 #include <m_string.h>
 #include <m_ctype.h>
