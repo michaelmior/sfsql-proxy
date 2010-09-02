@@ -1,5 +1,18 @@
-#ifndef _proxy_query_h
-#define _proxy_query_h
+/* 
+ * proxy_map.h
+ *
+ * Interface for mapping queries to backends.
+ *
+ * This file is subject to the terms and conditions of the GNU General
+ * Public License.  See the file "COPYING" in the main directory of
+ * this archive for more details.
+ *
+ * Copyright (C) 2010 by Michael Mior <mmior@cs.toronto.edu>
+ *
+ */
+
+#ifndef _proxy_map_h
+#define _proxy_map_h
 
 #include <string.h>
 
@@ -22,4 +35,4 @@ typedef struct {
 /** Function pointer for query mapping. */
 typedef proxy_query_map_t* (*proxy_map_query_t) (char*);
 
-#endif /* _proxy_query_h */
+#endif /* _proxy_map_h */
