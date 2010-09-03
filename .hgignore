@@ -8,6 +8,7 @@ tags
 .*\.patch$
 .*\.la$
 .*\.lo$
+.*\~$
 sfsql-proxy
 docs/.*
 autom4te.cache/.*
