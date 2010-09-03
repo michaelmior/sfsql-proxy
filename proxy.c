@@ -197,7 +197,7 @@ static void usage() {
 }
 
 int main(int argc, char *argv[]) {
-    int error, pport, c, i, num_backends=NUM_BACKENDS, ret=EXIT_SUCCESS;
+    int error, pport, c, i, num_conns=NUM_CONNS, ret=EXIT_SUCCESS;
     proxy_backend_t backend;
     my_bool autocommit = TRUE;
     char *user, *pass, *db, *phost, *backend_file;
@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
                 backend_file = strdup(optarg);
                 break;
             case 'N':
-                num_backends = atoi(optarg);
+                num_conns = atoi(optarg);
                 break;
             case 'a':
                 autocommit = FALSE;
@@ -326,21 +326,19 @@ int main(int argc, char *argv[]) {
         pthread_create(&(threads[i].thread), &attr, proxy_net_new_thread, (void*) &(threads[i]));
     }
 
+    proxy_backend_init(
+        user ? user : BACKEND_USER,
+        pass ? pass : BACKEND_PASS,
+        db   ? db   : BACKEND_DB,
+        num_conns, autocommit);
+
     /* Connect to the backend server (default parameters for now) */
     if (backend_file) {
-        error = proxy_backends_connect(backend_file,
-                user ? user : BACKEND_USER,
-                pass ? pass : BACKEND_PASS,
-                db   ? db   : BACKEND_DB,
-                autocommit);
+        error = proxy_backends_connect(backend_file);
     } else {
         backend.host = backend.host ? backend.host : strdup(BACKEND_HOST);
         backend.port = backend.port ? backend.port : BACKEND_PORT;
-        error = proxy_backend_connect(&backend,
-                user ? user : BACKEND_USER,
-                pass ? pass : BACKEND_PASS,
-                db   ? db   : BACKEND_DB,
-                num_backends, autocommit);
+        error = proxy_backend_connect(&backend);
     }
     if (error) {
         ret = EXIT_FAILURE;

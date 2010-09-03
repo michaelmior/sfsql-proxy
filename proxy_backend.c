@@ -24,26 +24,30 @@
 
 #include <sql_common.h>
 #include <client_settings.h>
+#include <time.h>
 
 static char BUF[BUFSIZ];
 
 #define MAX_PACKET_LENGTH (256L*256L*256L-1) /** Maximum TCP packet length (from sql/net_serv.cc) */
 
-static proxy_backend_t **backends = NULL; /** Array of backends currently available */
-static pool_t *backend_pool = NULL;       /** Lock pool for controlling backend access */
-static my_bool backend_autocommit;        /** Global autocommit option */
-static int backend_num;                   /** Total number of backends */
-static char *backend_user;                /** Username for all backends */
-static char *backend_pass;                /** Password for all backends */
-static char *backend_db;                  /** Database for all backends */
-static char *backend_file;                /** Filename where backends were read from */
+static proxy_backend_t **backends = NULL;    /** Array of backends currently available */
+static proxy_backend_conn_t ***backend_conns;/** Backend MySQL connections */
+static pool_t **backend_pools = NULL;        /** Lock pool for controlling backend access */
+static my_bool backend_autocommit;           /** Global autocommit option */
+static int backend_num;                      /** Total number of backends */
+static int backend_num_conns;                /** Connections per backend */
+static char *backend_user;                   /** Username for all backends */
+static char *backend_pass;                   /** Password for all backends */
+static char *backend_db;                     /** Database for all backends */
+static char *backend_file;                   /** Filename where backends were read from */
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
-static void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit);
-static my_bool backend_connect(proxy_backend_t *backend);
+static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn);
 proxy_backend_t** backend_read_file(char *filename, int *num);
+static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_backend_t *backend);
+static my_bool backends_alloc(int num_backends);
 
 /**
  * Read a MySQL packet from the backend and forward to the client.
@@ -142,10 +146,10 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
  *  \param user         Username for all backends.
  *  \param pass         Password for all backends.
  *  \param db           Database for all backends.
- *  \param num_backends Total number of backends.
+ *  \param num_conns    Connections per backend.
  *  \param autocommit   Autocommit option to set on all backends.
  **/
-static void backend_init(char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
+void proxy_backend_init(char *user, char *pass, char *db, int num_conns, my_bool autocommit) {
     /* Set default parameters use empty strings
      * to specify NULL */
     if (*user == '\0')
@@ -159,27 +163,80 @@ static void backend_init(char *user, char *pass, char *db, int num_backends, my_
     backend_user = user;
     backend_pass = pass;
     backend_db =   db;
-    backend_num =  num_backends;
     backend_autocommit = autocommit;
+    backend_num_conns = num_conns;
 
-    /* Initialize a pool for locking backend access */
-    backend_pool = proxy_pool_new(backend_num);
+    /* Seed the RNG for later use */
+    srand(time(NULL));
+}
+
+/**
+ * Allocated data structures for storing backend info
+ *
+ * \param num_backends Number of backends to allocate.
+ **/
+static my_bool backends_alloc(int num_backends)  {
+    int i, j;
+
+    backend_num = num_backends;
     
-    if (!backends)
-        backends = (proxy_backend_t**) calloc(backend_num, sizeof(proxy_backend_t*));
+    /* Allocate memory for backends and connections */
+    if (num_backends > 0) {
+        if (!backends) {
+            backends = (proxy_backend_t**) calloc(backend_num, sizeof(proxy_backend_t*));
+            if (!backends)
+                goto error;
+        }
+
+        if (!backend_conns) {
+            backend_conns = (proxy_backend_conn_t***) calloc(backend_num, sizeof(proxy_backend_conn_t**));
+            if (!backend_conns)
+                goto error;
+
+            for (i=0; i<backend_num; i++) {
+                backend_conns[i] = (proxy_backend_conn_t**) calloc(backend_num_conns, sizeof(proxy_backend_conn_t*));
+                if (!backend_conns[i])
+                    goto error;
+
+                for (j=0; j<backend_num_conns; j++) {
+                    backend_conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t*));
+                    if (!backend_conns[i][j])
+                        goto error;
+
+                    backend_conns[i][j]->mysql = NULL;
+                    backend_conns[i][j]->freed = FALSE;
+                }
+            }
+        }
+    }
+
+    /* Initialize pools for locking backend access */
+    backend_pools = (pool_t**) calloc(backend_num, sizeof(proxy_backend_t**));
+    if (!backend_pools)
+        goto error;
+
+    for (i=0; i<num_backends; i++)
+        backend_pools[i] = proxy_pool_new(backend_num);
+
+    return FALSE;
+
+error:
+    proxy_backend_close();
+    return TRUE;
 }
 
 /**
  * Connect to a backend server with the given address.
  *
  * \param backend Address information of the backend.
+ * \param conn    Connection whre MySQL object should be stored.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_connect(proxy_backend_t *backend) {
+static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn) {
     MYSQL *mysql;
 
-    mysql = backend->mysql = NULL;
+    mysql = conn->mysql = NULL;
     mysql = mysql_init(NULL);
 
     if (mysql == NULL) {
@@ -197,7 +254,7 @@ static my_bool backend_connect(proxy_backend_t *backend) {
     /* Set autocommit option if specified */
     mysql_autocommit(mysql, backend_autocommit);
 
-    backend->mysql = mysql;
+    conn->mysql = mysql;
 
     return FALSE;
 }
@@ -278,13 +335,10 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     pch = strtok(buf, " :\r\n\t");
     while (pch != NULL && (int)i<*num) {
         new_backends[i] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
-        new_backends[i]->freed = FALSE;
 
         new_backends[i]->host = strdup(pch);
         pch = strtok(NULL, " :\r\n\t");
         new_backends[i]->port = atoi(pch);
-
-        new_backends[i]->mysql = NULL;
 
         pch = strtok(NULL, " :\r\n\t");
         i++;
@@ -298,33 +352,24 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
  * Open a number of connections to a single backend.
  *
  * \param backend      Backend connection information.
- * \param user         Username to use when connecting to the backend.
- * \param pass         Password to use when connecting to the backend.
- * \param db           Database to be selected after connecting.
- * \param num_backends Number of connections to open.
- * \param autocommit   Whether autocommit mode should be enabled on backends.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit) {
+my_bool proxy_backend_connect(proxy_backend_t *backend) {
     int i;
 
-    backend_init(user, pass, db, num_backends, autocommit);
+    if (backends_alloc(1))
+        return TRUE;
+
+    backends[0] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
+    backends[0]->host = strdup(backend->host);
+    backends[0]->port = backend->port;
 
     /* Connect to all backends */
-    for (i=0; i<backend_num; i++) {
-        /* Allocate the new backend */
-        backends[i] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
-        backends[i]->freed = FALSE;
-        backends[i]->host = strdup(backend->host);
-        backends[i]->port = backend->port;
-        backends[i]->mysql = NULL;
-
-        if (backend_connect(backends[i]) < 0)
+    for (i=0; i<backend_num_conns; i++) {
+        if (backend_connect(backends[0], backend_conns[0][i]) < 0)
             return TRUE;
     }
-
-    backend_autocommit = autocommit;
 
     return FALSE;
 }
@@ -333,28 +378,28 @@ my_bool proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, 
  * Connect to all backends in a specified file.
  *
  * \param file       Filename of a file which contains a list of backends in the format host:port.
- * \param user       Username to use when connecting to the backend.
- * \param pass       Password to use when connecting to the backend.
- * \param db         Database to be selected after connecting.
- * \param autocommit Whether autocommit mode should be enabled on backends.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit) {
-    int num_backends=-1, i;
+my_bool proxy_backends_connect(char *file) {
+    int num_backends=-1, i, j;
 
     backend_file = file;
 
     backends = backend_read_file(file, &num_backends);
-    backend_init(user, pass, db, num_backends, autocommit);
-
     if (!backends)
         return TRUE;
 
+    if (backends_alloc(num_backends))
+        return TRUE;
+
     for (i=0; i<num_backends; i++) {
-        if (backend_connect(backends[i]))
-            return TRUE;
-        printf("Connected to %s:%d\n", backends[i]->host, backends[i]->port);
+        printf("Connecting to %s:%d\n", backends[i]->host, backends[i]->port);
+
+        for (j=0; j<backend_num_conns; j++) {
+            if (backend_connect(backends[i], backend_conns[i][j]))
+                return TRUE;
+        }
     }
  
      return FALSE;
@@ -364,12 +409,15 @@ my_bool proxy_backends_connect(char *file, char *user, char *pass, char *db, my_
  * Update the list of backends from the previously loaded file.
  **/
 void proxy_backends_update() {
+#if 0
     int num, oldnum, i, j;
     my_bool keep[backend_num], changed = FALSE;
     proxy_backend_t **new_backends = backend_read_file(backend_file, &num);
+    pool_t **new_pools;
 
     /* Block others from getting backends */
-    proxy_pool_lock(backend_pool);
+    for (i=0; i<backend_num; i++)
+        proxy_pool_lock(backend_pools[i]);
 
     /* Compare the current backends with the new ones to
      * see if there are any which can be reused */
@@ -392,17 +440,21 @@ void proxy_backends_update() {
     /* Clean up old backends */
     for (i=0; i<backend_num; i++) {
         if (!keep[i]) {
-            if (proxy_pool_is_free(backend_pool, i)) {
-                printf("Disconnecting backend %s:%d\n", backends[i]->host, backends[i]->port);
+            for (j=0; j<backend_num_conns; j++) {
+                if (proxy_pool_is_free(backend_pools[i], j)) {
 
-                proxy_pool_remove(backend_pool, i);
-                mysql_close(backends[i]->mysql);
-                free(backends[i]);
-                backends[i] = NULL;
-            } else {
-                backends[i]->freed = TRUE;
-                printf("Delaying disconnection of backend %s:%d\n",backends[i]->host, backends[i]->port);
+                    proxy_pool_remove(backend_pools[i], j);
+                    mysql_close(backend_conns[i][j]->mysql);
+                    free(backend_conns[i][j]);
+                    backends_conns[i][j] = NULL;
+                } else {
+                    backend_conns[i][j]->freed = TRUE;
+                }
             }
+            
+            /* Destroy the pool */
+            proxy_pool_destroy(backend_pools[i]);
+            backend_pools[i] = NULL;
             changed = TRUE;
         }
     }
@@ -419,17 +471,25 @@ void proxy_backends_update() {
         return;
     }
 
+    /* Reallocate the backend pools */
+    new_pools = (pool_t**) calloc(backend_num, sizeof(pool_t*));
+    for (i=0,j=0; i<backend_num; i++)
+        if (backend_pools[i])
+            new_pools[j++] = backend_pools[i];
+    free(backend_pools);
+    backend_pools = new_pools;
+
     /* Connect to new backends */
     for (i=0; i<backend_num; i++) {
-        if (backends[i]->mysql == NULL) {
-            printf("Connecting to new backend %s:%d\n", backends[i]->host, backends[i]->port);
-            backend_connect(backends[i]);
+        /* Unlock pools */
+        proxy_pool_unlock(backend_pools[i]);
+
+        for (j=0; j<backend_num_conns; j++) {
+            if (backend_conns[i][j]->mysql == NULL)
+                backend_connect(backends[i], backend_conns[i][j]);
         }
     }
-
-    /* Update the size of the pool and unlock */
-    proxy_pool_set_size(backend_pool, backend_num);
-    proxy_pool_unlock(backend_pool);
+#endif
 }
 
 /**
@@ -445,11 +505,15 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
     uchar *pos;
-
-    /* The call below will block until a backend is free  */
-    int i, bi = proxy_pool_get(backend_pool);
-    proxy_backend_t *backend = backends[bi];
-    MYSQL *mysql = backend->mysql;
+    int i, bi, ci;
+    proxy_backend_conn_t *conn;
+    MYSQL *mysql;
+   
+    /* Pick a random backend and get a connection */
+    bi = rand() % backend_num;
+    ci = proxy_pool_get(backend_pools[bi]);
+    conn = backend_conns[bi][ci];
+    mysql = conn->mysql;
 
     /* XXX: need to sync with proxy? */
     printf("Sending query %s to backend %d\n", query, bi);
@@ -494,21 +558,40 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     }
 
 out:
-    /* Make the backend available again */
-    proxy_pool_return(backend_pool, bi);
-    if (backend->freed)
-        backend_free(backends[bi]);
+    /* Free connection resources if this connection
+     * has gone away, otherwise, return to pool */
+    if (conn->freed)
+        conn_free(conn);
     else
-        proxy_pool_return(backend_pool, bi);
+        proxy_pool_return(backend_pools[bi], ci);
 
     return error;
 }
 
 /**
- * Free resources associated with a backend.
+ * Free resources associated with a connection.
+ *
+ * \param conn Connection to free.
  **/
-void backend_free(proxy_backend_t *backend) {
-    mysql_close(backend->mysql);
+static void conn_free(proxy_backend_conn_t *conn) {
+    if (!conn)
+        return;
+
+    if (conn->mysql)
+        mysql_close(conn->mysql);
+
+    free(conn);
+}
+
+/**
+ * Free resources associated with a backend.
+ *
+ * \param backend Backend to free.
+ **/
+static void backend_free(proxy_backend_t *backend) {
+    if (!backend)
+        return;
+
     free(backend->host);
     free(backend);
 }
@@ -518,18 +601,21 @@ void backend_free(proxy_backend_t *backend) {
  * and destroy mutexes.
  **/
 void proxy_backend_close() {
-    int i;
+    int i, j;
 
-    /* Destroy lock pool */
-    proxy_pool_destroy(backend_pool);
+    /* Close connections and destroy lock pools */
+    for (i=0; i<backend_num; i++) {
+        for (j=0; j<backend_num_conns; j++)
+            conn_free(backend_conns[i][j]);
+        free(backend_conns[i]);
 
-    if (!backends)
-        return;
+        backend_free(backends[i]);
 
-    /* Close connection with backends */
-    for (i=0; i<backend_num; i++)
-        if (backends[i]->mysql)
-            backend_free(backends[i]);
+        if (backend_pools)
+            proxy_pool_destroy(backend_pools[i]);
+    }
 
+    free(backend_pools);
     free(backends);
+    free(backend_conns);
 }

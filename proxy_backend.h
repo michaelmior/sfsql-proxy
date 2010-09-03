@@ -17,12 +17,16 @@
 typedef struct st_proxy_backend {
     char *host;
     int port;
-    MYSQL *mysql;
-    my_bool freed;
 } proxy_backend_t;
 
-my_bool proxy_backend_connect(proxy_backend_t *backend, char *user, char *pass, char *db, int num_backends, my_bool autocommit);
-my_bool proxy_backends_connect(char *file, char *user, char *pass, char *db, my_bool autocommit);
+typedef struct st_proxy_backend_conn_t {
+    MYSQL *mysql;
+    my_bool freed;
+} proxy_backend_conn_t;
+
+void proxy_backend_init(char *user, char *pass, char *db, int num_conns, my_bool autocommit);
+my_bool proxy_backend_connect(proxy_backend_t *backend);
+my_bool proxy_backends_connect(char *file);
 void proxy_backends_update();
 my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length);
 void proxy_backend_close();

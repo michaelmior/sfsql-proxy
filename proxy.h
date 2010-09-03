@@ -73,7 +73,7 @@ void __proxy_error(const char *loc, ...);
 #define BACKEND_USER  "root"      /** Default backend user */
 #define BACKEND_PASS  "root"      /** Default backend password */
 #define BACKEND_DB    "test"      /** Default backend database */
-#define NUM_BACKENDS  10          /** Default number of backends */
+#define NUM_CONNS     10          /** Default number of connections per backend */
 
 #define PROXY_PORT    4040        /** Default port to listen on for incoming connections */
 #define PROXY_THREADS 10          /** Default number of threads started to do client work */
