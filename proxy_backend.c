@@ -409,11 +409,11 @@ my_bool proxy_backends_connect(char *file) {
  * Update the list of backends from the previously loaded file.
  **/
 void proxy_backends_update() {
-#if 0
-    int num, oldnum, i, j;
-    my_bool keep[backend_num], changed = FALSE;
-    proxy_backend_t **new_backends = backend_read_file(backend_file, &num);
-    pool_t **new_pools;
+    int num, oldnum, i, j, keep[backend_num];
+    my_bool changed = FALSE;
+    proxy_backend_t **new_backends = backend_read_file(backend_file, &num), **old_backends;
+    pool_t **new_pools = NULL, **old_pools;
+    proxy_backend_conn_t ***new_conns = NULL, ***old_conns;
 
     /* Block others from getting backends */
     for (i=0; i<backend_num; i++)
@@ -422,46 +422,62 @@ void proxy_backends_update() {
     /* Compare the current backends with the new ones to
      * see if there are any which can be reused */
     for (i=0; i<backend_num; i++) {
-        keep[i] = FALSE;
+        keep[i] = -1;
 
         for (j=0; j<num; j++) {
             /* Check for backends already connected */
             if (strcmp(backends[i]->host, new_backends[j]->host) == 0
-                    && backends[i]->port == new_backends[j]->port
-                    && backends[i]->mysql != NULL
-                    && new_backends[j]->mysql == NULL) {
-                new_backends[j]->mysql = backends[i]->mysql;
-                keep[i] = TRUE;
+                    && backends[i]->port == new_backends[j]->port) {
+                keep[i] = j;
                 break;
             }
+        }
+
+        if (keep[i] < 0)
+            changed = TRUE;
+    }
+
+    /* Reallocate data structures if necessary */
+    if (backend_num != num || changed) {
+        new_pools = (pool_t**) calloc(num, sizeof(pool_t*));
+        new_conns = (proxy_backend_conn_t***) calloc(num, sizeof(proxy_backend_conn_t**));
+
+        for (j=0; j<num; j++) {
+            new_pools[j] = NULL;
+            new_conns[j] = NULL;
         }
     }
 
     /* Clean up old backends */
     for (i=0; i<backend_num; i++) {
-        if (!keep[i]) {
+        if (keep[i] < 0) {
+            /* Free connections */
             for (j=0; j<backend_num_conns; j++) {
                 if (proxy_pool_is_free(backend_pools[i], j)) {
-
                     proxy_pool_remove(backend_pools[i], j);
-                    mysql_close(backend_conns[i][j]->mysql);
-                    free(backend_conns[i][j]);
-                    backends_conns[i][j] = NULL;
+                    conn_free(backend_conns[i][j]);
                 } else {
                     backend_conns[i][j]->freed = TRUE;
                 }
             }
+
+            free(backend_conns[i]);
+            backend_free(backends[i]);
             
             /* Destroy the pool */
             proxy_pool_destroy(backend_pools[i]);
             backend_pools[i] = NULL;
-            changed = TRUE;
+        } else {
+            /* Save existing data */
+            new_pools[keep[i]] = backend_pools[i];
+            new_conns[keep[i]] = backend_conns[i];
         }
     }
 
     /* Switch to the new set of backends */
-    free(backends);
+    old_backends = backends;
     backends = new_backends;
+    free(old_backends);
     oldnum = backend_num;
     backend_num = num;
 
@@ -471,25 +487,34 @@ void proxy_backends_update() {
         return;
     }
 
-    /* Reallocate the backend pools */
-    new_pools = (pool_t**) calloc(backend_num, sizeof(pool_t*));
-    for (i=0,j=0; i<backend_num; i++)
-        if (backend_pools[i])
-            new_pools[j++] = backend_pools[i];
-    free(backend_pools);
+    /* Switch to new resources */
+    old_pools = backend_pools;
     backend_pools = new_pools;
+    free(old_pools);
+
+    old_conns = backend_conns;
+    backend_conns = new_conns;
+    free(old_conns);
 
     /* Connect to new backends */
     for (i=0; i<backend_num; i++) {
-        /* Unlock pools */
-        proxy_pool_unlock(backend_pools[i]);
+        if (!backend_conns[i]) {
+            backend_conns[i] = (proxy_backend_conn_t**) calloc(backend_num_conns, sizeof(proxy_backend_conn_t*));
 
-        for (j=0; j<backend_num_conns; j++) {
-            if (backend_conns[i][j]->mysql == NULL)
+            for (j=0; j<backend_num_conns; j++) {
+                backend_conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
                 backend_connect(backends[i], backend_conns[i][j]);
+            }
+        }
+
+        /* Allocate a new pool if necessary */
+        if (!backend_pools[i]) {
+            backend_pools[i] = proxy_pool_new(backend_num_conns);
+        } else {
+            /* Unlock pool */
+            proxy_pool_unlock(backend_pools[i]);
         }
     }
-#endif
 }
 
 /**
@@ -509,8 +534,12 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     proxy_backend_conn_t *conn;
     MYSQL *mysql;
    
-    /* Pick a random backend and get a connection */
+    /* Pick a random backend and get a connection.
+     * We check for an unallocated pool in case
+     * backends are in the process of changing */
     bi = rand() % backend_num;
+    while (!backend_pools[bi]) { bi = rand() % backend_num; }
+
     ci = proxy_pool_get(backend_pools[bi]);
     conn = backend_conns[bi][ci];
     mysql = conn->mysql;
