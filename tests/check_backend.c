@@ -24,16 +24,6 @@
 
 #include <check.h>
 
-START_TEST (test_backend_init) {
-    proxy_backend_init(BACKEND_USER, BACKEND_PASS, BACKEND_DB, NUM_CONNS, TRUE);
-
-    fail_unless(strcmp(backend_user, BACKEND_USER) == 0);
-    fail_unless(strcmp(backend_pass, BACKEND_PASS) == 0);
-    fail_unless(strcmp(backend_db, BACKEND_DB) == 0);
-    fail_unless(backend_num_conns == NUM_CONNS);
-    fail_unless(backend_autocommit);
-} END_TEST
-
 START_TEST (test_backend_read_no_filename) {
     int num;
 
@@ -80,10 +70,6 @@ START_TEST (test_backend_read_file) {
 
 Suite *backend_suite(void) {
     Suite *s = suite_create("Backend");
-
-    TCase *tc_init = tcase_create("Initialization");
-    tcase_add_test(tc_init, test_backend_init);
-    suite_add_tcase(s, tc_init);
 
     TCase *tc_file = tcase_create("File");
     tcase_add_test(tc_file, test_backend_read_no_filename);

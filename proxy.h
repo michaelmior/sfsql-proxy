@@ -67,6 +67,7 @@ void __proxy_error(const char *loc, ...);
 #include "proxy_backend.h"
 #include "proxy_pool.h"
 #include "proxy_threading.h"
+#include "proxy_options.h"
 
 #define BACKEND_HOST  "127.0.0.1" /** Default backend host */
 #define BACKEND_PORT  3306        /** Default backend port */

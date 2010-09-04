@@ -26,8 +26,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
-#include <getopt.h>
-#include <sysexits.h>
 
 #include "proxy.h"
 
@@ -173,118 +171,15 @@ static void catch_sig(int sig) {
     }
 }
 
-/** Print a simple usage message with command-line arguments.
- **/
-static void usage() {
-    printf(
-            "SnowFlock SQL proxy server - (C) Michael Mior <mmior@cs.toronto.edu>, 2010\n\n"
-            "Options:\n"
-            "\t--help,         -?\tShow this message\n\n"
-            "Backend options:\n"
-            "\t--backend-host, -h\tHost to forward queries to (default: 127.0.0.1)\n"
-            "\t--backend-port, -p\tPort of the backend host (default: 3306)\n"
-            "\t--backend-db,   -D\tName of database on the backend (default: test)\n"
-            "\t--backend-user, -u\tUser for backend server (default: root)\n"
-            "\t--backend-pass, -p\tPassword for backend user\n"
-            "\t--backend-file, -f\tFile listing available backends\n"
-            "\t                  \t(cannot be specified with above options)\n"
-            "\t--num-backends, -N\tNumber connections per backend\n"
-            "\t                -a\tDisable autocommit (default is enabled)\n\n"
-            "Proxy options:\n"
-            "\t--proxy-host,   -b\tBinding address (default is 0.0.0.0)\n"
-            "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n"
-    );
-}
 
 int main(int argc, char *argv[]) {
-    int error, pport, c, i, num_conns=NUM_CONNS, ret=EXIT_SUCCESS;
-    proxy_backend_t backend;
-    my_bool autocommit = TRUE;
-    char *user, *pass, *db, *phost, *backend_file;
+    int error, i, ret=EXIT_SUCCESS;
     pthread_attr_t attr;
     struct sigaction new_action, old_action;
 
-    /* Set arguments to default values */
-    backend.host = NULL;
-    backend.port = 0;
-    user = pass = db = phost = backend_file = NULL;
-    pport = PROXY_PORT;
-
-    /* Parse command-line options */
-    while(1) {
-        static struct option long_options[] = {
-            {"help",         no_argument,       0, '?'},
-            {"backend-host", required_argument, 0, 'h'},
-            {"backend-port", required_argument, 0, 'P'},
-            {"backend-db",   required_argument, 0, 'D'},
-            {"backend-user", required_argument, 0, 'u'},
-            {"backend-pass", required_argument, 0, 'p'},
-            {"backend-file", required_argument, 0, 'f'},
-            {"num-backends", required_argument, 0, 'N'},
-            {"proxy-host",   required_argument, 0, 'b'},
-            {"proxy-port",   required_argument, 0, 'L'},
-            {0, 0, 0, 0}
-        };
-
-        int opt = 0;
-        c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:", long_options, &opt);
-
-        if (c == -1)
-            break;
-
-        switch(c) {
-            case '?':
-                usage();
-                ret = EXIT_SUCCESS;
-                goto out_free;
-            case 'h':
-                backend.host = strdup(optarg);
-                break;
-            case 'P':
-                backend.port = atoi(optarg);
-                break;
-            case 'D':
-                db = strdup(optarg);
-                break;
-            case 'u':
-                user = strdup(optarg);
-                break;
-            case 'p':
-                pass = strdup(optarg);
-                break;
-            case 'f':
-                backend_file = strdup(optarg);
-                break;
-            case 'N':
-                num_conns = atoi(optarg);
-                break;
-            case 'a':
-                autocommit = FALSE;
-                break;
-            case 'b':
-                phost = strdup(optarg);
-                break;
-            case 'L':
-                pport = atoi(optarg);
-                break;
-            default:
-                usage();
-                ret = EX_USAGE;
-                goto out_free;
-        }
-    }
-
-    if (backend_file) {
-        if (backend.host || backend.port > 0) {
-            usage();
-            ret = EX_USAGE;
-            goto out_free;
-        } else if (access(backend_file, R_OK)) {
-            proxy_error("Error accessing backend file:%s", errstr);
-            ret = EX_NOINPUT;
-            goto out_free;
-        }
-    }
+    ret = parse_options(argc, argv);
+    if (ret != EXIT_SUCCESS)
+        goto out_free;
 
     /* Threading initialization */
     proxy_threading_init();
@@ -326,28 +221,24 @@ int main(int argc, char *argv[]) {
         pthread_create(&(threads[i].thread), &attr, proxy_net_new_thread, (void*) &(threads[i]));
     }
 
-    proxy_backend_init(
-        user ? user : BACKEND_USER,
-        pass ? pass : BACKEND_PASS,
-        db   ? db   : BACKEND_DB,
-        num_conns, autocommit);
+    /* Initialize backend data */
+    proxy_backend_init();
 
-    /* Connect to the backend server (default parameters for now) */
-    if (backend_file) {
-        error = proxy_backends_connect(backend_file);
-    } else {
-        backend.host = backend.host ? backend.host : strdup(BACKEND_HOST);
-        backend.port = backend.port ? backend.port : BACKEND_PORT;
-        error = proxy_backend_connect(&backend);
-    }
+    /* Connect to the backend server */
+    if (options.backend_file)
+        error = proxy_backends_connect();
+    else
+        error = proxy_backend_connect();
+
     if (error) {
         ret = EXIT_FAILURE;
         goto out;
     }
 
     /* Start proxying */
-    printf("Starting proxy on %s:%d\n", phost ? phost : "0.0.0.0", pport);
-    server_run(phost, pport);
+    printf("Starting proxy on %s:%d\n",
+        options.phost ? options.phost : "0.0.0.0", options.pport);
+    server_run(options.phost, options.pport);
 
     /* Shutdown */
 out:
@@ -372,12 +263,12 @@ out:
 
 out_free:
     /* Free additional memory */
-    free(backend.host);
-    free(user);
-    free(pass);
-    free(db);
-    free(backend_file);
-    free(phost);
+    free(options.backend.host);
+    free(options.user);
+    free(options.pass);
+    free(options.db);
+    free(options.backend_file);
+    free(options.phost);
 
     return ret;
 }
