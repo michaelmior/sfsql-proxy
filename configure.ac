@@ -124,10 +124,4 @@ if test "$with_debug" = "yes"; then
   CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 fi
 
-# Set correct directory for test files
-AS_IF([test "x$srcdir" = x.],
-      [TESTS_DIR=""],
-      [TESTS_DIR="$srcdir/tests/"])
-AC_DEFINE_UNQUOTED([TESTS_DIR], ["$TESTS_DIR"], [Directory for test files])
-
 AC_OUTPUT
