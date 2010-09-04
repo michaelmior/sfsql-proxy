@@ -44,7 +44,7 @@ static char *backend_file;                   /** Filename where backends were re
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
 static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn);
-proxy_backend_t** backend_read_file(char *filename, int *num);
+static proxy_backend_t** backend_read_file(char *filename, int *num);
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_backend_t *backend);
 static my_bool backends_alloc(int num_backends);

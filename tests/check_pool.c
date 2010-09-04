@@ -20,8 +20,9 @@
  *
  */
 
+#include "../proxy_pool.c"
+
 #include <check.h>
-#include "../proxy.h"
 
 static pool_t *pool;
 

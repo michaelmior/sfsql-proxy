@@ -20,9 +20,10 @@
  *
  */
 
+#include "../proxy_net.c"
+
 #include <check.h>
 #include "check_net.h"
-#include "../proxy.h"
 
 #include <stdio.h>
 #include <sys/socket.h>

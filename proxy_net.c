@@ -27,11 +27,11 @@
 extern CHARSET_INFO *default_charset_info; /** Exposes the default charset in the client library */
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
-MYSQL* client_init(Vio *vio);
+static MYSQL* client_init(Vio *vio);
 void client_do_work(proxy_work_t *work);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
-my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
+static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
 
 /**
  * Perform client authentication.
