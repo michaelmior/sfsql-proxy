@@ -24,6 +24,80 @@
 
 #include <check.h>
 
+#define TEST_HOST          "127.0.0.2"
+#define TEST_PORT          "3307"
+#define TEST_DB            "db"
+#define TEST_USER          "test"
+#define TEST_PASS          "test"
+#define TEST_NUM_CONNS     "5"
+#define TEST_PROXY_HOST    "127.0.0.3"
+#define TEST_PROXY_PORT    "4041"
+#define TEST_PROXY_THREADS "5"
+
+/* Confirm that testing options are not the same as defaults */
+START_TEST (test_options_test) {
+    fail_unless(strcmp(TEST_HOST, BACKEND_HOST));
+    fail_unless(atoi(TEST_PORT) != BACKEND_PORT);
+    fail_unless(strcmp(TEST_DB, BACKEND_DB));
+    fail_unless(strcmp(TEST_USER, BACKEND_USER));
+    fail_unless(strcmp(TEST_PASS, BACKEND_PASS));
+    fail_unless(atoi(TEST_NUM_CONNS) != NUM_CONNS);
+    fail_unless(TEST_PROXY_HOST != NULL);
+    fail_unless(atoi(TEST_PROXY_PORT) != PROXY_PORT);
+    fail_unless(atoi(TEST_PROXY_THREADS) != PROXY_THREADS);
+} END_TEST
+
+/* Short option parsing */
+START_TEST (test_options_short) {
+    char *argv[] = { "./sfsql-proxy",
+        "-h" TEST_HOST,
+        "-P" TEST_PORT,
+        "-D" TEST_DB,
+        "-u" TEST_USER,
+        "-p" TEST_PASS,
+        "-N" TEST_NUM_CONNS,
+        "-a",
+        "-b" TEST_PROXY_HOST,
+        "-L" TEST_PROXY_PORT };
+
+    fail_unless(parse_options(10, argv) == EXIT_SUCCESS);
+
+    fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
+    fail_unless(options.backend.port == atoi(TEST_PORT));
+    fail_unless(strcmp(options.db, TEST_DB) == 0);
+    fail_unless(strcmp(options.user, TEST_USER) == 0);
+    fail_unless(strcmp(options.pass, TEST_PASS) == 0);
+    fail_unless(options.num_conns == atoi(TEST_NUM_CONNS));
+    fail_unless(!options.autocommit);
+    fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
+    fail_unless(options.pport == atoi(TEST_PROXY_PORT));
+} END_TEST
+
+/* Long option parsing */
+START_TEST (test_options_long) {
+    char *argv[] = { "./sfsql-proxy",
+        "--backend-host=" TEST_HOST,
+        "--backend-port=" TEST_PORT,
+        "--backend-db="   TEST_DB,
+        "--backend-user=" TEST_USER,
+        "--backend-pass=" TEST_PASS,
+        "--num-conns="    TEST_NUM_CONNS,
+        "--proxy-host="   TEST_PROXY_HOST,
+        "--proxy-port="   TEST_PROXY_PORT };
+
+    fail_unless(parse_options(9, argv) == EXIT_SUCCESS);
+
+    fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
+    fail_unless(options.backend.port == atoi(TEST_PORT));
+    fail_unless(strcmp(options.db, TEST_DB) == 0);
+    fail_unless(strcmp(options.user, TEST_USER) == 0);
+    fail_unless(strcmp(options.pass, TEST_PASS) == 0);
+    fail_unless(options.num_conns == atoi(TEST_NUM_CONNS));
+    fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
+    fail_unless(options.pport == atoi(TEST_PROXY_PORT));
+} END_TEST
+
+/* Assignment of default options */
 START_TEST (test_options_defaults) {
     /* Specify no arguments */
     fail_unless(parse_options(0, NULL) == EXIT_SUCCESS);
@@ -41,6 +115,7 @@ START_TEST (test_options_defaults) {
     fail_unless(options.pport == PROXY_PORT);
 } END_TEST
 
+/* Specification of invalid file */
 START_TEST (test_options_bad_file) {
     char *argv[] = { "./sfsql-proxy", "-fNOTHING.txt" };
 
@@ -50,8 +125,9 @@ START_TEST (test_options_bad_file) {
     fail_unless(parse_options(2, argv) == EX_NOINPUT);
 } END_TEST
 
+/* Specification of both backend and filename */
 START_TEST (test_options_backend_and_file) {
-    char *argv[] = { "./sfsql-proxy", "-fNOTHING.txt", "-h127.0.0.1" };
+    char *argv[] = { "./sfsql-proxy", "-fNOTHING.txt", "-h" BACKEND_HOST };
 
     FILE *null = fopen("/dev/null", "w");
     if (null) { fclose(stderr); stderr = null; }
@@ -64,6 +140,9 @@ Suite *options_suite(void) {
     Suite *s = suite_create("Options");
 
     TCase *tc_cli = tcase_create("Command-line parsing");
+    tcase_add_test(tc_cli, test_options_test);
+    tcase_add_test(tc_cli, test_options_short);
+    tcase_add_test(tc_cli, test_options_long);
     tcase_add_test(tc_cli, test_options_defaults);
     tcase_add_test(tc_cli, test_options_bad_file);
     tcase_add_test(tc_cli, test_options_backend_and_file);
