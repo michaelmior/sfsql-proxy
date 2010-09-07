@@ -10,7 +10,7 @@ tags
 .*\.lo$
 .*\~$
 sfsql-proxy
-docs/.*
+doc/.*
 autom4te.cache/.*
 (.*/)?\.deps
 config\.guess
