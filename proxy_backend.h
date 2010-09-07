@@ -14,12 +14,12 @@
 
 /**
  * Connection information for backends */
-typedef struct st_proxy_backend {
+typedef struct {
     char *host;
     int port;
 } proxy_backend_t;
 
-typedef struct st_proxy_backend_conn_t {
+typedef struct {
     MYSQL *mysql;
     my_bool freed;
 } proxy_backend_conn_t;
