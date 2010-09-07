@@ -181,7 +181,6 @@ int proxy_pool_get(pool_t *pool) {
 
     /* Wait for something to become available */
     while (1) {
-        printf("No more threads :( I'll wait...\n");
         proxy_mutex_lock(pool->avail_mutex);
         proxy_cond_wait(pool->avail_cv, pool->avail_mutex);
 
@@ -245,8 +244,6 @@ int proxy_pool_get_locked(pool_t *pool) {
  * \param idx  Index of the item to return
  **/
 void proxy_pool_return(pool_t *pool, int idx) {
-    printf("You can have %d back\n", idx);
-    
     /* Update the item availability */
     pthread_mutex_lock(&(pool->lock));
     if (pool->avail[idx])
