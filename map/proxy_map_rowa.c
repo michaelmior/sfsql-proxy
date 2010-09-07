@@ -33,11 +33,11 @@ proxy_query_map_t* proxy_map_query(char *query) {
     if (!map)
         return NULL;
 
-    map->query = strdup(query);
+    map->query = NULL;
 
     /* Anything which starts with SELECT goes to
      * any backend, otherwise, go everywhere */
-    if (strncmp(query, SELECT, strlen(SELECT)) == 0)
+    if (strncasecmp(query, SELECT, strlen(SELECT)) == 0)
         map->map = QUERY_MAP_ANY;
     else
         map->map = QUERY_MAP_ALL;

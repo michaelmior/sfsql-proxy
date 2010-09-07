@@ -24,11 +24,11 @@ typedef struct st_proxy_backend_conn_t {
     my_bool freed;
 } proxy_backend_conn_t;
 
-void proxy_backend_init();
+my_bool proxy_backend_init();
 my_bool proxy_backend_connect();
 my_bool proxy_backends_connect();
 void proxy_backends_update();
-my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length);
+my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length);
 void proxy_backend_close();
 
 #endif /* _proxy_backend_h */

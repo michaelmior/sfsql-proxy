@@ -18,7 +18,7 @@ check_net_LDFLAGS = \
 check_net_DEPENDENCIES = $(top_srcdir)/proxy_net.c $(top_srcdir)/proxy_net.h
 
 check_backend_SOURCES = check_backend.c $(top_srcdir)/proxy_pool.c
-check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
+check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ -lltdl
 check_backend_DEPENDENCIES = $(top_srcdir)/proxy_backend.c $(top_srcdir)/proxy_backend.h 
 
 check_map_SOURCES = check_map.c

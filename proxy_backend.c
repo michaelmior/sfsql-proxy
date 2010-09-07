@@ -21,19 +21,23 @@
  */
 
 #include "proxy.h"
+#include "map/proxy_map.h"
 
 #include <sql_common.h>
 #include <client_settings.h>
 #include <time.h>
+#include <ltdl.h>
 
 static char BUF[BUFSIZ];
 
-#define MAX_PACKET_LENGTH (256L*256L*256L-1) /** Maximum TCP packet length (from sql/net_serv.cc) */
+#define MAX_PACKET_LENGTH (256L*256L*256L-1)     /** Maximum TCP packet length (from sql/net_serv.cc) */
 
-static proxy_backend_t **backends = NULL;    /** Array of backends currently available */
-static proxy_backend_conn_t ***backend_conns;/** Backend MySQL connections */
-static pool_t **backend_pools = NULL;        /** Lock pool for controlling backend access */
-static int backend_num;                      /** Total number of backends */
+static proxy_backend_t **backends = NULL;        /** Array of backends currently available */
+static proxy_backend_conn_t ***backend_conns;    /** Backend MySQL connections */
+static pool_t **backend_pools = NULL;            /** Lock pool for controlling backend access */
+static int backend_num;                          /** Total number of backends */
+static proxy_map_query_t backend_mapper = NULL;  /** Query mapper for selecting backends */
+static lt_dlhandle backend_mapper_handle = NULL; /** ltdl handle to the mapper library */
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
@@ -42,6 +46,7 @@ static proxy_backend_t** backend_read_file(char *filename, int *num);
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_backend_t *backend);
 static my_bool backends_alloc(int num_backends);
+static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length);
 
 /**
  * Read a MySQL packet from the backend and forward to the client.
@@ -79,10 +84,12 @@ static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
     if (net->read_pos[0] == 255 && pkt_len <= 3)
         return (packet_error);
 
-    /* Read from the backend and forward to the proxy connection */
-    if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
-        proxy_error("Couldn't forward backend packet to proxy");
-        return (packet_error);
+    if (proxy) {
+        /* Read from the backend and forward to the proxy connection */
+        if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
+            proxy_error("Couldn't forward backend packet to proxy");
+            return (packet_error);
+        }
     }
 
     return pkt_len;
@@ -123,12 +130,12 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
         if (total_len >= MAX_PACKET_LENGTH) {
             total_len = 0;
             /* Flush the write buffer */
-            net_flush(&(proxy->net));
+            proxy_net_flush(proxy);
         }
     }
 
     /* Final flush */
-    net_flush(&(proxy->net));
+    proxy_net_flush(proxy);
 
     /* success */
     return FALSE;
@@ -136,10 +143,44 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
 
 /**
  *  Set up backend data structures.
+ *
+ *  \return TRUE on error, FALSE otherwise.
  **/
-void proxy_backend_init() {
+my_bool proxy_backend_init() {
+    char *buf = NULL;
+
+    /* Load the query mapper */
+    if (options.mapper != NULL) {
+        /* Initialize ltdl */
+        if (lt_dlinit())
+            return TRUE;
+
+        /* Construct the path to the mapper library */
+        buf = (char*) malloc(BUFSIZ);
+        snprintf(buf, BUFSIZ, "map/" LT_OBJDIR "libproxymap-%s", options.mapper);
+
+        if (!(backend_mapper_handle = lt_dlopenext(buf))) {
+            free(buf);
+            return TRUE;
+        }
+
+        /* Grab the mapper from the library */
+        backend_mapper = (proxy_map_query_t) (intptr_t) lt_dlsym(backend_mapper_handle, "proxy_map_query");
+
+        /* Check for errors */
+        free(buf);
+        buf = (char*) lt_dlerror();
+
+        if (buf) {
+            proxy_error("Couldn't load mapper %s:%s", options.mapper, buf);
+            free(buf);
+        }
+    }
+
     /* Seed the RNG for later use */
     srand(time(NULL));
+
+    return FALSE;
 }
 
 /**
@@ -171,7 +212,7 @@ static my_bool backends_alloc(int num_backends)  {
                     goto error;
 
                 for (j=0; j<options.num_conns; j++) {
-                    backend_conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t*));
+                    backend_conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
                     if (!backend_conns[i][j])
                         goto error;
 
@@ -268,7 +309,7 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     fseek(f, 0, SEEK_SET);
 
     /* Read the entire file */
-    buf = (char*) malloc(pos);
+    buf = (char*) malloc(pos+1);
     if (fread(buf, 1, pos, f) != pos) {
         if (ferror(f))
             proxy_error("Error reading from backend file %s:%s", filename, errstr);
@@ -282,6 +323,7 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
         return NULL;
     }
     fclose(f);
+    buf[pos] = '\0';
 
     /* Count number of non-empty lines */
     *num = 0;
@@ -492,19 +534,86 @@ void proxy_backends_update() {
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
+my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
+    int bi;
+    proxy_query_map_t *map = NULL;
+    enum QUERY_MAP type = QUERY_MAP_ANY;
+    my_bool error = FALSE;
+    char *oq, *oq2;
+
+    /* Get the query map and modified query
+     * if a mapper was specified */
+    if (backend_mapper) {
+        map = (*backend_mapper)(query);
+
+        type = map->map;
+        if (map->query)
+            query = map->query;
+        printf("Query %s mapped to %d\n", query, (int) type);
+    }
+
+    switch (type) {
+        case QUERY_MAP_ANY:
+            /* Pick a random backend and get a connection.
+             * We check for an unallocated pool in case
+             * backends are in the process of changing */
+            bi = rand() % backend_num;
+            while (!backend_pools[bi]) { bi = rand() % backend_num; }
+            if (backend_query_idx(bi, proxy, query, length)) {
+                error = TRUE;
+                goto out;
+            }
+            break;
+        case QUERY_MAP_ALL:
+            /* Send a query to the other backends and keep only the first result */
+            /* XXX: For some reason, mysql_send_query messes with the value of
+             *      query even though it's declared const. The strdup-ing should
+             *      be unnecessary. */
+            for (bi=0; bi<backend_num; bi++) {
+                oq = strdup(query);
+                oq2 = query;
+                if (backend_query_idx(bi, bi == 0 ? proxy: NULL, query, length)) {
+                    error = TRUE;
+                    goto out;
+                }
+                free(oq2);
+                query = oq;
+            }
+            free(oq);
+
+            break;
+        default:
+            error = TRUE;
+            goto out;
+    }
+
+out:
+    /* Free resources associated with the map */
+    if (map) {
+        if (map->query)
+            free(map->query);
+        free(map);
+    }
+    return error;
+}
+
+/**
+ * Forward a query to a specific backend
+ *
+ * \param bi     Index of the backend to send the query to.
+ * \param proxy  MYSQL object to forward results to.
+ * \param query  Query string to execute.
+ * \param length Length of the query.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
     uchar *pos;
-    int i, bi, ci;
-    proxy_backend_conn_t *conn;
+    int ci, i;
     MYSQL *mysql;
-   
-    /* Pick a random backend and get a connection.
-     * We check for an unallocated pool in case
-     * backends are in the process of changing */
-    bi = rand() % backend_num;
-    while (!backend_pools[bi]) { bi = rand() % backend_num; }
+    proxy_backend_conn_t *conn;
 
     ci = proxy_pool_get(backend_pools[bi]);
     conn = backend_conns[bi][ci];
@@ -531,7 +640,7 @@ my_bool proxy_backend_query(MYSQL *proxy, const char *query, ulong length) {
     }
 
     /* Flush the write buffer */
-    net_flush(&(proxy->net));
+    proxy_net_flush(proxy);
 
     /* read field info */
     if (backend_read_rows(mysql, proxy, 7)) {
@@ -610,6 +719,14 @@ void proxy_backend_close() {
             proxy_pool_destroy(backend_pools[i]);
     }
 
+    /* Free ltdl resources associated with
+     * the mapper library */
+    if (backend_mapper_handle)
+        lt_dlclose(backend_mapper_handle);
+    if (backend_mapper)
+        lt_dlexit();
+
+    /* Free allocated memory */
     free(backend_pools);
     free(backends);
     free(backend_conns);

@@ -47,7 +47,10 @@ static void usage() {
             "\t                -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
             "\t--proxy-host,   -b\tBinding address (default is 0.0.0.0)\n"
-            "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n"
+            "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n\n"
+            "Mapper options:\n"
+            "\t--mapper,       -m\tMapper to use for mapping queryies to backends\n"
+            "\t                  \t(default is first available)\n\n"
     );
 }
 
@@ -70,6 +73,7 @@ int parse_options(int argc, char *argv[]) {
         {"num-conns",    required_argument, 0, 'N'},
         {"proxy-host",   required_argument, 0, 'b'},
         {"proxy-port",   required_argument, 0, 'L'},
+        {"mapper",       required_argument, 0, 'm'},
         {0, 0, 0, 0}
     };
 
@@ -84,9 +88,10 @@ int parse_options(int argc, char *argv[]) {
     options.backend_file = NULL;
     options.phost        = NULL;
     options.pport        = PROXY_PORT;
+    options.mapper       = NULL;
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:m:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 usage();
@@ -120,6 +125,9 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'L':
                 options.pport = atoi(optarg);
+                break;
+            case 'm':
+                options.mapper = strdup(optarg);
                 break;
             default:
                 usage();

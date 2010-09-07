@@ -326,7 +326,7 @@ void client_do_work(proxy_work_t *work) {
 
         /* One more flush the write buffer to make
          * sure client has everything */
-        net_flush(&(work->proxy->net));
+        proxy_net_flush(work->proxy);
 
         if (error != 0) {
             if (error < 0)
@@ -472,6 +472,6 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ul
         proxy_error("Error writing OK to client");
         return TRUE;
     } else {
-        return net_flush(net);
+        return proxy_net_flush(mysql);
     }
 }

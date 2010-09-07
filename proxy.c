@@ -222,7 +222,10 @@ int main(int argc, char *argv[]) {
     }
 
     /* Initialize backend data */
-    proxy_backend_init();
+    if (proxy_backend_init()) {
+        ret = EXIT_FAILURE;
+        goto out;
+    }
 
     /* Connect to the backend server */
     if (options.backend_file)
@@ -269,6 +272,7 @@ out_free:
     free(options.db);
     free(options.backend_file);
     free(options.phost);
+    free(options.mapper);
 
     return ret;
 }

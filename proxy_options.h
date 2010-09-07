@@ -26,6 +26,7 @@ struct {
     my_bool autocommit;      /** Autocommit option for backends */
     char *phost;             /** Host for proxy to bind to */
     int pport;               /** Port for proxy to listen on */
+    char *mapper;            /** Name of the query mapper to use */
 } options;
 
 #endif /* _proxy_options_h */
