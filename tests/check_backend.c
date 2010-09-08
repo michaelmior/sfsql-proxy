@@ -24,6 +24,7 @@
 
 #include <check.h>
 
+/* Error when trying to read backend with no filename */
 START_TEST (test_backend_read_no_filename) {
     int num;
 
@@ -34,6 +35,7 @@ START_TEST (test_backend_read_no_filename) {
     fail_unless(num < 0);
 } END_TEST
 
+/* Error for reading empty backend file */
 START_TEST (test_backend_read_not_exists) {
     int num;
 
@@ -44,6 +46,7 @@ START_TEST (test_backend_read_not_exists) {
     fail_unless(num < 0);
 } END_TEST
 
+/* NULL produced when reading empty f ile */
 START_TEST (test_backend_read_empty_file) {
     int num;
     proxy_backend_t **backends;
@@ -54,6 +57,7 @@ START_TEST (test_backend_read_empty_file) {
     fail_unless(num == 0);
 } END_TEST
 
+/* Correct parsing of backend file */
 START_TEST (test_backend_read_file) {
     int num;
     proxy_backend_t **backends;
