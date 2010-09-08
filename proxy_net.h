@@ -27,7 +27,7 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ul
  * /return TRUE on error, FALSE otherwise.
  **/
 static inline my_bool proxy_net_flush(MYSQL *proxy) {
-    if (proxy)
+    if (likely((intptr_t) proxy))
         return net_flush(&(proxy->net));
     else
         return FALSE;
