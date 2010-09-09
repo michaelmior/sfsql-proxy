@@ -36,7 +36,7 @@ int send_file(char *filename, int sd) {
     FILE *fp;
     ulong size;
     int n;
-    char *buf;
+    char *buf, *pos;
 
     fp = fopen(filename, "r");
     if (!fp)
@@ -48,15 +48,18 @@ int send_file(char *filename, int sd) {
     fseek(fp, 0L, SEEK_SET);
 
     buf = (char*) malloc(size);
+    pos = buf;
 
     /* Read the packet */
     while (size > 0) {
-        n = fread(buf, 1, size, fp);
-        if (write(sd, buf, n) != n)
+        n = fread(pos, 1, size, fp);
+        if (write(sd, pos, n) != n)
             return -1;
         size -= n;
-        buf += n;
+        pos += n;
     }
+
+    free(buf);
 
     return 0;
 }
@@ -93,6 +96,9 @@ int compare_to_file(char *filename, int sd) {
     for (i=0; i<size; i++)
         if (buf1[i] != buf2[i])
             return -1;
+
+    free(buf1);
+    free(buf2);
 
     return 0;
 }

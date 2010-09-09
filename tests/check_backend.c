@@ -70,6 +70,12 @@ START_TEST (test_backend_read_file) {
     fail_unless(backends[0]->port == 3306);
     fail_unless(strcmp(backends[1]->host, "127.0.0.1") == 0);
     fail_unless(backends[1]->port == 3307);
+
+    free(backends[0]->host);
+    free(backends[0]);
+    free(backends[1]->host);
+    free(backends[1]);
+    free(backends);
 } END_TEST
 
 /* LCG must produce all values */
