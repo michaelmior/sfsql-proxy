@@ -32,6 +32,7 @@
 static char BUF[BUFSIZ];
 
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)     /** Maximum TCP packet length (from sql/net_serv.cc) */
+#define MAX_BACKENDS      128                    /** Maximum number of backends. Must be a power of 2 for LCG. */
 
 static proxy_backend_t **backends = NULL;        /** Array of backends currently available */
 static proxy_backend_conn_t ***backend_conns;    /** Backend MySQL connections */
@@ -339,7 +340,9 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
         }
     }
 
-    if (*num == 0) {
+    /* Make sure number of backends is valid */
+    if (*num == 0 || *num > MAX_BACKENDS) {
+        proxy_error("Invalid number of backends %d\n", *num);
         free(buf);
         return NULL;
     }
@@ -530,16 +533,21 @@ void proxy_backends_update() {
  * Linear congruential generator for picking backends in random order. 
  *
  * \param X Previous value returned by ::lcg, -1 for first value.
- * \param N Maximum value to generate (must be less than 128).
+ * \param N Maximum value to generate (must be less than ::MAX_BACKENDS).
  *
  * \return The next value in the random sequence.
  **/
 int lcg(int X, int N) {
-    static int m = 128; /* 2^8 */
+    static int m = MAX_BACKENDS;
     static int c = 17;
     static int s;
     int a;
 
+    /* Give an invalid result for inavlid input */
+    if (N > MAX_BACKENDS)
+        return -1;
+
+    /* Pick a new random starting value */
     if (X < 0)
         s = rand();
 

@@ -51,6 +51,9 @@ START_TEST (test_backend_read_empty_file) {
     int num;
     proxy_backend_t **backends;
 
+    FILE *null = fopen("/dev/null", "w");
+    if (null) { fclose(stderr); stderr = null; }
+
     backends = backend_read_file(TESTS_DIR "backend/backends-empty.txt", &num);
 
     fail_unless(backends == NULL);
@@ -76,6 +79,20 @@ START_TEST (test_backend_read_file) {
     free(backends[1]->host);
     free(backends[1]);
     free(backends);
+} END_TEST
+
+/* Error when reading more than maximum backends from file */
+START_TEST (test_backend_read_too_many) {
+    int num;
+    proxy_backend_t **backends;
+
+    FILE *null = fopen("/dev/null", "w");
+    if (null) { fclose(stderr); stderr = null; }
+
+    backends = backend_read_file(TESTS_DIR "backend/backends-too-many.txt", &num);
+
+    fail_unless(backends == NULL);
+    fail_unless(num > MAX_BACKENDS);
 } END_TEST
 
 /* LCG must produce all values */
@@ -108,6 +125,7 @@ Suite *backend_suite(void) {
     tcase_add_test(tc_file, test_backend_read_not_exists);
     tcase_add_test(tc_file, test_backend_read_empty_file);
     tcase_add_test(tc_file, test_backend_read_file);
+    tcase_add_test(tc_file, test_backend_read_too_many);
     suite_add_tcase(s, tc_file);
 
     TCase *tc_lcg = tcase_create("LCG");
