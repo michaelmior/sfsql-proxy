@@ -106,9 +106,15 @@ void proxy_pool_set_size(pool_t *pool, int size) {
     if (alloc != pool->__alloc) {
         avail = (my_bool*) calloc(alloc, sizeof(my_bool));
 
+        /* Check if we are shrinking */
+        if (pool->size > alloc)
+            pool->size = alloc;
+
+        /* Copy old availability */
         for (i=0; i<pool->size; i++)
             avail[i] = pool->avail[i];
 
+        /* Set new resources to be available */
         for (i=pool->size; i<alloc; i++)
             avail[i] = TRUE;
 
