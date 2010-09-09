@@ -26,6 +26,7 @@
 #include <sql_common.h>
 #include <client_settings.h>
 #include <time.h>
+#include <unistd.h>
 #include <ltdl.h>
 
 static char BUF[BUFSIZ];
@@ -526,6 +527,30 @@ void proxy_backends_update() {
 }
 
 /**
+ * Linear congruential generator for picking backends in random order. 
+ *
+ * \param X Previous value returned by ::lcg, -1 for first value.
+ * \param N Maximum value to generate (must be less than 128).
+ *
+ * \return The next value in the random sequence.
+ **/
+int lcg(int X, int N) {
+    static int m = 128; /* 2^8 */
+    static int c = 17;
+    static int s;
+    int a;
+
+    if (X < 0)
+        s = rand();
+
+    a = ((s * 4) + 1) & (m - 1);
+
+    do { X = (a * X + c) & (m - 1); } while (X >= N);
+
+    return X;
+}
+
+/**
  * Send a query to the backend and return the results to the client.
  *
  * \param proxy  MySQL object corresponding to the client connection.
@@ -535,11 +560,11 @@ void proxy_backends_update() {
  * \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
-    int bi;
+    int bi, i;
     proxy_query_map_t *map = NULL;
     enum QUERY_MAP type = QUERY_MAP_ANY;
     my_bool error = FALSE;
-    char *oq, *oq2;
+    //char *oq, *oq2;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -569,17 +594,22 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             /* XXX: For some reason, mysql_send_query messes with the value of
              *      query even though it's declared const. The strdup-ing should
              *      be unnecessary. */
-            for (bi=0; bi<backend_num; bi++) {
-                oq = strdup(query);
-                oq2 = query;
-                if (backend_query_idx(bi, bi == 0 ? proxy: NULL, query, length)) {
+            bi = -1;
+            for (i=0; i<backend_num; i++) {
+                /* Get the next backend from the LCG */
+                bi = lcg(bi, backend_num);
+                while (!backend_pools[bi]) { usleep(1000); } /* XXX: should maybe lock here */
+
+                //oq = strdup(query);
+                //oq2 = query;
+                if (backend_query_idx(bi, i == 0 ? proxy: NULL, query, length)) {
                     error = TRUE;
                     goto out;
                 }
-                free(oq2);
-                query = oq;
+                //free(oq2);
+                //query = oq;
             }
-            free(oq);
+            //free(oq);
 
             break;
         default:
@@ -614,14 +644,17 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
     int ci, i;
     MYSQL *mysql;
     proxy_backend_conn_t *conn;
+    char *oq;
 
     ci = proxy_pool_get(backend_pools[bi]);
     conn = backend_conns[bi][ci];
     mysql = conn->mysql;
 
-    /* XXX: need to sync with proxy? */
+    /* MySQL reassigns the pointer, so we restore it after the call */
+    oq = (char*) query;
     printf("Sending query %s to backend %d\n", query, bi);
     mysql_send_query(mysql, query, length);
+    query = oq;
 
     /* derived from sql/client.c:cli_read_query_result */
     /* read info and result header packets */

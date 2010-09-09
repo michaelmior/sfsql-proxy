@@ -72,6 +72,28 @@ START_TEST (test_backend_read_file) {
     fail_unless(backends[1]->port == 3307);
 } END_TEST
 
+/* LCG must produce all values */
+START_TEST (test_backend_lcg) {
+    int i, X = -1, N = 10;
+    my_bool p[N];
+
+    /* Mark all numbers as not picked */
+    for (i=0; i < N; i++)
+        p[i] = FALSE;
+
+    /* Run through the LCG and update
+     * values selected */
+    for (i=0; i < N; i++) {
+        X = lcg(X, N);
+        fail_unless(!p[X]);
+        p[X] = TRUE;
+    }
+
+    /* Ensure all values were selected */
+    for (i=0; i < N; i++)
+        fail_unless(p[i]);
+} END_TEST
+
 Suite *backend_suite(void) {
     Suite *s = suite_create("Backend");
 
@@ -81,6 +103,10 @@ Suite *backend_suite(void) {
     tcase_add_test(tc_file, test_backend_read_empty_file);
     tcase_add_test(tc_file, test_backend_read_file);
     suite_add_tcase(s, tc_file);
+
+    TCase *tc_lcg = tcase_create("LCG");
+    tcase_add_test(tc_lcg, test_backend_lcg);
+    suite_add_tcase(s, tc_lcg);
 
     return s;
 }
