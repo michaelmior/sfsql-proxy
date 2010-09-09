@@ -69,16 +69,6 @@ void __proxy_error(const char *loc, ...);
 #include "proxy_threading.h"
 #include "proxy_options.h"
 
-#define BACKEND_HOST  "127.0.0.1" /** Default backend host */
-#define BACKEND_PORT  3306        /** Default backend port */
-#define BACKEND_USER  "root"      /** Default backend user */
-#define BACKEND_PASS  "root"      /** Default backend password */
-#define BACKEND_DB    "test"      /** Default backend database */
-#define NUM_CONNS     10          /** Default number of connections per backend */
-
-#define PROXY_PORT    4040        /** Default port to listen on for incoming connections */
-#define PROXY_THREADS 10          /** Default number of threads started to do client work */
-
 pool_t *thread_pool;
 
 /**
