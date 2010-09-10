@@ -42,10 +42,11 @@ AC_CHECK_HEADERS([\
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
+AC_TYPE_INTPTR_T
 AC_C_INLINE
 
 # Checks for library functions.
-AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname])
+AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp])
 AC_FUNC_MALLOC
 AC_FUNC_FORK
 
