@@ -572,7 +572,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     proxy_query_map_t *map = NULL;
     enum QUERY_MAP type = QUERY_MAP_ANY;
     my_bool error = FALSE;
-    //char *oq, *oq2;
+    char *oq = NULL, *oq2;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -602,22 +602,21 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             /* XXX: For some reason, mysql_send_query messes with the value of
              *      query even though it's declared const. The strdup-ing should
              *      be unnecessary. */
+            oq = strdup(query);
             bi = -1;
             for (i=0; i<backend_num; i++) {
                 /* Get the next backend from the LCG */
                 bi = lcg(bi, backend_num);
                 while (!backend_pools[bi]) { usleep(1000); } /* XXX: should maybe lock here */
 
-                //oq = strdup(query);
-                //oq2 = query;
-                if (backend_query_idx(bi, i == 0 ? proxy: NULL, query, length)) {
+                /* We make a copy of the query string since MySQL destroys it */
+                oq2 = strdup(oq);
+                if (backend_query_idx(bi, i == 0 ? proxy: NULL, oq2, length)) {
                     error = TRUE;
                     goto out;
                 }
-                //free(oq2);
-                //query = oq;
+                free(oq2);
             }
-            //free(oq);
 
             break;
         default:
@@ -632,6 +631,9 @@ out:
             free(map->query);
         free(map);
     }
+
+    free(oq);
+
     return error;
 }
 
@@ -652,17 +654,13 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
     int ci, i;
     MYSQL *mysql;
     proxy_backend_conn_t *conn;
-    char *oq;
 
     ci = proxy_pool_get(backend_pools[bi]);
     conn = backend_conns[bi][ci];
     mysql = conn->mysql;
 
-    /* MySQL reassigns the pointer, so we restore it after the call */
-    oq = (char*) query;
     printf("Sending query %s to backend %d\n", query, bi);
     mysql_send_query(mysql, query, length);
-    query = oq;
 
     /* derived from sql/client.c:cli_read_query_result */
     /* read info and result header packets */
