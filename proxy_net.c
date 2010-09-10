@@ -367,7 +367,7 @@ int proxy_net_read_query(MYSQL *mysql) {
         return -1;
     }
 
-    printf("Read %lu byte packet from client\n", pkt_len);
+    //printf("Read %lu byte packet from client\n", pkt_len);
 
     packet = (char*) net->read_pos;
     if (pkt_len == 0) {
@@ -383,7 +383,7 @@ int proxy_net_read_query(MYSQL *mysql) {
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    printf("Got command %d\n", command);
+    //printf("Got command %d\n", command);
 
     switch (command) {
         case COM_INIT_DB:

@@ -582,7 +582,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
         type = map->map;
         if (map->query)
             query = map->query;
-        printf("Query %s mapped to %d\n", query, (int) type);
+        //printf("Query %s mapped to %d\n", query, (int) type);
     }
 
     switch (type) {
@@ -659,7 +659,7 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
     conn = backend_conns[bi][ci];
     mysql = conn->mysql;
 
-    printf("Sending query %s to backend %d\n", query, bi);
+    //printf("Sending query %s to backend %d\n", query, bi);
     mysql_send_query(mysql, query, length);
 
     /* derived from sql/client.c:cli_read_query_result */
