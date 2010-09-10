@@ -602,7 +602,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             /* XXX: For some reason, mysql_send_query messes with the value of
              *      query even though it's declared const. The strdup-ing should
              *      be unnecessary. */
-            oq = strdup(query);
+            oq = (char*) malloc(length + 1);
+            memcpy(oq, query, length+1);
             bi = -1;
             for (i=0; i<backend_num; i++) {
                 /* Get the next backend from the LCG */
@@ -610,7 +611,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 while (!backend_pools[bi]) { usleep(1000); } /* XXX: should maybe lock here */
 
                 /* We make a copy of the query string since MySQL destroys it */
-                oq2 = strdup(oq);
+                oq2 = (char*) malloc(length + 1);
+                memcpy(oq2, oq, length + 1);
                 if (backend_query_idx(bi, i == 0 ? proxy: NULL, oq2, length)) {
                     error = TRUE;
                     goto out;
