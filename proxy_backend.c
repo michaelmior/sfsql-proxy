@@ -40,6 +40,8 @@ static pool_t **backend_pools = NULL;            /** Lock pool for controlling b
 static int backend_num;                          /** Total number of backends */
 static proxy_map_query_t backend_mapper = NULL;  /** Query mapper for selecting backends */
 static lt_dlhandle backend_mapper_handle = NULL; /** ltdl handle to the mapper library */
+static proxy_thread_t *backend_threads = NULL;   /** Thread data structures for backend query threads */
+static pool_t *backend_thread_pool = NULL;       /** Pool for locking access to backend threads */
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
@@ -149,7 +151,9 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
  *  \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_init() {
+    int i;
     char *buf = NULL;
+    pthread_attr_t attr;
 
     /* Load the query mapper */
     if (options.mapper != NULL) {
@@ -181,6 +185,28 @@ my_bool proxy_backend_init() {
 
     /* Seed the RNG for later use */
     srand(time(NULL));
+
+    /* Create a thread pool */
+    if (!backend_thread_pool)
+        backend_thread_pool = proxy_pool_new(BACKEND_THREADS);
+
+    /* Set up thread attributes */
+    if (!backend_threads) {
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+        /* Start backend threads */
+        backend_threads = calloc(BACKEND_THREADS, sizeof(proxy_thread_t));
+
+        for (i=0; i<BACKEND_THREADS; i++) {
+            backend_threads[i].id = i;
+            proxy_cond_init(&(backend_threads[i].cv));
+            proxy_mutex_init(&(backend_threads[i].lock));
+            backend_threads[i].data.query.query = NULL;
+
+            pthread_create(&(backend_threads[i].thread), &attr, proxy_backend_new_thread, (void*) &(backend_threads[i]));
+        }
+    }
 
     return FALSE;
 }
@@ -529,6 +555,43 @@ void proxy_backends_update() {
     }
 }
 
+void* proxy_backend_new_thread(void *ptr) {
+    proxy_thread_t *thread = (proxy_thread_t*) ptr;
+    proxy_backend_query_t *query = &(thread->data.query);
+    char *oq;
+
+    while (1) {
+        /* Wait for work to be available */
+        proxy_mutex_lock(&(thread->lock));
+        proxy_cond_wait(&(thread->cv), &(thread->lock));
+
+        /* If no query specified, must be ready to exit */
+        if ((query->query == NULL)) {
+            proxy_mutex_unlock(&(thread->lock));
+            break;
+        }
+
+        /* We make a copy of the query string since MySQL destroys it */
+        oq = (char*) malloc(*(query->length) + 1);
+        memcpy(oq, query->query, *(query->length) + 1);
+        query->result[query->bi] = backend_query_idx(query->bi, query->proxy, oq, *(query->length));
+        free(oq);
+
+        /* Check and signal if all backends have received the query */
+        proxy_mutex_lock(thread->data.query.mutex);
+        if (++(*(thread->data.query.count)) == backend_num)
+            proxy_cond_signal(thread->data.query.cv);
+        proxy_mutex_unlock(thread->data.query.mutex);
+
+        /* Signify thread availability */
+        thread->data.query.query = NULL;
+        proxy_pool_return(backend_thread_pool, thread->id);
+        proxy_mutex_unlock(&(thread->lock));
+    }
+
+    pthread_exit(NULL);
+}
+
 /**
  * Linear congruential generator for picking backends in random order. 
  *
@@ -568,11 +631,13 @@ int lcg(int X, int N) {
  * \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
-    int bi, i;
+    int bi = -1, i, ti, count = 0;
     proxy_query_map_t *map = NULL;
     enum QUERY_MAP type = QUERY_MAP_ANY;
-    my_bool error = FALSE;
-    char *oq = NULL, *oq2;
+    my_bool error = FALSE, *result;
+    char *oq = NULL;
+    pthread_cond_t *query_cv;
+    pthread_mutex_t *query_mutex;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -604,21 +669,52 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
              *      be unnecessary. */
             oq = (char*) malloc(length + 1);
             memcpy(oq, query, length+1);
-            bi = -1;
+
+            while (!backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
+
+            query_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_cond_t));
+            proxy_mutex_init(query_mutex);
+            query_cv = (pthread_cond_t*) malloc(sizeof(pthread_cond_t));
+            proxy_cond_init(query_cv);
+            result = (my_bool*) calloc(backend_num, sizeof(my_bool));
+
             for (i=0; i<backend_num; i++) {
                 /* Get the next backend from the LCG */
                 bi = lcg(bi, backend_num);
-                while (!backend_pools[bi]) { usleep(1000); } /* XXX: should maybe lock here */
 
-                /* We make a copy of the query string since MySQL destroys it */
-                oq2 = (char*) malloc(length + 1);
-                memcpy(oq2, oq, length + 1);
-                if (backend_query_idx(bi, i == 0 ? proxy: NULL, oq2, length)) {
-                    error = TRUE;
-                    goto out;
-                }
-                free(oq2);
+                /* Dispatch threads for backend queries */
+                ti = proxy_pool_get(backend_thread_pool);
+
+                proxy_mutex_lock(&(backend_threads[ti].lock));
+                
+                backend_threads[ti].data.query.query = oq;
+                backend_threads[ti].data.query.length = &length;
+                backend_threads[ti].data.query.proxy = (i == 0) ? proxy : NULL;
+                backend_threads[ti].data.query.bi = bi;
+                backend_threads[ti].data.query.result = result;
+                backend_threads[ti].data.query.count = &count;
+                backend_threads[ti].data.query.mutex = query_mutex;
+                backend_threads[ti].data.query.cv = query_cv;
+
+                proxy_cond_signal(&(backend_threads[ti].cv));
+                proxy_mutex_unlock(&(backend_threads[ti].lock));
             }
+
+            /* Wait until all queries are complete */
+            proxy_mutex_lock(query_mutex);
+            while (count < backend_num) { proxy_cond_wait(query_cv, query_mutex); }
+            proxy_mutex_unlock(query_mutex);
+
+            /* Free synchronization primitives */
+            proxy_mutex_destroy(query_mutex);
+            free(query_mutex);
+            proxy_cond_destroy(query_cv);
+            free(query_cv);
+
+            /* XXX: should do better at handling failures */
+            for (i=0; i<count; i++)
+                if (result[i])
+                    proxy_error("Failure for query on backend %d\n", i);
 
             break;
         default:
@@ -766,6 +862,12 @@ void proxy_backend_close() {
         lt_dlclose(backend_mapper_handle);
     if (backend_mapper)
         lt_dlexit();
+
+    /* Free threads */
+    if (backend_threads) {
+        proxy_threading_cancel(backend_threads, BACKEND_THREADS, backend_thread_pool);
+        proxy_threading_cleanup(backend_threads, BACKEND_THREADS, backend_thread_pool);
+    }
 
     /* Free allocated memory */
     free(backend_pools);

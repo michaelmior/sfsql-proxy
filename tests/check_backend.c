@@ -24,6 +24,16 @@
 
 #include <check.h>
 
+/* Dummy threading functions */
+void __wrap_proxy_threading_cancel(
+    __attribute__((unused)) proxy_thread_t *threads,
+    __attribute__((unused)) int num,
+    __attribute__((unused)) pool_t *pool) {}
+void __wrap_proxy_threading_cleanup(
+    __attribute__((unused)) proxy_thread_t *threads,
+    __attribute__((unused)) int num,
+    __attribute__((unused)) pool_t *pool) {}
+
 /* Error when trying to read backend with no filename */
 START_TEST (test_backend_read_no_filename) {
     int num;

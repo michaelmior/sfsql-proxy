@@ -85,27 +85,6 @@ static inline void __proxy_error(__attribute__((unused)) void *p, ...) {
 pool_t *thread_pool;
 
 /**
- * All information needed by threads
- * to connect to clients and begin working. */
-typedef struct {
-    int clientfd;
-    struct sockaddr_in *addr;
-    MYSQL *proxy;
-} proxy_work_t;
-
-/**
- * Data structures needed for thread pool
- * implementation and signaling of new work. */
-typedef struct {
-    int id;
-    pthread_t thread;
-    pthread_cond_t cv;
-    pthread_mutex_t lock;
-    proxy_work_t *work;
-} proxy_thread_t;
-proxy_thread_t threads[PROXY_THREADS];
-
-/**
  * Copied from client/sql_string.h since this
  * function is not included in the client library. */
 uint32 copy_and_convert(char *to, uint32 to_length, CHARSET_INFO *to_cs,

@@ -223,8 +223,8 @@ void client_destroy(proxy_thread_t *thread) {
     printf("Called client_destroy on thread %d\n", thread->id);
 
     /* Clean up connection if still live */
-    if (thread->work) {
-        if ((mysql = thread->work->proxy)) {
+    if (thread->data.work.proxy) {
+        if ((mysql = thread->data.work.proxy)) {
             /* XXX: may need to send error before closing connection */
             /* derived from sql/sql_mysqld.cc:close_connection */
             if (vio_close(mysql->net.vio) < 0)
@@ -237,7 +237,7 @@ void client_destroy(proxy_thread_t *thread) {
             mysql_close(mysql);
         }
 
-        free(thread->work);
+        thread->data.work.proxy = NULL;
     }
 }
 
@@ -274,7 +274,7 @@ void* proxy_net_new_thread(void *ptr) {
         printf("Thread %d signaled\n", thread->id);
 
         /* If no work specified, must be ready to exit */
-        if (thread->work == NULL) {
+        if (thread->data.work.addr == NULL) {
             proxy_mutex_unlock(&(thread->lock));
             break;
         }
@@ -282,9 +282,9 @@ void* proxy_net_new_thread(void *ptr) {
         printf("Workin' on thead %d\n", thread->id);
 
         /* Handle client requests */
-        client_do_work(thread->work);
+        client_do_work(&(thread->data.work));
         client_destroy(thread);
-        thread->work = NULL;
+        thread->data.work.addr = NULL;
 
         /* Signify that we are available for work again */
         proxy_pool_return(thread_pool, thread->id);

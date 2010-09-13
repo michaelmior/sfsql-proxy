@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_threading.c
  *
- * Initialize any necessary data structures for threading
+ * Initialize necessary data structures for threading
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -39,4 +39,59 @@ void proxy_threading_end() {
 #ifdef DEBUG
     pthread_mutexattr_destroy(&__proxy_mutexattr);
 #endif
+}
+
+/**
+ * Cancel all running client threads. This signals threads to check
+ * for work, and they will exit upon seeing no work available.
+ * We then return any locked threads to the pool.
+ *
+ * \param threads Array of threads to cancel.
+ * \param num     Number of threads in the array.
+ * \param pool    Pool for locking thread access.
+ **/
+void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool) {
+    int i;
+
+    for (i=0; i<num; i++) {
+        /* Make sure worker threads release their mutex */
+        proxy_mutex_lock(&(threads[i].lock));
+        proxy_cond_signal(&(threads[i].cv));
+        proxy_mutex_unlock(&(threads[i].lock));
+
+        /* Try to acquire the lock again to ensure threads
+         * have exited and cleaned up */
+        proxy_mutex_lock(&(threads[i].lock));
+        proxy_mutex_unlock(&(threads[i].lock));
+    }
+
+    /* Return any locked threads to the pool */
+    while ((i = proxy_pool_get_locked(pool)) >= 0)
+        proxy_pool_return(pool, i);
+}
+
+/**
+ *  Join and clean up thread data structures.
+ *
+ *  \param threads Array of threads to clean up.
+ *  \param num     Number of threads in the array.
+ *  \param pool    Pool for locking thread access.
+ **/
+void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool) {
+    int i;
+
+    /* Join all threads */
+    for (i=0; i<num; i++) {
+        pthread_join(threads[i].thread, NULL);
+
+        proxy_cond_destroy(&(threads[i].cv));
+        proxy_mutex_destroy(&(threads[i].lock));
+    }
+
+    /* Free extra memory */
+    free(threads);
+    threads = NULL;
+
+    proxy_pool_destroy(pool);
+    pool = NULL;
 }

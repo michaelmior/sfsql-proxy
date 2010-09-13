@@ -11,12 +11,39 @@
  *
  */
 
-
 #ifndef _proxy_threading_h
 #define _proxy_threading_h
 
+#include "proxy.h"
+
+/**
+ * All information needed by threads
+ * to connect to clients and begin working. */
+typedef struct {
+    int clientfd;
+    struct sockaddr_in *addr;
+    MYSQL *proxy;
+} proxy_work_t;
+
+/**
+ * Data structures needed for thread pool
+ * implementation and signaling of new work. */
+typedef struct {
+    int id;
+    pthread_t thread;
+    pthread_cond_t cv;
+    pthread_mutex_t lock;
+
+    union {
+        proxy_work_t work;
+        proxy_backend_query_t query;
+    } data;
+} proxy_thread_t;
+
 void proxy_threading_init();
 void proxy_threading_end();
+void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);
+void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);
 
 #ifdef DEBUG
 pthread_mutexattr_t __proxy_mutexattr;
