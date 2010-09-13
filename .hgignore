@@ -31,3 +31,4 @@ config\.h.*
 (.*/)?Makefile.in
 tests/check_.*[^\.][^c]$
 (.*/)?\.libs/.*
+callgrind.out.[0-9]+
