@@ -67,7 +67,7 @@ START_TEST (test_options_short) {
         "-t" TEST_CLIENT_THREADS,
         "-T" TEST_BACKEND_THREADS };
 
-    fail_unless(parse_options(13, argv) == EXIT_SUCCESS);
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
@@ -98,7 +98,7 @@ START_TEST (test_options_long) {
         "--client-threads="  TEST_CLIENT_THREADS,
         "--backend-threads=" TEST_BACKEND_THREADS };
 
-    fail_unless(parse_options(12, argv) == EXIT_SUCCESS);
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
@@ -141,7 +141,7 @@ START_TEST (test_options_bad_file) {
     FILE *null = fopen("/dev/null", "w");
     if (null) { fclose(stderr); stderr = null; }
 
-    fail_unless(parse_options(2, argv) == EX_NOINPUT);
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_NOINPUT);
 } END_TEST
 
 /* Specification of both backend and filename */
@@ -152,7 +152,7 @@ START_TEST (test_options_backend_and_file) {
     if (null) { fclose(stderr); stderr = null; }
     if (null) { fclose(stdout); stdout = null; }
 
-    fail_unless(parse_options(3, argv) == EX_USAGE);
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
 Suite *options_suite(void) {
