@@ -91,6 +91,27 @@ START_TEST (test_backend_read_file) {
     free(backends);
 } END_TEST
 
+/* Correct parsing of backend file with a missing port number*/
+START_TEST (test_backend_read_file_noport) {
+    int num;
+    proxy_backend_t **backends;
+
+    backends = backend_read_file(TESTS_DIR "backend/backends-noport.txt", &num);
+
+    fail_unless(num == 2);
+
+    fail_unless(strcmp(backends[0]->host, "127.0.0.1") == 0);
+    fail_unless(backends[0]->port == 3306);
+    fail_unless(strcmp(backends[1]->host, "127.0.0.1") == 0);
+    fail_unless(backends[1]->port == 3307);
+
+    free(backends[0]->host);
+    free(backends[0]);
+    free(backends[1]->host);
+    free(backends[1]);
+    free(backends);
+} END_TEST
+
 /* Error when reading more than maximum backends from file */
 START_TEST (test_backend_read_too_many) {
     int num;
@@ -135,6 +156,7 @@ Suite *backend_suite(void) {
     tcase_add_test(tc_file, test_backend_read_not_exists);
     tcase_add_test(tc_file, test_backend_read_empty_file);
     tcase_add_test(tc_file, test_backend_read_file);
+    tcase_add_test(tc_file, test_backend_read_file_noport);
     tcase_add_test(tc_file, test_backend_read_too_many);
     suite_add_tcase(s, tc_file);
 

@@ -314,7 +314,7 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
  **/
 proxy_backend_t** backend_read_file(char *filename, int *num) {
     FILE *f;
-    char *buf, *pch;
+    char *buf, *buf2, *pch;
     ulong pos;
     uint i, c=0;
     proxy_backend_t **new_backends;
@@ -380,15 +380,20 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     /* Allocate and read backends */
     new_backends = (proxy_backend_t**) calloc(*num, sizeof(proxy_backend_t*));
     i = 0;
-    pch = strtok(buf, " :\r\n\t");
+    pch = strtok(buf, " \r\n\t");
     while (pch != NULL && (int)i<*num) {
         new_backends[i] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
 
-        new_backends[i]->host = strdup(pch);
-        pch = strtok(NULL, " :\r\n\t");
-        new_backends[i]->port = atoi(pch);
+        /* If we have a colon, then a port number must have been specified */
+        if ((buf2 = strchr(pch, ':'))) {
+            new_backends[i]->host = strndup(pch, buf2-pch);
+            new_backends[i]->port = atoi(buf2 + 1);
+        } else {
+            new_backends[i]->host = strdup(pch);
+            new_backends[i]->port = 3306;
+        }
 
-        pch = strtok(NULL, " :\r\n\t");
+        pch = strtok(NULL, " \r\n\t");
         i++;
     }
 
