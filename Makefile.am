@@ -12,7 +12,7 @@ sfsql_proxy_CFLAGS = $(MYSQL_CFLAGS) $(PTHREAD_CFLAGS)
 sfsql_proxy_LIBS = $(MYSQL_LIBS) $(PTHREAD_LIBS)
 sfsql_proxy_LDADD = -lltdl
 
-include_HEADERS = \
+noinst_HEADERS = \
 	proxy.h \
 	proxy_options.h \
 	proxy_net.h \
