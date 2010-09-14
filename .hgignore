@@ -27,7 +27,7 @@ libtool
 ltmain.sh
 depcomp
 config\.h.*
-(.*/)?Makefile
+(.*/)?Makefile$
 (.*/)?Makefile.in
 tests/check_.*[^\.][^c]$
 (.*/)?\.libs/.*
