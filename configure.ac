@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.65)
+AC_PREREQ(2.64)
 AC_INIT([sfsql-proxy],[0.1],[mmior@cs.toronto.edu])
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([proxy.c])
@@ -11,7 +11,7 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_CONFIG_AUX_DIR([libltdl/config])
 
-AM_INIT_AUTOMAKE(1.11 no-define)
+AM_INIT_AUTOMAKE(1.10 no-define)
 AC_LANG([C])
 
 #LT_CONFIG_LTDL_DIR([libltdl])
