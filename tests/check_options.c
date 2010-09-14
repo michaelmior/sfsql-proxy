@@ -32,6 +32,7 @@
 #define TEST_NUM_CONNS       "5"
 #define TEST_PROXY_HOST      "127.0.0.3"
 #define TEST_PROXY_PORT      "4041"
+#define TEST_MAPPER          "dummy"
 #define TEST_CLIENT_THREADS  "5"
 #define TEST_BACKEND_THREADS "5"
 
@@ -45,6 +46,7 @@ START_TEST (test_options_test) {
     fail_unless(atoi(TEST_NUM_CONNS) != NUM_CONNS);
     fail_unless(TEST_PROXY_HOST != NULL);
     fail_unless(atoi(TEST_PROXY_PORT) != PROXY_PORT);
+    fail_unless(TEST_MAPPER != NULL);
     fail_unless(atoi(TEST_CLIENT_THREADS) != CLIENT_THREADS);
     fail_unless(atoi(TEST_BACKEND_THREADS) != BACKEND_THREADS);
 } END_TEST
@@ -61,10 +63,11 @@ START_TEST (test_options_short) {
         "-a",
         "-b" TEST_PROXY_HOST,
         "-L" TEST_PROXY_PORT,
+        "-m" TEST_MAPPER,
         "-t" TEST_CLIENT_THREADS,
         "-T" TEST_BACKEND_THREADS };
 
-    fail_unless(parse_options(12, argv) == EXIT_SUCCESS);
+    fail_unless(parse_options(13, argv) == EXIT_SUCCESS);
 
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
@@ -75,6 +78,7 @@ START_TEST (test_options_short) {
     fail_unless(!options.autocommit);
     fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
     fail_unless(options.pport == atoi(TEST_PROXY_PORT));
+    fail_unless(strcmp(options.mapper, TEST_MAPPER) == 0);
     fail_unless(options.client_threads == atoi(TEST_CLIENT_THREADS));
     fail_unless(options.backend_threads == atoi(TEST_BACKEND_THREADS));
 } END_TEST
@@ -90,10 +94,11 @@ START_TEST (test_options_long) {
         "--num-conns="       TEST_NUM_CONNS,
         "--proxy-host="      TEST_PROXY_HOST,
         "--proxy-port="      TEST_PROXY_PORT,
+        "--mapper="          TEST_MAPPER,
         "--client-threads="  TEST_CLIENT_THREADS,
         "--backend-threads=" TEST_BACKEND_THREADS };
 
-    fail_unless(parse_options(11, argv) == EXIT_SUCCESS);
+    fail_unless(parse_options(12, argv) == EXIT_SUCCESS);
 
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
@@ -103,6 +108,7 @@ START_TEST (test_options_long) {
     fail_unless(options.num_conns == atoi(TEST_NUM_CONNS));
     fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
     fail_unless(options.pport == atoi(TEST_PROXY_PORT));
+    fail_unless(strcmp(options.mapper, TEST_MAPPER) == 0);
     fail_unless(options.client_threads == atoi(TEST_CLIENT_THREADS));
     fail_unless(options.backend_threads == atoi(TEST_BACKEND_THREADS));
 } END_TEST
@@ -123,6 +129,7 @@ START_TEST (test_options_defaults) {
     fail_unless(options.backend_file == NULL);
     fail_unless(options.phost == NULL);
     fail_unless(options.pport == PROXY_PORT);
+    fail_unless(options.mapper == NULL);
     fail_unless(options.client_threads == CLIENT_THREADS);
     fail_unless(options.backend_threads == BACKEND_THREADS);
 } END_TEST
