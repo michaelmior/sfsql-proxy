@@ -20,7 +20,6 @@ LT_INIT([shared, dlopen])
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
-AC_USE_SYSTEM_EXTENSIONS
 AC_PROG_CC_C99
 AX_CFLAGS_GCC_OPTION(-Wall)
 AX_CFLAGS_GCC_OPTION(-Werror)
