@@ -4,7 +4,6 @@ tags
 .*\.log$
 .*\.orig$
 .*\.rej$
-.*\.txt$
 .*\.patch$
 .*\.la$
 .*\.lo$
