@@ -188,7 +188,7 @@ my_bool proxy_backend_init() {
 
     /* Create a thread pool */
     if (!backend_thread_pool)
-        backend_thread_pool = proxy_pool_new(BACKEND_THREADS);
+        backend_thread_pool = proxy_pool_new(options.backend_threads);
 
     /* Set up thread attributes */
     if (!backend_threads) {
@@ -196,9 +196,9 @@ my_bool proxy_backend_init() {
         pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
         /* Start backend threads */
-        backend_threads = calloc(BACKEND_THREADS, sizeof(proxy_thread_t));
+        backend_threads = calloc(options.backend_threads, sizeof(proxy_thread_t));
 
-        for (i=0; i<BACKEND_THREADS; i++) {
+        for (i=0; i<options.backend_threads; i++) {
             backend_threads[i].id = i;
             proxy_cond_init(&(backend_threads[i].cv));
             proxy_mutex_init(&(backend_threads[i].lock));
@@ -871,8 +871,8 @@ void proxy_backend_close() {
 
     /* Free threads */
     if (backend_threads) {
-        proxy_threading_cancel(backend_threads, BACKEND_THREADS, backend_thread_pool);
-        proxy_threading_cleanup(backend_threads, BACKEND_THREADS, backend_thread_pool);
+        proxy_threading_cancel(backend_threads, options.backend_threads, backend_thread_pool);
+        proxy_threading_cleanup(backend_threads, options.backend_threads, backend_thread_pool);
     }
 
     /* Free allocated memory */

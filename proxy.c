@@ -133,7 +133,7 @@ static void catch_sig(int sig) {
             run = 0;
 
             /* Cancel running threads */
-            proxy_threading_cancel(threads, PROXY_THREADS, thread_pool);
+            proxy_threading_cancel(threads, CLIENT_THREADS, thread_pool);
 
             break;
         case SIGUSR1:
@@ -176,16 +176,16 @@ int main(int argc, char *argv[]) {
     mysql_library_init(0, NULL, NULL);
 
     /* Create a thread pool */
-    thread_pool = proxy_pool_new(PROXY_THREADS);
+    thread_pool = proxy_pool_new(CLIENT_THREADS);
 
     /* Set up thread attributes */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     
     /* Create the new threads */
-    threads = (proxy_thread_t*) calloc(PROXY_THREADS, sizeof(proxy_thread_t));
+    threads = (proxy_thread_t*) calloc(CLIENT_THREADS, sizeof(proxy_thread_t));
 
-    for (i=0; i<PROXY_THREADS; i++) {
+    for (i=0; i<CLIENT_THREADS; i++) {
         threads[i].id = i;
         proxy_cond_init(&(threads[i].cv));
         proxy_mutex_init(&(threads[i].lock));
@@ -221,8 +221,8 @@ out:
     printf("Shutting down...\n");
 
     /* Cancel any outstanding client threads */
-    proxy_threading_cancel(threads, PROXY_THREADS, thread_pool);
-    proxy_threading_cleanup(threads, PROXY_THREADS, thread_pool);
+    proxy_threading_cancel(threads, CLIENT_THREADS, thread_pool);
+    proxy_threading_cleanup(threads, CLIENT_THREADS, thread_pool);
 
     proxy_backend_close();
     mysql_library_end();

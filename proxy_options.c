@@ -34,23 +34,26 @@ static void usage() {
     printf(
             "SnowFlock SQL proxy server - (C) Michael Mior <mmior@cs.toronto.edu>, 2010\n\n"
             "Options:\n"
-            "\t--help,         -?\tShow this message\n\n"
+            "\t--help,             -?\tShow this message\n\n"
             "Backend options:\n"
-            "\t--backend-host, -h\tHost to forward queries to (default: 127.0.0.1)\n"
-            "\t--backend-port, -P\tPort of the backend host (default: 3306)\n"
-            "\t--backend-db,   -D\tName of database on the backend (default: test)\n"
-            "\t--backend-user, -u\tUser for backend server (default: root)\n"
-            "\t--backend-pass, -p\tPassword for backend user\n"
-            "\t--backend-file, -f\tFile listing available backends\n"
-            "\t                  \t(cannot be specified with above options)\n"
-            "\t--num-conns,    -N\tNumber connections per backend\n"
-            "\t                -a\tDisable autocommit (default is enabled)\n\n"
+            "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
+            "\t--backend-port,    -P\tPort of the backend host (default: 3306)\n"
+            "\t--backend-db,      -D\tName of database on the backend (default: test)\n"
+            "\t--backend-user,    -u\tUser for backend server (default: root)\n"
+            "\t--backend-pass,    -p\tPassword for backend user\n"
+            "\t--backend-file,    -f\tFile listing available backends\n"
+            "\t                     \t(cannot be specified with above options)\n"
+            "\t--num-conns,       -N\tNumber connections per backend\n"
+            "\t                   -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
-            "\t--proxy-host,   -b\tBinding address (default is 0.0.0.0)\n"
-            "\t--proxy-port,   -L\tPort for the proxy server to listen on (default: 4040)\n\n"
-            "Mapper options:\n"
-            "\t--mapper,       -m\tMapper to use for mapping queryies to backends\n"
-            "\t                  \t(default is first available)\n\n"
+            "\t--proxy-host,      -b\tBinding address (default is 0.0.0.0)\n"
+            "\t--proxy-port,      -L\tPort for the proxy server to listen on (default: 4040)\n\n"
+            "Mapper options:\n"   
+            "\t--mapper,          -m\tMapper to use for mapping queryies to backends\n"
+            "\t                     \t(default is first available)\n\n"
+            "Thread options:\n"
+            "\t--client-threads,  -t\tNumber of threads to handle client connections\n"
+            "\t--backend-threads, -T\tNumber of threads to dispatch backend queries\n\n"
     );
 }
 
@@ -63,35 +66,39 @@ static void usage() {
 int parse_options(int argc, char *argv[]) {
     int c, opt=0;
     static struct option long_options[] = {
-        {"help",         no_argument,       0, '?'},
-        {"backend-host", required_argument, 0, 'h'},
-        {"backend-port", required_argument, 0, 'P'},
-        {"backend-db",   required_argument, 0, 'D'},
-        {"backend-user", required_argument, 0, 'u'},
-        {"backend-pass", required_argument, 0, 'p'},
-        {"backend-file", required_argument, 0, 'f'},
-        {"num-conns",    required_argument, 0, 'N'},
-        {"proxy-host",   required_argument, 0, 'b'},
-        {"proxy-port",   required_argument, 0, 'L'},
-        {"mapper",       required_argument, 0, 'm'},
+        {"help",            no_argument,       0, '?'},
+        {"backend-host",    required_argument, 0, 'h'},
+        {"backend-port",    required_argument, 0, 'P'},
+        {"backend-db",      required_argument, 0, 'D'},
+        {"backend-user",    required_argument, 0, 'u'},
+        {"backend-pass",    required_argument, 0, 'p'},
+        {"backend-file",    required_argument, 0, 'f'},
+        {"num-conns",       required_argument, 0, 'N'},
+        {"proxy-host",      required_argument, 0, 'b'},
+        {"proxy-port",      required_argument, 0, 'L'},
+        {"mapper",          required_argument, 0, 'm'},
+        {"client-threads",  required_argument, 0, 't'},
+        {"backend-threads", required_argument, 0, 'T'},
         {0, 0, 0, 0}
     };
 
     /* Set options to default values */
-    options.num_conns    = NUM_CONNS;
-    options.autocommit   = TRUE;
-    options.backend.host = NULL;
-    options.backend.port = 0;
-    options.user         = NULL;
-    options.pass         = NULL;
-    options.db           = NULL;
-    options.backend_file = NULL;
-    options.phost        = NULL;
-    options.pport        = PROXY_PORT;
-    options.mapper       = NULL;
+    options.num_conns       = NUM_CONNS;
+    options.autocommit      = TRUE;
+    options.backend.host    = NULL;
+    options.backend.port    = 0;
+    options.user            = NULL;
+    options.pass            = NULL;
+    options.db              = NULL;
+    options.backend_file    = NULL;
+    options.phost           = NULL;
+    options.pport           = PROXY_PORT;
+    options.mapper          = NULL;
+    options.client_threads  = CLIENT_THREADS;
+    options.backend_threads = BACKEND_THREADS; 
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:m:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 usage();
@@ -128,6 +135,12 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'm':
                 options.mapper = strdup(optarg);
+                break;
+            case 't':
+                options.client_threads = atoi(optarg);
+                break;
+            case 'T':
+                options.backend_threads = atoi(optarg);
                 break;
             default:
                 usage();

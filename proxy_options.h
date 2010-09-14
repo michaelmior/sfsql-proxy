@@ -23,7 +23,7 @@
 #define NUM_CONNS       10          /** Default number of connections per backend */
 
 #define PROXY_PORT      4040        /** Default port to listen on for incoming connections */
-#define PROXY_THREADS   10          /** Default number of threads started to do client work */
+#define CLIENT_THREADS   10          /** Default number of threads started to do client work */
 
 int parse_options(int argc, char *argv[]);
 
@@ -38,6 +38,8 @@ struct {
     char *phost;             /** Host for proxy to bind to */
     int pport;               /** Port for proxy to listen on */
     char *mapper;            /** Name of the query mapper to use */
+    int client_threads;
+    int backend_threads;
 } options;
 
 #endif /* _proxy_options_h */
