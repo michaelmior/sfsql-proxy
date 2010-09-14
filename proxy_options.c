@@ -83,6 +83,8 @@ int parse_options(int argc, char *argv[]) {
     };
 
     /* Set options to default values */
+    options.help            = FALSE;
+
     options.num_conns       = NUM_CONNS;
     options.autocommit      = TRUE;
     options.backend.host    = NULL;
@@ -101,6 +103,7 @@ int parse_options(int argc, char *argv[]) {
     while((c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
+                options.help = TRUE;
                 usage();
                 return EXIT_SUCCESS;
             case 'h':

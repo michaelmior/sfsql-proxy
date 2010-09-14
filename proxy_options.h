@@ -28,6 +28,8 @@
 int parse_options(int argc, char *argv[]);
 
 struct {
+    my_bool help;            /** TRUE if the user asked for help */
+
     proxy_backend_t backend; /** Backend address info */
     char *db;                /** Backend database */
     char *user;              /** Backend username */

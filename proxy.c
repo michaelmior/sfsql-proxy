@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
     struct sigaction new_action, old_action;
 
     ret = parse_options(argc, argv);
-    if (ret != EXIT_SUCCESS)
+    if (ret != EXIT_SUCCESS || options.help)
         goto out_free;
 
     /* Threading initialization */
