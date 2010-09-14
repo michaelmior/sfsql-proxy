@@ -279,8 +279,6 @@ void* proxy_net_new_thread(void *ptr) {
             break;
         }
 
-        printf("Workin' on thead %d\n", thread->id);
-
         /* Handle client requests */
         client_do_work(&(thread->data.work));
         client_destroy(thread);
@@ -291,7 +289,7 @@ void* proxy_net_new_thread(void *ptr) {
         proxy_mutex_unlock(&(thread->lock));
     }
 
-    printf("Exiting loop on thead %d\n", thread->id);
+    printf("Exiting loop on client thead %d\n", thread->id);
 
     pthread_cleanup_pop(1);
     pthread_exit(NULL);

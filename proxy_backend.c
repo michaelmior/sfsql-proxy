@@ -276,6 +276,7 @@ error:
  **/
 static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn) {
     MYSQL *mysql;
+    my_bool reconnect = TRUE;
 
     mysql = conn->mysql = NULL;
     mysql = mysql_init(NULL);
@@ -284,6 +285,9 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
         proxy_error("Out of memory when allocating MySQL backend");
         return TRUE;
     }
+
+    /* Reconnect if a backend connection is lost */
+    mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
     if (!mysql_real_connect(mysql,
                 backend->host, options.user, options.pass, options.db, backend->port, NULL, 0)) {
@@ -588,6 +592,8 @@ void* proxy_backend_new_thread(void *ptr) {
         proxy_pool_return(backend_thread_pool, thread->id);
         proxy_mutex_unlock(&(thread->lock));
     }
+
+    printf("Exiting loop on backend thead %d\n", thread->id);
 
     pthread_exit(NULL);
 }
