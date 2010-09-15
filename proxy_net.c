@@ -122,6 +122,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
 
         if (passwd + passwd_len + db_len > (char*) net->read_pos + pkt_len) {
             proxy_error("Client sent oversized auth packet");
+            return;
         }
 
         /* If a DB was specified, read it */
