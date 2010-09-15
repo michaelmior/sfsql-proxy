@@ -86,6 +86,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
             (pkt_len = my_net_read(net)) == packet_error ||
             pkt_len < MIN_HANDSHAKE_SIZE) {
         proxy_error("Error sending handshake to client");
+        return;
     }
 
     /* XXX: pre-4.1 protocol not supported (or even checked) */
@@ -102,6 +103,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
                 "expecting max size %d"
                 ", got size %d",
                 pkt_len + 2, end - (char*) (net->read_pos + pkt_len + 2));
+        return;
     }
 
     {
