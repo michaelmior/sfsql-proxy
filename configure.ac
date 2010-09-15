@@ -107,14 +107,6 @@ if test x"$MYSQL_LIBS" = x; then
 fi
 AC_MSG_RESULT([$MYSQL_LIBS])
 
-AC_ARG_WITH([mysql-source],
-  [AS_HELP_STRING([--with-mysql-source], [location of MySQL source tree])],
-  [MYSQL_CFLAGS="-I$withval/include -I$withval/libmysql_r $MYSQL_CFLAGS"],
-  [with_mysql_source=no])
-
-AS_IF([test "x$with_mysql_source" = xno],
-  [AC_MSG_FAILURE([must specify path to MySQL source tree via --with-mysql-source])])
-
 AC_SUBST(MYSQL_CFLAGS)
 AC_SUBST(MYSQL_LIBS)
 

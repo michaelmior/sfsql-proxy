@@ -12,12 +12,10 @@
 #ifndef _proxy_net_h
 #define _proxy_net_h
 
-#include <my_base.h>
-
 void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
 int proxy_net_read_query(MYSQL *mysql);
-my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ulonglong last_insert_id);
+my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 
 /**
  * Flush the write buffer of the proxy MySQL object

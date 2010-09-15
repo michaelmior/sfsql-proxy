@@ -447,7 +447,7 @@ int proxy_net_read_query(MYSQL *mysql) {
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ha_rows affected_rows, ulonglong last_insert_id) {
+my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id) {
     NET *net = &(mysql->net);
     uchar buff[MYSQL_ERRMSG_SIZE + 10], *pos;
 

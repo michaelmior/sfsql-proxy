@@ -24,7 +24,6 @@
 #include "map/proxy_map.h"
 
 #include <sql_common.h>
-#include <client_settings.h>
 #include <time.h>
 #include <unistd.h>
 #include <ltdl.h>
