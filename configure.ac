@@ -7,14 +7,14 @@ AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([proxy.c])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile map/Makefile tests/Makefile])
-AC_CONFIG_MACRO_DIR([m4])
+AC_CONFIG_MACRO_DIR([m4 libltdl/m4])
 
 AC_CONFIG_AUX_DIR([libltdl/config])
 
 AM_INIT_AUTOMAKE(1.10 no-define)
 AC_LANG([C])
 
-#LT_CONFIG_LTDL_DIR([libltdl])
+LT_CONFIG_LTDL_DIR([libltdl])
 LT_INIT([shared, dlopen])
 
 # Checks for programs.
@@ -45,7 +45,7 @@ AC_TYPE_INTPTR_T
 AC_C_INLINE
 
 # Checks for library functions.
-AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp])
+AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])
 AC_FUNC_MALLOC
 AC_FUNC_FORK
 

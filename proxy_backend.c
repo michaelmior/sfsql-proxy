@@ -161,11 +161,17 @@ my_bool proxy_backend_init() {
             return TRUE;
 
         /* Construct the path to the mapper library */
+        lt_dladdsearchdir("map/" LT_OBJDIR);
+        lt_dladdsearchdir(PKG_LIB_DIR);
+
         buf = (char*) malloc(BUFSIZ);
-        snprintf(buf, BUFSIZ, "map/" LT_OBJDIR "libproxymap-%s", options.mapper);
+        snprintf(buf, BUFSIZ, "libproxymap-%s", options.mapper);
 
         if (!(backend_mapper_handle = lt_dlopenext(buf))) {
             free(buf);
+
+            buf = (char*) lt_dlerror();
+            proxy_error("Couldn't get handle to mapper %s:%s", options.mapper, buf);
             return TRUE;
         }
 
@@ -178,7 +184,7 @@ my_bool proxy_backend_init() {
 
         if (buf) {
             proxy_error("Couldn't load mapper %s:%s", options.mapper, buf);
-            free(buf);
+            return TRUE;
         }
     }
 
