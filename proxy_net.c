@@ -62,7 +62,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
     end += 4;
 
     /* Generate scramble string */
-    randominit(&rand, 0, 0); /* XXX: init elsewhere */
+    randominit(&rand, time(NULL), thread_id); /* XXX: init elsewhere */
     create_random_string(scramble, SCRAMBLE_LENGTH, &rand);
     end = strmake(end, scramble, SCRAMBLE_LENGTH_323) + 1;
 
@@ -203,7 +203,7 @@ MYSQL* client_init(Vio *vio) {
 
     /* Initialize network structures */
     mysql->protocol_version = PROTOCOL_VERSION;
-    mysql->server_version   = MYSQL_SERVER_VERSION;
+    mysql->server_version   = "5.1-sfsql_proxy";
 
     /* Initialize the client network structure */
     net = &(mysql->net);

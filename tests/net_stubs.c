@@ -33,6 +33,7 @@
 
 MYSQL* client_init(Vio *vio);
 my_bool __real_my_net_init(NET *net, Vio *vio);
+void __real_randominit(struct rand_struct *rand_st, ulong seed1, ulong seed2);
 
 my_bool __wrap_my_net_init(NET *net, Vio *vio) {
     struct sockaddr_un sa;
@@ -64,3 +65,8 @@ my_bool __wrap_proxy_backend_query(__attribute__((unused)) MYSQL *proxy, const c
 
 /* Don't need to touch the pool here */
 void __wrap_proxy_pool_return(__attribute__((unused)) pool_t *pool, __attribute__((unused)) int idx) {}
+
+/* Use a fixed seed for tests */
+void __wrap_randominit(struct rand_struct *rand_st, __attribute__((unused)) ulong seed1, __attribute__((unused)) ulong seed2) {
+    __real_randominit(rand_st, 0, 0);
+}

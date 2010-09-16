@@ -14,7 +14,8 @@ check_net_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
 check_net_LDFLAGS = \
 	-Wl,--wrap,my_net_init \
 	-Wl,--wrap,proxy_backend_query \
-	-Wl,--wrap,proxy_pool_return
+	-Wl,--wrap,proxy_pool_return \
+    -Wl,--wrap,randominit
 check_net_DEPENDENCIES = $(top_srcdir)/proxy_net.c $(top_srcdir)/proxy_net.h
 
 check_backend_SOURCES = check_backend.c $(top_srcdir)/proxy_pool.c
