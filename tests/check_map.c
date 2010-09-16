@@ -53,15 +53,19 @@ void teardown() {
     lt_dlexit();
 }
 
-START_TEST (test_rowa_select) {
-    proxy_query_map_t *map = (*func)("SELECT 1;");
+START_TEST (test_rowa_read) {
+    proxy_query_map_t *map;
 
+    map = (*func)("SELECT 1;");
     fail_unless(map->map == QUERY_MAP_ANY);
-} END_TEST
 
-START_TEST (test_rowa_show) {
-    proxy_query_map_t *map = (*func)("SHOW TABLES;");
+    map = (*func)("SHOW TABLES;");
+    fail_unless(map->map == QUERY_MAP_ANY);
 
+    map = (*func)("DESCRIBE TABLE `test`;");
+    fail_unless(map->map == QUERY_MAP_ANY);
+
+    map = (*func)("EXPLAIN SELECT 1;");
     fail_unless(map->map == QUERY_MAP_ANY);
 } END_TEST
 
@@ -76,8 +80,7 @@ Suite *map_suite(void) {
 
     TCase *tc_rowa = tcase_create("Read one, Write all");
     tcase_add_checked_fixture(tc_rowa, setup_rowa, teardown);
-    tcase_add_test(tc_rowa, test_rowa_select);
-    tcase_add_test(tc_rowa, test_rowa_show);
+    tcase_add_test(tc_rowa, test_rowa_read);
     tcase_add_test(tc_rowa, test_rowa_other);
     suite_add_tcase(s, tc_rowa);
 
