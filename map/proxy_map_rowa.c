@@ -25,6 +25,7 @@
 #include "proxy_map.h"
 
 #define SELECT "SELECT"
+#define SHOW   "SHOW"
 
 proxy_query_map_t* proxy_map_query(char *query) {
     proxy_query_map_t *map = NULL;
@@ -37,7 +38,8 @@ proxy_query_map_t* proxy_map_query(char *query) {
 
     /* Anything which starts with SELECT goes to
      * any backend, otherwise, go everywhere */
-    if (strncasecmp(query, SELECT, strlen(SELECT)) == 0)
+    if (strncasecmp(query, SELECT, strlen(SELECT)) == 0
+        || strncasecmp(query, SHOW, strlen(SHOW)) == 0)
         map->map = QUERY_MAP_ANY;
     else
         map->map = QUERY_MAP_ALL;
