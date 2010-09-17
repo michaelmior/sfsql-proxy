@@ -103,7 +103,7 @@ AC_MSG_RESULT($MYSQL_CFLAGS)
 
 AC_MSG_CHECKING(for MySQL libs)
 if test x"$MYSQL_LIBS" = x; then
-  MYSQL_LIBS="`$MYSQL_CONFIG --libs | sed s/\'//g`"
+  MYSQL_LIBS="`$MYSQL_CONFIG --libs_r | sed s/\'//g`"
 fi
 AC_MSG_RESULT([$MYSQL_LIBS])
 
