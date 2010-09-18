@@ -3,7 +3,7 @@
 TESTS = check_options check_pool check_net check_backend check_map
 check_PROGRAMS = check_options check_pool check_net check_backend check_map
 
-AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ -DTESTS_DIR="\"$(top_srcdir)/tests/\""
+AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\""
 
 check_pool_SOURCES = check_pool.c
 check_pool_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
@@ -19,14 +19,14 @@ check_net_LDFLAGS = \
 check_net_DEPENDENCIES = $(top_srcdir)/proxy_net.c $(top_srcdir)/proxy_net.h
 
 check_backend_SOURCES = check_backend.c $(top_srcdir)/proxy_pool.c
-check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ -lltdl
+check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ $(LIBLTDL)
 check_backend_DEPENDENCIES = $(top_srcdir)/proxy_backend.c $(top_srcdir)/proxy_backend.h 
 check_backend_LDFLAGS = \
 	-Wl,--wrap,proxy_threading_cancel \
 	-Wl,--wrap,proxy_threading_cleanup
 
 check_map_SOURCES = check_map.c
-check_map_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ -lltdl
+check_map_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ $(LIBLTDL)
 check_map_DEPENDENCIES = $(top_srcdir)/map/proxy_map.h
 
 check_options_SOURCES = check_options.c
