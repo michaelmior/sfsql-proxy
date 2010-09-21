@@ -47,7 +47,9 @@ static void usage() {
             "\t                   -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
             "\t--proxy-host,      -b\tBinding address (default is 0.0.0.0)\n"
-            "\t--proxy-port,      -L\tPort for the proxy server to listen on (default: 4040)\n\n"
+            "\t--proxy-port,      -L\tPort for the proxy server to listen on (default: 4040)\n"
+            "\t--timeout,         -n\tSeconds to wait wihout data before disconnecting clients,\n"
+            "\t                     \tnegative to wait forever (default: 5)\n\n"
             "Mapper options:\n"   
             "\t--mapper,          -m\tMapper to use for mapping queryies to backends\n"
             "\t                     \t(default is first available)\n\n"
@@ -76,6 +78,7 @@ int parse_options(int argc, char *argv[]) {
         {"num-conns",       required_argument, 0, 'N'},
         {"proxy-host",      required_argument, 0, 'b'},
         {"proxy-port",      required_argument, 0, 'L'},
+        {"timeout",         required_argument, 0, 'n'},
         {"mapper",          required_argument, 0, 'm'},
         {"client-threads",  required_argument, 0, 't'},
         {"backend-threads", required_argument, 0, 'T'},
@@ -95,12 +98,13 @@ int parse_options(int argc, char *argv[]) {
     options.backend_file    = NULL;
     options.phost           = NULL;
     options.pport           = PROXY_PORT;
+    options.timeout         = CLIENT_TIMEOUT;
     options.mapper          = NULL;
     options.client_threads  = CLIENT_THREADS;
     options.backend_threads = BACKEND_THREADS; 
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?h:P:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?h:P:n:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -111,6 +115,9 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'P':
                 options.backend.port = atoi(optarg);
+                break;
+            case 'n':
+                options.timeout = atoi(optarg);
                 break;
             case 'D':
                 options.db = strdup(optarg);

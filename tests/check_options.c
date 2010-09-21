@@ -34,6 +34,7 @@
 #define TEST_PROXY_PORT      "4041"
 #define TEST_MAPPER          "dummy"
 #define TEST_CLIENT_THREADS  "5"
+#define TEST_CLIENT_TIMEOUT  "10"
 #define TEST_BACKEND_THREADS "5"
 
 /* Confirm that testing options are not the same as defaults */
@@ -46,6 +47,7 @@ START_TEST (test_options_test) {
     fail_unless(atoi(TEST_NUM_CONNS) != NUM_CONNS);
     fail_unless(TEST_PROXY_HOST != NULL);
     fail_unless(atoi(TEST_PROXY_PORT) != PROXY_PORT);
+    fail_unless(atoi(TEST_CLIENT_TIMEOUT) != CLIENT_TIMEOUT);
     fail_unless(TEST_MAPPER != NULL);
     fail_unless(atoi(TEST_CLIENT_THREADS) != CLIENT_THREADS);
     fail_unless(atoi(TEST_BACKEND_THREADS) != BACKEND_THREADS);
@@ -56,6 +58,7 @@ START_TEST (test_options_short) {
     char *argv[] = { "./sfsql-proxy",
         "-h" TEST_HOST,
         "-P" TEST_PORT,
+        "-n" TEST_CLIENT_TIMEOUT,
         "-D" TEST_DB,
         "-u" TEST_USER,
         "-p" TEST_PASS,
@@ -78,6 +81,7 @@ START_TEST (test_options_short) {
     fail_unless(!options.autocommit);
     fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
     fail_unless(options.pport == atoi(TEST_PROXY_PORT));
+    fail_unless(options.timeout == atoi(TEST_CLIENT_TIMEOUT));
     fail_unless(strcmp(options.mapper, TEST_MAPPER) == 0);
     fail_unless(options.client_threads == atoi(TEST_CLIENT_THREADS));
     fail_unless(options.backend_threads == atoi(TEST_BACKEND_THREADS));
@@ -94,6 +98,7 @@ START_TEST (test_options_long) {
         "--num-conns="       TEST_NUM_CONNS,
         "--proxy-host="      TEST_PROXY_HOST,
         "--proxy-port="      TEST_PROXY_PORT,
+        "--timeout="         TEST_CLIENT_TIMEOUT,
         "--mapper="          TEST_MAPPER,
         "--client-threads="  TEST_CLIENT_THREADS,
         "--backend-threads=" TEST_BACKEND_THREADS };
@@ -108,6 +113,7 @@ START_TEST (test_options_long) {
     fail_unless(options.num_conns == atoi(TEST_NUM_CONNS));
     fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
     fail_unless(options.pport == atoi(TEST_PROXY_PORT));
+    fail_unless(options.timeout == atoi(TEST_CLIENT_TIMEOUT));
     fail_unless(strcmp(options.mapper, TEST_MAPPER) == 0);
     fail_unless(options.client_threads == atoi(TEST_CLIENT_THREADS));
     fail_unless(options.backend_threads == atoi(TEST_BACKEND_THREADS));
@@ -129,6 +135,7 @@ START_TEST (test_options_defaults) {
     fail_unless(options.backend_file == NULL);
     fail_unless(options.phost == NULL);
     fail_unless(options.pport == PROXY_PORT);
+    fail_unless(options.timeout == CLIENT_TIMEOUT);
     fail_unless(options.mapper == NULL);
     fail_unless(options.client_threads == CLIENT_THREADS);
     fail_unless(options.backend_threads == BACKEND_THREADS);

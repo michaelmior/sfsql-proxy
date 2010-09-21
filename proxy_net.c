@@ -355,6 +355,9 @@ int proxy_net_read_query(MYSQL *mysql) {
     ulong pkt_len;
     char *packet = 0;
     enum enum_server_command command;
+    size_t nread = 0;
+    fd_set sock;
+    struct timeval timeout;
 
     if (!mysql) {
         proxy_error("Invalid MySQL object for reading query");
@@ -363,6 +366,23 @@ int proxy_net_read_query(MYSQL *mysql) {
 
     /* Start a new transaction and read the incoming packet */
     net_new_transaction(net);
+
+    /* Wait for new data */
+    FD_ZERO(&sock);
+    FD_SET(net->vio->sd, &sock);
+    timeout.tv_sec  = options.timeout;
+    timeout.tv_usec = 0;
+    if (select(FD_SETSIZE, &sock, NULL, NULL, &timeout) != 1) {
+        proxy_error("Error in waiting on socket data");
+    }
+
+    /* Check if the connection is gone */
+    ioctl(net->vio->sd, FIONREAD, &nread);
+    if (nread == 0) {
+        proxy_error("Lost connection to client");
+        return -1;
+    }
+
     if ((pkt_len = my_net_read(net)) == packet_error) {
         proxy_error("Error reading query from client");
         return -1;

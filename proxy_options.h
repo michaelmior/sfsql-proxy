@@ -23,7 +23,8 @@
 #define NUM_CONNS       10          /** Default number of connections per backend */
 
 #define PROXY_PORT      4040        /** Default port to listen on for incoming connections */
-#define CLIENT_THREADS   10          /** Default number of threads started to do client work */
+#define CLIENT_THREADS  10          /** Default number of threads started to do client work */
+#define CLIENT_TIMEOUT  5           /** Default seconds to wait before disconnecting client */
 
 int parse_options(int argc, char *argv[]);
 
@@ -31,6 +32,7 @@ struct {
     my_bool help;            /** TRUE if the user asked for help */
 
     proxy_backend_t backend; /** Backend address info */
+    int timeout;             /** Seconds to wait before disconnecting client */
     char *db;                /** Backend database */
     char *user;              /** Backend username */
     char *pass;              /** Backend password */
