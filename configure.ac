@@ -32,6 +32,7 @@ PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for header files.
 AC_HEADER_STDC
+AC_HEADER_TIME
 AC_CHECK_HEADERS([\
     arpa/inet.h \
     netdb.h \
@@ -41,11 +42,17 @@ AC_CHECK_HEADERS([\
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
 AC_TYPE_INTPTR_T
+AC_TYPE_SIGNAL
+AC_TYPE_PID_T
 AC_C_INLINE
+AC_C_CONST
+AC_C_VOLATILE
 
 # Checks for library functions.
 AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])
 AC_FUNC_FORK
+AC_FUNC_SELECT_ARGTYPES
+AC_FUNC_VPRINTF
 
 # Doxygen support
 DX_HTML_FEATURE(ON)
