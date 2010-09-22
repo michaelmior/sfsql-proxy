@@ -357,7 +357,7 @@ int proxy_net_read_query(MYSQL *mysql) {
     enum enum_server_command command;
     size_t nread = 0;
     fd_set sock;
-    struct timeval timeout;
+    struct timeval tv, *timeout = NULL;
 
     if (!mysql) {
         proxy_error("Invalid MySQL object for reading query");
@@ -370,9 +370,13 @@ int proxy_net_read_query(MYSQL *mysql) {
     /* Wait for new data */
     FD_ZERO(&sock);
     FD_SET(net->vio->sd, &sock);
-    timeout.tv_sec  = options.timeout;
-    timeout.tv_usec = 0;
-    if (select(FD_SETSIZE, &sock, NULL, NULL, &timeout) != 1) {
+
+    if (options.timeout >= 0) {
+        tv.tv_sec  = options.timeout;
+        tv.tv_usec = 0;
+        timeout = &tv;
+    }
+    if (select(FD_SETSIZE, &sock, NULL, NULL, timeout) != 1) {
         proxy_error("Error in waiting on socket data");
     }
 

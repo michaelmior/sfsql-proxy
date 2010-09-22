@@ -24,7 +24,7 @@
 
 #define PROXY_PORT      4040        /** Default port to listen on for incoming connections */
 #define CLIENT_THREADS  10          /** Default number of threads started to do client work */
-#define CLIENT_TIMEOUT  5           /** Default seconds to wait before disconnecting client */
+#define CLIENT_TIMEOUT  5*60        /** Default seconds to wait before disconnecting client */
 
 int parse_options(int argc, char *argv[]);
 

@@ -34,7 +34,7 @@
 #define TEST_PROXY_PORT      "4041"
 #define TEST_MAPPER          "dummy"
 #define TEST_CLIENT_THREADS  "5"
-#define TEST_CLIENT_TIMEOUT  "10"
+#define TEST_CLIENT_TIMEOUT  "600"
 #define TEST_BACKEND_THREADS "5"
 
 /* Confirm that testing options are not the same as defaults */
