@@ -304,7 +304,7 @@ void* proxy_net_new_thread(void *ptr) {
  * \param work Information on the work to be done
  **/
 void client_do_work(proxy_work_t *work) {
-    int error;
+    int error, optval;
     Vio *vio_tmp;
 
     if (!work)
@@ -312,7 +312,19 @@ void client_do_work(proxy_work_t *work) {
 
     /* derived from sql/mysqld.cc:handle_connections_sockets */
     vio_tmp = vio_new(work->clientfd, VIO_TYPE_TCPIP, 0);
-    vio_keepalive(vio_tmp, TRUE);
+    vio_fastsend(vio_tmp);
+
+    /* Enable TCP keepalive which equivalent to
+     * to vio_keepalive(vio_tmp, TRUE) plus setting
+     *   tcp_keepalive_probes = 4
+     *   tcp_keepalive_time   = 60
+     *   tcp_keepalive_intvl  = 60 */
+    setsockopt(vio_tmp->sd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
+    optval = 4;
+    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPCNT, &optval, sizeof(optval));
+    optval = 60;
+    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPIDLE, &optval, sizeof(optval));
+    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPINTVL, &optval, sizeof(optval));
 
     work->proxy = client_init(vio_tmp);
     if (work->proxy == NULL)
