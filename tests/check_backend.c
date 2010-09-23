@@ -20,7 +20,7 @@
  *
  */
 
-#include "../proxy_backend.c"
+#include "../src/proxy_backend.c"
 
 #include <check.h>
 

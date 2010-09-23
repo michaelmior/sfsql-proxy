@@ -1,4 +1,4 @@
-/* 
+/*
  * proxy.h
  *
  * Main proxy include file with useful macros, structs, and default configuration options
@@ -50,7 +50,7 @@ static inline void __proxy_error(__attribute__((unused)) void *p, ...) {
 #endif
     char *fmt;
     va_list arg;
-    
+
     va_start(arg, NULL);
     fmt = va_arg(arg, char*);
 

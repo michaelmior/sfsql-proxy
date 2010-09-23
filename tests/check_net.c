@@ -20,7 +20,7 @@
  *
  */
 
-#include "../proxy_net.c"
+#include "../src/proxy_net.c"
 
 #include <check.h>
 #include "check_net.h"

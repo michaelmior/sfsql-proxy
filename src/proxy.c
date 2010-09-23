@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
     /* Set up thread attributes */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    
+
     /* Create the new threads */
     threads = (proxy_thread_t*) calloc(options.client_threads, sizeof(proxy_thread_t));
 

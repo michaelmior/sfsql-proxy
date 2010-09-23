@@ -4,7 +4,7 @@
 AC_PREREQ(2.61)
 AC_INIT([sfsql-proxy],[0.1],[mmior@cs.toronto.edu])
 AC_USE_SYSTEM_EXTENSIONS
-AC_CONFIG_SRCDIR([proxy.c])
+AC_CONFIG_SRCDIR([src/proxy.c])
 AC_CONFIG_HEADERS([config.h])
 LT_CONFIG_LTDL_DIR([libltdl])
 AC_CONFIG_AUX_DIR([libltdl/config])
@@ -119,5 +119,5 @@ if test "$with_debug" = "yes"; then
   CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 fi
 
-AC_CONFIG_FILES([libltdl/Makefile Makefile map/Makefile tests/Makefile])
+AC_CONFIG_FILES([Makefile libltdl/Makefile src/Makefile map/Makefile tests/Makefile])
 AC_OUTPUT

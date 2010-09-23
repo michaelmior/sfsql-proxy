@@ -138,7 +138,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
         user_buff[user_len = copy_and_convert(user_buff, sizeof(user_buff)-1,
                 system_charset_info, user, user_len, charset, &dummy_errors)] = '\0';
         user = user_buff;
-        
+
         /* Strip quotes */
         if (user_len > 1 && user[0] == '\'' && user[user_len - 1] == '\'') {
             user[user_len - 1] = 0;
@@ -499,7 +499,7 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
     int2store(pos, min(warnings, 65535));
     pos += 2;
 
-    /* XXX: ignore messages for now 
+    /* XXX: ignore messages for now
     if (message && message[0])
         pos = net_store_data(pos, (uchar*), message, strlen(message));
     */

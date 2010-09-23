@@ -29,7 +29,7 @@
 #include <sys/un.h>
 
 #include "check_net.h"
-#include "../proxy.h"
+#include "proxy.h"
 
 MYSQL* client_init(Vio *vio);
 my_bool __real_my_net_init(NET *net, Vio *vio);

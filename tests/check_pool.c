@@ -20,7 +20,7 @@
  *
  */
 
-#include "../proxy_pool.c"
+#include "../src/proxy_pool.c"
 
 #include <check.h>
 

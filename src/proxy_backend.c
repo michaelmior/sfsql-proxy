@@ -453,7 +453,7 @@ my_bool proxy_backends_connect() {
                 return TRUE;
         }
     }
- 
+
      return FALSE;
 }
 
@@ -515,7 +515,7 @@ void proxy_backends_update() {
 
             free(backend_conns[i]);
             backend_free(backends[i]);
-            
+
             /* Destroy the pool */
             proxy_pool_destroy(backend_pools[i]);
             backend_pools[i] = NULL;
@@ -609,7 +609,7 @@ void* proxy_backend_new_thread(void *ptr) {
 }
 
 /**
- * Linear congruential generator for picking backends in random order. 
+ * Linear congruential generator for picking backends in random order.
  *
  * \param X Previous value returned by ::lcg, -1 for first value.
  * \param N Maximum value to generate (must be less than ::MAX_BACKENDS).
@@ -702,7 +702,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 ti = proxy_pool_get(backend_thread_pool);
 
                 proxy_mutex_lock(&(backend_threads[ti].lock));
-                
+
                 backend_threads[ti].data.query.query = oq;
                 backend_threads[ti].data.query.length = &length;
                 backend_threads[ti].data.query.proxy = (i == 0) ? proxy : NULL;
@@ -788,7 +788,7 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
         pos = (uchar*) mysql->net.read_pos;
         if (net_field_length(&pos) == 0 || mysql->net.read_pos[0] == 255) {
             error = FALSE;
-            goto out; 
+            goto out;
         }
     }
 
