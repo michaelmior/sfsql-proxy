@@ -45,8 +45,6 @@ AC_TYPE_INTPTR_T
 AC_TYPE_SIGNAL
 AC_TYPE_PID_T
 AC_C_INLINE
-AC_C_CONST
-AC_C_VOLATILE
 
 # Checks for library functions.
 AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])

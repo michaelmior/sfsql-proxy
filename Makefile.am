@@ -23,5 +23,3 @@ noinst_HEADERS = \
 include $(top_srcdir)/doxygen.am
 MOSTLYCLEANFILES = $(DX_CLEANFILES)
 doc: doxygen-doc
-test:
-	echo $(LTDLDEPS)
