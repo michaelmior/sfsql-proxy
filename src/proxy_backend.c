@@ -43,7 +43,7 @@ static proxy_thread_t *backend_threads = NULL;   /** Thread data structures for 
 static pool_t *backend_thread_pool = NULL;       /** Pool for locking access to backend threads */
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
-static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy);
+static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy);
 static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn);
 static proxy_backend_t** backend_read_file(char *filename, int *num);
 static void conn_free(proxy_backend_conn_t *conn);
@@ -61,7 +61,7 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
  *
  * \return Length of the packet which was read.
  **/
-static ulong backend_read_to_proxy(MYSQL *backend, MYSQL *proxy) {
+static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy) {
     NET *net = &(backend->net);
     ulong pkt_len;
 

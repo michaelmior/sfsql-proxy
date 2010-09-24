@@ -35,6 +35,11 @@ volatile sig_atomic_t run = 1;
 static proxy_thread_t *threads;
 static char BUF[BUFSIZ];
 
+union sockaddr_union {
+    struct sockaddr sa;
+    struct sockaddr_in sin;
+};
+
 static void server_run(char *host, int port);
 
 /**
@@ -47,7 +52,7 @@ static void server_run(char *host, int port) {
     int serverfd, clientfd;
     fd_set fds;
     unsigned int clientlen;
-    struct sockaddr_in serveraddr, clientaddr;
+    union sockaddr_union serveraddr, clientaddr;
     struct hostent *hostinfo;
     proxy_thread_t *thread;
 
@@ -63,7 +68,7 @@ static void server_run(char *host, int port) {
 
     /* Intialize the server address */
     memset(&serveraddr, 0, sizeof(serveraddr));
-    serveraddr.sin_family = AF_INET;
+    serveraddr.sin.sin_family = AF_INET;
 
     /* Set the binding address */
     if (host) {
@@ -72,16 +77,16 @@ static void server_run(char *host, int port) {
             proxy_error("Invalid binding address %s\n", host);
             return;
         } else {
-            serveraddr.sin_addr = *(struct in_addr*) hostinfo->h_addr;
+            serveraddr.sin.sin_addr = *(struct in_addr*) hostinfo->h_addr;
         }
     } else {
-        serveraddr.sin_addr.s_addr = htonl(INADDR_ANY);
+        serveraddr.sin.sin_addr.s_addr = htonl(INADDR_ANY);
     }
 
-    serveraddr.sin_port = htons((unsigned short) port);
+    serveraddr.sin.sin_port = htons((unsigned short) port);
 
     /* Bind the socket and start accepting connections */
-    if (bind(serverfd, (struct sockaddr*) &serveraddr, sizeof(serveraddr)) < 0) {
+    if (bind(serverfd, &(serveraddr.sa), sizeof(serveraddr)) < 0) {
         proxy_error("Error binding server socket on port %d", port);
         return;
     }
@@ -100,7 +105,7 @@ static void server_run(char *host, int port) {
         if (select(FD_SETSIZE, &fds, NULL, NULL, NULL) != 1)
             continue;
 
-        clientfd = accept(serverfd, (struct sockaddr*) &clientaddr, &clientlen);
+        clientfd = accept(serverfd, &(clientaddr.sa), &clientlen);
         if (clientfd < 0) {
             if (errno != EINTR)
                 proxy_error("Error accepting client connection: %s", errstr);
@@ -113,7 +118,7 @@ static void server_run(char *host, int port) {
         /* Give work to thread and signal it to go */
         proxy_mutex_lock(&(thread->lock));
         thread->data.work.clientfd = clientfd;
-        thread->data.work.addr = &clientaddr;
+        thread->data.work.addr = &(clientaddr.sin);
         thread->data.work.proxy = NULL;
         proxy_cond_signal(&(thread->cv));
         proxy_mutex_unlock(&(thread->lock));

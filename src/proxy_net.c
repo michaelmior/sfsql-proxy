@@ -54,7 +54,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
     net = &mysql->net;
 
     vio_peer_addr(net->vio, ip, &port);
-    vio_in_addr(net->vio, (struct in_addr*) &(clientaddr->sin_addr.s_addr));
+    vio_in_addr(net->vio, &(clientaddr->sin_addr));
 
     /* Save version number */
     end = strnmov(buff, mysql->server_version, SERVER_VERSION_LENGTH) + 1;

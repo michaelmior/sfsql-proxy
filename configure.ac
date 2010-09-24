@@ -23,6 +23,7 @@ AC_PROG_CC_C99
 AX_CFLAGS_GCC_OPTION(-Wall)
 AX_CFLAGS_GCC_OPTION(-Werror)
 AX_CFLAGS_GCC_OPTION(-Wextra)
+AX_CFLAGS_GCC_OPTION(-Wstrict-aliasing=2)
 AX_CFLAGS_GCC_OPTION(-pedantic)
 
 # Checks for libraries.
@@ -45,6 +46,7 @@ AC_TYPE_INTPTR_T
 AC_TYPE_SIGNAL
 AC_TYPE_PID_T
 AC_C_INLINE
+AC_C_RESTRICT
 
 # Checks for library functions.
 AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])
