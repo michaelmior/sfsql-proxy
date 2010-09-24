@@ -498,6 +498,10 @@ void proxy_backends_update() {
             new_pools[j] = NULL;
             new_conns[j] = NULL;
         }
+    } else {
+        free(new_backends);
+        printf("No backends changed. Done.\n");
+        return;
     }
 
     /* Clean up old backends */
@@ -532,12 +536,6 @@ void proxy_backends_update() {
     free(old_backends);
     oldnum = backend_num;
     backend_num = num;
-
-    /* Nothing new here */
-    if (!changed && oldnum == num) {
-        printf("No backends changed. Done.\n");
-        return;
-    }
 
     /* Switch to new resources */
     old_pools = backend_pools;
