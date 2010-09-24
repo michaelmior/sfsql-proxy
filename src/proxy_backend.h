@@ -30,6 +30,7 @@ typedef struct {
     MYSQL *proxy;
     pthread_mutex_t *mutex;
     pthread_cond_t *cv;
+    pthread_barrier_t *barrier;
     int bi;
     my_bool *result;
     int *count;

@@ -49,7 +49,7 @@ static proxy_backend_t** backend_read_file(char *filename, int *num);
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_backend_t *backend);
 static my_bool backends_alloc(int num_backends);
-static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length);
+static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier);
 
 /**
  * Read a MySQL packet from the backend and forward to the client.
@@ -588,7 +588,7 @@ void* proxy_backend_new_thread(void *ptr) {
         /* We make a copy of the query string since MySQL destroys it */
         oq = (char*) malloc(*(query->length) + 1);
         memcpy(oq, query->query, *(query->length) + 1);
-        query->result[query->bi] = backend_query_idx(query->bi, query->proxy, oq, *(query->length));
+        query->result[query->bi] = backend_query_idx(query->bi, query->proxy, oq, *(query->length), query->barrier);
         free(oq);
 
         /* Check and signal if all backends have received the query */
@@ -654,6 +654,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     char *oq = NULL;
     pthread_cond_t *query_cv;
     pthread_mutex_t *query_mutex;
+    pthread_barrier_t *query_barrier;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -673,7 +674,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
              * backends are in the process of changing */
             bi = rand() % backend_num;
             while (!backend_pools[bi]) { bi = rand() % backend_num; }
-            if (backend_query_idx(bi, proxy, query, length)) {
+            if (backend_query_idx(bi, proxy, query, length, NULL)) {
                 error = TRUE;
                 goto out;
             }
@@ -688,10 +689,13 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
 
             while (!backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
 
+            /* Set up synchronization */
             query_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_cond_t));
             proxy_mutex_init(query_mutex);
             query_cv = (pthread_cond_t*) malloc(sizeof(pthread_cond_t));
             proxy_cond_init(query_cv);
+            query_barrier = (pthread_barrier_t*) malloc(sizeof(pthread_barrier_t));
+            pthread_barrier_init(query_barrier, NULL, backend_num);
             result = (my_bool*) calloc(backend_num, sizeof(my_bool));
 
             for (i=0; i<backend_num; i++) {
@@ -761,7 +765,7 @@ out:
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length) {
+static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
     uchar *pos;
@@ -791,6 +795,11 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
             goto out;
         }
     }
+
+    /* If we're sending to multiple backends, wait
+     * until everyone is done before sending results */
+    if (barrier)
+        pthread_barrier_wait(barrier);
 
     /* Flush the write buffer */
     proxy_net_flush(proxy);
