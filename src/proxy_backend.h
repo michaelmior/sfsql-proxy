@@ -44,4 +44,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length);
 void* proxy_backend_new_thread(void *ptr);
 void proxy_backend_close();
 
+extern volatile sig_atomic_t querying;
+
 #endif /* _proxy_backend_h */

@@ -29,6 +29,7 @@
 #include <mysql_com.h>
 #include <violite.h>
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -36,6 +37,7 @@
 #include <mysql.h>
 #include <pthread.h>
 
+extern volatile sig_atomic_t cloning;  /** Signify that we are currently cloning */
 
 /**
  *  Output an error message to stderr

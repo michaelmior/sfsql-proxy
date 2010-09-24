@@ -42,6 +42,8 @@ static lt_dlhandle backend_mapper_handle = NULL; /** ltdl handle to the mapper l
 static proxy_thread_t *backend_threads = NULL;   /** Thread data structures for backend query threads */
 static pool_t *backend_thread_pool = NULL;       /** Pool for locking access to backend threads */
 
+volatile sig_atomic_t querying = 0;              /** Signify that a backend is currently querying */
+
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy);
 static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn);
@@ -585,11 +587,15 @@ void* proxy_backend_new_thread(void *ptr) {
             break;
         }
 
+        __sync_fetch_and_add(&querying, 1);
+
         /* We make a copy of the query string since MySQL destroys it */
         oq = (char*) malloc(*(query->length) + 1);
         memcpy(oq, query->query, *(query->length) + 1);
         query->result[query->bi] = backend_query_idx(query->bi, query->proxy, oq, *(query->length), query->barrier);
         free(oq);
+
+        __sync_fetch_and_sub(&querying, 1);
 
         /* Check and signal if all backends have received the query */
         proxy_mutex_lock(thread->data.query.mutex);
@@ -688,6 +694,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             memcpy(oq, query, length+1);
 
             while (!backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
+            while (cloning) { usleep(1000); }           /* Wait until cloning is done */
 
             /* Set up synchronization */
             query_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_cond_t));

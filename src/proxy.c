@@ -25,14 +25,15 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <signal.h>
 
 #include "proxy.h"
 
 #define QUEUE_LENGTH  10
 
 volatile sig_atomic_t run = 1;
+volatile sig_atomic_t cloning  = 1;
 static proxy_thread_t *threads;
+pid_t signaller = -1;
 static char BUF[BUFSIZ];
 
 union sockaddr_union {
@@ -130,7 +131,7 @@ static void server_run(char *host, int port) {
 /**
  * Main signal handler with switch() to handle multiple signals.
  **/
-static void catch_sig(int sig) {
+static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attribute__((unused)) void *ucontext_t) {
     switch (sig) {
         /* Tell the server to stop */
         case SIGINT:
@@ -141,12 +142,36 @@ static void catch_sig(int sig) {
             proxy_threading_cancel(threads, options.client_threads, thread_pool);
 
             break;
+
+        /* Prepare to clone */
         case SIGUSR1:
+            cloning = 1;
+
+            if (signaller > 0)
+                proxy_error("Received second cloning signal before clone complete");
+
+            signaller = info->si_pid;
+
+            /* Wait for queries to finish */
+            while (querying) { usleep(1000); }
+
+            /* Signal the process to clone */
+            printf("Signaling back %d\n", signaller);
+            kill(signaller, SIGUSR1);
+
+            break;
+
+        /* Update backends with new clone */
+        case SIGUSR2:
             proxy_backends_update();
+            cloning = 0;
+
+            if (info->si_pid != signaller)
+                proxy_error("Different process sent cloning completion signal");
+            signaller = -1;
             break;
     }
 }
-
 
 int main(int argc, char *argv[]) {
     int error, i, ret=EXIT_SUCCESS;
@@ -161,21 +186,23 @@ int main(int argc, char *argv[]) {
     proxy_threading_init();
 
     /* Install signal handler */
-    new_action.sa_handler = catch_sig;
+    new_action.sa_sigaction = catch_sig;
     sigemptyset(&new_action.sa_mask);
     sigaddset(&new_action.sa_mask, SIGINT);
     sigaddset(&new_action.sa_mask, SIGUSR1);
-    new_action.sa_flags = 0;
+    new_action.sa_flags = SA_SIGINFO;
 
-    /* Handle signal for stopping server */
-    sigaction(SIGINT, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN)
-        sigaction(SIGINT, &new_action, NULL);
+#define HANDLE_SIG(sig) \
+    sigaction(sig, NULL, &old_action); \
+    if (old_action.sa_handler != SIG_IGN) \
+        sigaction(sig, &new_action, NULL); \
+    sigaction(sig, NULL, &old_action);
 
-    /* Handle signal for reloading backend file */
-    sigaction(SIGUSR1, NULL, &old_action);
-    if (old_action.sa_handler != SIG_IGN)
-        sigaction(SIGUSR1, &new_action, NULL);
+    /* Set up signal handlers */
+    HANDLE_SIG(SIGTERM);
+    HANDLE_SIG(SIGINT);
+    HANDLE_SIG(SIGUSR1);
+    HANDLE_SIG(SIGUSR2);
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
