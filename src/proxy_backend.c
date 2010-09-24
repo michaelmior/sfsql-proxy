@@ -715,6 +715,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 backend_threads[ti].data.query.count = &count;
                 backend_threads[ti].data.query.mutex = query_mutex;
                 backend_threads[ti].data.query.cv = query_cv;
+                backend_threads[ti].data.query.barrier = query_barrier;
 
                 proxy_cond_signal(&(backend_threads[ti].cv));
                 proxy_mutex_unlock(&(backend_threads[ti].lock));
@@ -730,6 +731,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             free(query_mutex);
             proxy_cond_destroy(query_cv);
             free(query_cv);
+            pthread_barrier_destroy(query_barrier);
+            free(query_barrier);
 
             /* XXX: should do better at handling failures */
             for (i=0; i<count; i++)
@@ -788,6 +791,11 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
             goto out;
         }
 
+        /* If we're sending to multiple backends, wait
+         * until everyone is done before sending results */
+        if (i == 0 && barrier)
+            pthread_barrier_wait(barrier);
+
         /* If the query doesn't return results, no more to do */
         pos = (uchar*) mysql->net.read_pos;
         if (net_field_length(&pos) == 0 || mysql->net.read_pos[0] == 255) {
@@ -795,11 +803,6 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
             goto out;
         }
     }
-
-    /* If we're sending to multiple backends, wait
-     * until everyone is done before sending results */
-    if (barrier)
-        pthread_barrier_wait(barrier);
 
     /* Flush the write buffer */
     proxy_net_flush(proxy);
