@@ -267,6 +267,7 @@ void net_thread_destroy(void *ptr) {
 void* proxy_net_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
 
+    proxy_threading_mask();
     pthread_cleanup_push(net_thread_destroy, ptr);
 
     while (1) {

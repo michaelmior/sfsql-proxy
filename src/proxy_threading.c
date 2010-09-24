@@ -20,16 +20,35 @@
  *
  */
 
+#include <signal.h>
+
 #include "proxy.h"
+
+static int handle_sigs[] = { SIGINT, SIGUSR1, SIGUSR2 }; /** Signals which should be handled by the proxy */
+static sigset_t handle_set;                              /** Signal set corresponding to ::handle_sigs */
 
 /**
  * Initialize threading data structures.
  **/
 void proxy_threading_init() {
+    int i, size = sizeof(handle_sigs)/sizeof(*handle_sigs);
+
+    /* Set up signal set for masked signals */
+    sigemptyset(&handle_set);
+    for (i=0; i<size; i++)
+        sigaddset(&handle_set, handle_sigs[i]);
+
 #ifdef DEBUG
     pthread_mutexattr_init(&__proxy_mutexattr);
     pthread_mutexattr_settype(&__proxy_mutexattr, PTHREAD_MUTEX_ERRORCHECK);
 #endif
+}
+
+/*
+ * Block signals so they are handled by the main thread
+ */
+void proxy_threading_mask() {
+    pthread_sigmask(SIG_BLOCK, &handle_set, NULL);
 }
 
 /**

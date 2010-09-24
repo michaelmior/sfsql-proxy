@@ -41,6 +41,7 @@ typedef struct {
 } proxy_thread_t;
 
 void proxy_threading_init();
+void proxy_threading_mask();
 void proxy_threading_end();
 void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);
 void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);

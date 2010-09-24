@@ -574,6 +574,8 @@ void* proxy_backend_new_thread(void *ptr) {
     proxy_backend_query_t *query = &(thread->data.query);
     char *oq;
 
+    proxy_threading_mask();
+
     while (1) {
         /* Wait for work to be available */
         proxy_mutex_lock(&(thread->lock));
