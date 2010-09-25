@@ -18,22 +18,33 @@
 
 /**
  * All information needed by threads
- * to connect to clients and begin working. */
+ * to connect to clients and begin working.
+ **/
 typedef struct {
+    /** Socket descriptor of client. */
     int clientfd;
+    /** Address of client endpoint. */
     struct sockaddr_in *addr;
+    /** MySQL object initialized for client. */
     MYSQL *proxy;
 } proxy_work_t;
 
 /**
  * Data structures needed for thread pool
- * implementation and signaling of new work. */
+ * implementation and signaling of new work.
+ **/
 typedef struct {
+    /** Number of the thread. */
     int id;
+    /** pthreads thread identifier. */
     pthread_t thread;
+    /** Condition variable for signifying
+        the thread of available work. */
     pthread_cond_t cv;
+    /** Lock associated with condition variable. */
     pthread_mutex_t lock;
 
+    /** Work for different types of threads. */
     union {
         proxy_work_t work;
         proxy_backend_query_t query;

@@ -22,9 +22,11 @@
 
 #include "proxy.h"
 
-#define MIN_HANDSHAKE_SIZE 6 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
+/** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
+#define MIN_HANDSHAKE_SIZE 6
 
-extern CHARSET_INFO *default_charset_info; /** Exposes the default charset in the client library */
+/** Exposes the default charset in the client library */
+extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
 static MYSQL* client_init(Vio *vio);

@@ -36,8 +36,11 @@ static proxy_thread_t *threads;
 pid_t signaller = -1;
 static char BUF[BUFSIZ];
 
+/** Union used to avoid aliasing warnings. */
 union sockaddr_union {
+    /** Standard socket structure. */
     struct sockaddr sa;
+    /** Incoming socket structure. */
     struct sockaddr_in sin;
 };
 

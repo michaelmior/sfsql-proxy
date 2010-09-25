@@ -32,6 +32,12 @@
 
 MYSQL* client_init(Vio *vio);
 
+/**
+ * Send all data in a file to a socket.
+ *
+ * \param filename Name of file containing data to send.
+ * \param sd       Socket descriptor where data should be sent.
+ **/
 int send_file(char *filename, int sd) {
     FILE *fp;
     ulong size;
@@ -64,6 +70,12 @@ int send_file(char *filename, int sd) {
     return 0;
 }
 
+/**
+ * Compare data received on a socket to data in a file.
+ *
+ * \param filename Name of file containing data for comparison.
+ * \param sd       Socket descriptor to read comparison data from.
+ **/
 int compare_to_file(char *filename, int sd) {
     FILE *fp;
     ulong size, c, i, n;
@@ -103,6 +115,7 @@ int compare_to_file(char *filename, int sd) {
     return 0;
 }
 
+/* Proxy executes handshake correctly */
 START_TEST (test_net_handshake) {
     struct sockaddr_un sa;
     struct sockaddr_in addr;

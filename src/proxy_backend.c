@@ -30,19 +30,30 @@
 
 static char BUF[BUFSIZ];
 
-#define MAX_PACKET_LENGTH (256L*256L*256L-1)     /** Maximum TCP packet length (from sql/net_serv.cc) */
-#define MAX_BACKENDS      128                    /** Maximum number of backends. Must be a power of 2 for LCG. */
+/** Maximum TCP packet length (from sql/net_serv.cc) */
+#define MAX_PACKET_LENGTH (256L*256L*256L-1)
+/** Maximum number of backends. Must be a power of 2 for LCG. */
+#define MAX_BACKENDS      128
 
-static proxy_backend_t **backends = NULL;        /** Array of backends currently available */
-static proxy_backend_conn_t ***backend_conns;    /** Backend MySQL connections */
-static pool_t **backend_pools = NULL;            /** Lock pool for controlling backend access */
-static int backend_num;                          /** Total number of backends */
-static proxy_map_query_t backend_mapper = NULL;  /** Query mapper for selecting backends */
-static lt_dlhandle backend_mapper_handle = NULL; /** ltdl handle to the mapper library */
-static proxy_thread_t *backend_threads = NULL;   /** Thread data structures for backend query threads */
-static pool_t *backend_thread_pool = NULL;       /** Pool for locking access to backend threads */
+/** Array of backends currently available */
+static proxy_backend_t **backends = NULL;
+/** Backend MySQL connections */
+static proxy_backend_conn_t ***backend_conns;
+/** Lock pool for controlling backend access */
+static pool_t **backend_pools = NULL;
+/** Total number of backends */
+static int backend_num;
+/** Query mapper for selecting backends */
+static proxy_map_query_t backend_mapper = NULL;
+/** ltdl handle to the mapper library */
+static lt_dlhandle backend_mapper_handle = NULL;
+/** Thread data structures for backend query threads */
+static proxy_thread_t *backend_threads = NULL;
+/** Pool for locking access to backend threads */
+static pool_t *backend_thread_pool = NULL;
 
-volatile sig_atomic_t querying = 0;              /** Signify that a backend is currently querying */
+/** Signify that a backend is currently querying */
+volatile sig_atomic_t querying = 0;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy);
@@ -768,10 +779,12 @@ out:
 /**
  * Forward a query to a specific backend
  *
- * \param bi     Index of the backend to send the query to.
- * \param proxy  MYSQL object to forward results to.
- * \param query  Query string to execute.
- * \param length Length of the query.
+ * \param bi      Index of the backend to send the query to.
+ * \param proxy   MYSQL object to forward results to.
+ * \param query   Query string to execute.
+ * \param length  Length of the query.
+ * \param barrier Optional barrier which blocks query response
+ *                until all backends have received the query.
  *
  * \return TRUE on error, FALSE otherwise.
  **/

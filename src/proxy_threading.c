@@ -24,8 +24,10 @@
 
 #include "proxy.h"
 
-static int handle_sigs[] = { SIGINT, SIGUSR1, SIGUSR2 }; /** Signals which should be handled by the proxy */
-static sigset_t handle_set;                              /** Signal set corresponding to ::handle_sigs */
+/** Signals which should be handled by the proxy */
+static int handle_sigs[] = { SIGINT, SIGUSR1, SIGUSR2 };
+/** Signal set corresponding to ::handle_sigs */
+static sigset_t handle_set;
 
 /**
  * Initialize threading data structures.

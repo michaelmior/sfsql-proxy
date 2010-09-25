@@ -16,10 +16,17 @@
  * Data structure for lock pool implemenation
  * with list of availability of a set of items. */
 typedef struct {
-    int size, __alloc;
+    /** Current size of the pool. */
+    int size;
+    /** Currently allocated size of the pool. */
+    int __alloc;
+    /** List of availabilities of items in the pool. */
     my_bool *avail;
+    /** Lock to block pool access. */
     pthread_mutex_t lock;
+    /** Condition variable for signifying new availability. */
     pthread_cond_t *avail_cv;
+    /** Lock assocated with condition variable. */
     pthread_mutex_t *avail_mutex;
 } pool_t;
 

@@ -13,26 +13,51 @@
 #define _proxy_backend_h
 
 /**
- * Connection information for backends */
+ * Connection information for backends.
+ **/
 typedef struct {
+    /** Hostname or IP of the backend to connect to. */
     char *host;
+    /** Port number of the associated host. */
     int port;
 } proxy_backend_t;
 
+/**
+ * Backend connection information.
+ **/
 typedef struct {
+    /** MySQL object associated with connection. */
     MYSQL *mysql;
-    my_bool freed;
+
+    /** If the connection should be freed when the
+        current user is finished. */
+    my_bool freed; 
+                   
 } proxy_backend_conn_t;
 
+/**
+ * Query structure required for backend threads.
+ **/
 typedef struct {
+    /** Query to execute. */
     char *query;
+    /** Length of the query string. */
     ulong *length;
-    MYSQL *proxy;
-    pthread_mutex_t *mutex;
+   /** Proxy MySQL object where results
+       should be sent, or NULL to discard. */
+    MYSQL *proxy;             
+    /** Condition variable for syncing access to count. */
     pthread_cond_t *cv;
+    /** Mutex associated with condition variable. */
+    pthread_mutex_t *mutex;
+    /** Barrier for ensuring all queries execute
+        before sending results. */
     pthread_barrier_t *barrier;
+    /** Index of the backend the query should be sent to. */
     int bi;
+    /** Success array from various backends. */
     my_bool *result;
+    /** Count of backends which have executed the query. */
     int *count;
 } proxy_backend_query_t;
 

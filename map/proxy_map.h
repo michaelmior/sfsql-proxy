@@ -20,15 +20,19 @@
  * Types of query mappings.
  **/
 enum QUERY_MAP {
-    QUERY_MAP_ANY, /** Map to any available backend. */
-    QUERY_MAP_ALL  /** Map to all backends. */
+    /** Map to any available backend. */
+    QUERY_MAP_ANY,
+    /** Map to all backends. */
+    QUERY_MAP_ALL
 };
 
 /**
  * Information about mapping for a
  * particular query. */
 typedef struct {
+    /** Result of query mapping. */
     enum QUERY_MAP map;
+    /** Modified query, or NULL if unchanged. */
     char *query;
 } proxy_query_map_t;
 

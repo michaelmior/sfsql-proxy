@@ -33,6 +33,7 @@
 proxy_map_query_t func = NULL;
 lt_dlhandle handle;
 
+/** Fixture to set  up the mapper object */
 void setup_rowa() {
     fail_unless(lt_dlinit() == 0);
 
@@ -49,10 +50,12 @@ void setup_rowa() {
     }
 }
 
+/** Fixture to teardown the mapper object */
 void teardown() {
     lt_dlexit();
 }
 
+/* Read queries should be mapped to any backend with ROWA mapper */
 START_TEST (test_rowa_read) {
     proxy_query_map_t *map;
 
@@ -69,6 +72,7 @@ START_TEST (test_rowa_read) {
     fail_unless(map->map == QUERY_MAP_ANY);
 } END_TEST
 
+/* Non-read queries should be mapped to all backends with ROWA mapper */
 START_TEST (test_rowa_other) {
     proxy_query_map_t *map = (*func)("INSERT INTO test VALUES(1);");
 
