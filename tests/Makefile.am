@@ -23,7 +23,7 @@ check_net_DEPENDENCIES = $(SRC_DIR)/proxy_net.c $(SRC_DIR)/proxy_net.h
 
 check_backend_SOURCES = check_backend.c $(SRC_DIR)/proxy_pool.c
 check_backend_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ $(LIBLTDL)
-check_backend_DEPENDENCIES = $(SRC_DIR)/proxy_backend.c $(SRC_DIR)/proxy_backend.h
+check_backend_DEPENDENCIES = $(LTDLDEPS) $(SRC_DIR)/proxy_backend.c $(SRC_DIR)/proxy_backend.h
 check_backend_LDFLAGS = \
 	-Wl,--wrap,proxy_threading_cancel \
 	-Wl,--wrap,proxy_threading_cleanup \
