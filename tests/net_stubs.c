@@ -25,8 +25,6 @@
 #include <mysql.h>
 
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 
 #include "check_net.h"
 #include "proxy.h"
@@ -36,15 +34,15 @@ my_bool __real_my_net_init(NET *net, Vio *vio);
 void __real_randominit(struct rand_struct *rand_st, ulong seed1, ulong seed2);
 
 my_bool __wrap_my_net_init(NET *net, Vio *vio) {
-    struct sockaddr_un sa;
+    sun_addr_t addr;
     int s;
 
     /* Connect to the local socket */
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, SOCK_NAME, sizeof(struct sockaddr_un) - sizeof(short));
+    addr.sun.sun_family = AF_UNIX;
+    strncpy(addr.sun.sun_path, SOCK_NAME, sizeof(struct sockaddr_un) - sizeof(short));
 
     s = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (s < 0 || connect(s, (struct sockaddr*) &sa, sizeof(struct sockaddr_un)))
+    if (s < 0 || connect(s, &(addr.sa), sizeof(struct sockaddr_un)))
         return TRUE;
 
     /* Finish structure setup */
@@ -65,6 +63,9 @@ my_bool __wrap_proxy_backend_query(__attribute__((unused)) MYSQL *proxy, const c
 
 /* Don't need to touch the pool here */
 void __wrap_proxy_pool_return(__attribute__((unused)) pool_t *pool, __attribute__((unused)) int idx) {}
+
+/* No need for thread masking in tests */
+void __wrap_proxy_threading_mask() {}
 
 /* Use a fixed seed for tests */
 void __wrap_randominit(struct rand_struct *rand_st, __attribute__((unused)) ulong seed1, __attribute__((unused)) ulong seed2) {

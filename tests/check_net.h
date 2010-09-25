@@ -14,6 +14,14 @@
 #ifndef _check_net_h
 #define _check_net_h
 
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #define SOCK_NAME  "mysql.sock"
+
+typedef union {
+    struct sockaddr_un sun;
+    struct sockaddr    sa;
+} sun_addr_t;
 
 #endif /* _check_net_h */

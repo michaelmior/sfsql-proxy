@@ -26,8 +26,6 @@
 #include "check_net.h"
 
 #include <stdio.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 #include <signal.h>
 
 MYSQL* client_init(Vio *vio);
@@ -117,7 +115,7 @@ int compare_to_file(char *filename, int sd) {
 
 /* Proxy executes handshake correctly */
 START_TEST (test_net_handshake) {
-    struct sockaddr_un sa;
+    sun_addr_t server_addr;
     struct sockaddr_in addr;
     int s, ns, pid;
     socklen_t i;
@@ -127,11 +125,11 @@ START_TEST (test_net_handshake) {
     remove(SOCK_NAME);
 
     /* Set up client connection */
-    sa.sun_family = AF_UNIX;
-    strncpy(sa.sun_path, SOCK_NAME, sizeof(struct sockaddr_un) - sizeof(short));
+    server_addr.sun.sun_family = AF_UNIX;
+    strncpy(server_addr.sun.sun_path, SOCK_NAME, sizeof(struct sockaddr_un) - sizeof(short));
 
     fail_unless((s = socket(AF_UNIX, SOCK_STREAM, 0)) > 0);
-    fail_unless(bind(s, (struct sockaddr*) &sa, sizeof(struct sockaddr_un)) == 0);
+    fail_unless(bind(s, &(server_addr.sa), sizeof(struct sockaddr_un)) == 0);
     fail_unless(listen(s, 0) == 0);
 
     /* Fork to handle both sides of the connection */
@@ -147,7 +145,7 @@ START_TEST (test_net_handshake) {
             exit(0);
         default:
             i = sizeof(struct sockaddr_un);
-            fail_unless((ns = accept(s, (struct sockaddr*) &sa, &i)) > 0);
+            fail_unless((ns = accept(s, &(server_addr.sa), &i)) > 0);
 
             fail_unless(compare_to_file(TESTS_DIR "net/handshake-greeting.cap", ns) == 0);
             fail_unless(send_file(TESTS_DIR "net/handshake-auth.cap", ns) == 0);
