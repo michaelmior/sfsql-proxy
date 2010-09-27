@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
     pthread_attr_t attr;
     struct sigaction new_action, old_action;
     FILE *pid_file;
-    pid_t pid;
+    pid_t pid = 0;
 
     ret = parse_options(argc, argv);
     if (ret != EXIT_SUCCESS || options.help)
@@ -192,6 +192,7 @@ int main(int argc, char *argv[]) {
     /* Check for existing process */
     if (access(PID_FILE, F_OK) == 0) {
         proxy_error("PID file already exists in %s", PID_FILE);
+        pid = 0;
         goto out_free;
     }
 
@@ -293,7 +294,7 @@ out_free:
     free(options.mapper);
 
     /* Delete PID file */
-    if (unlink(PID_FILE))
+    if (pid && unlink(PID_FILE))
         proxy_error("Can't remove PID file: %s", errstr);
 
     return ret;
