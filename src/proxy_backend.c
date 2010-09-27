@@ -307,6 +307,8 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
     /* Reconnect if a backend connection is lost */
     mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
+    printf("Connecting to %s:%d\n", backend->host, backend->port);
+
     if (!mysql_real_connect(mysql,
                 backend->host, options.user, options.pass, options.db, backend->port, NULL, 0)) {
         proxy_error("Failed to connect to MySQL backend: %s",
@@ -459,8 +461,6 @@ my_bool proxy_backends_connect() {
         return TRUE;
 
     for (i=0; i<num_backends; i++) {
-        printf("Connecting to %s:%d\n", backends[i]->host, backends[i]->port);
-
         for (j=0; j<options.num_conns; j++) {
             if (backend_connect(backends[i], backend_conns[i][j]))
                 return TRUE;
