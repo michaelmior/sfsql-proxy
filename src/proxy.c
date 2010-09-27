@@ -29,6 +29,8 @@
 #include "proxy.h"
 
 #define QUEUE_LENGTH  10
+/** File to store PID of proxy process */
+#define PID_FILE      "/var/run/sfsql-proxy.pid"
 
 volatile sig_atomic_t run = 1;
 volatile sig_atomic_t cloning  = 1;
@@ -180,10 +182,27 @@ int main(int argc, char *argv[]) {
     int error, i, ret=EXIT_SUCCESS;
     pthread_attr_t attr;
     struct sigaction new_action, old_action;
+    FILE *pid_file;
+    pid_t pid;
 
     ret = parse_options(argc, argv);
     if (ret != EXIT_SUCCESS || options.help)
         goto out_free;
+
+    /* Check for existing process */
+    if (access(PID_FILE, F_OK) == 0) {
+        proxy_error("PID file already exists in %s", PID_FILE);
+        goto out_free;
+    }
+
+    /* Write PID file */
+    pid = getpid();
+    pid_file = fopen(PID_FILE, "w");
+
+    if (!pid_file || (fprintf(pid_file, "%d\n", (int) pid) < 0))
+        proxy_error("Couldn't write PID file");
+    else
+        fclose(pid_file);
 
     /* Threading initialization */
     proxy_threading_init();
@@ -272,6 +291,10 @@ out_free:
     free(options.backend_file);
     free(options.phost);
     free(options.mapper);
+
+    /* Delete PID file */
+    if (unlink(PID_FILE))
+        proxy_error("Can't remove PID file: %s", errstr);
 
     return ret;
 }
