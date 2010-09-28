@@ -754,8 +754,10 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
 
             /* XXX: should do better at handling failures */
             for (i=0; i<count; i++)
-                if (result[i])
+                if (result[i]) {
+                    error = TRUE;
                     proxy_error("Failure for query on backend %d\n", i);
+                }
 
             break;
         default:
@@ -818,8 +820,11 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
 
         /* If the query doesn't return results, no more to do */
         pos = (uchar*) mysql->net.read_pos;
-        if (net_field_length(&pos) == 0 || mysql->net.read_pos[0] == 255) {
+        if (net_field_length(&pos) == 0) {
             error = FALSE;
+            goto out;
+        } else if (mysql->net.read_pos[0] == 0xFF) {
+            error = TRUE;
             goto out;
         }
     }
