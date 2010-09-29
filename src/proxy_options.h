@@ -42,6 +42,10 @@ struct {
 
     /** Backend address info. */
     proxy_backend_t backend;
+    /** Whether or not to use UNIX sockets*/
+    my_bool unix_socket;
+    /** UNIX socket filename */
+    char *socket_file;
     /** Seconds to wait before disconnecting client. */
     int timeout;
     /** Backend database */

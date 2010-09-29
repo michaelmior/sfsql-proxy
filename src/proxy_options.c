@@ -38,11 +38,12 @@ static void usage() {
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
             "\t--backend-port,    -P\tPort of the backend host (default: 3306)\n"
+            "\t--socket,          -s\tUse a UNIX socket for the backend connection\n\n"
             "\t--backend-db,      -D\tName of database on the backend (default: test)\n"
             "\t--backend-user,    -u\tUser for backend server (default: root)\n"
-            "\t--backend-pass,    -p\tPassword for backend user\n"
+            "\t--backend-pass,    -p\tPassword for backend user\n\n"
             "\t--backend-file,    -f\tFile listing available backends\n"
-            "\t                     \t(cannot be specified with above options)\n"
+            "\t                     \t(cannot be specified with above options)\n\n"
             "\t--num-conns,       -N\tNumber connections per backend\n"
             "\t                   -a\tDisable autocommit (default is enabled)\n\n"
             "Proxy options:\n"
@@ -71,6 +72,7 @@ int parse_options(int argc, char *argv[]) {
         {"help",            no_argument,       0, '?'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
+        {"socket",          optional_argument, 0, 's'},
         {"backend-db",      required_argument, 0, 'D'},
         {"backend-user",    required_argument, 0, 'u'},
         {"backend-pass",    required_argument, 0, 'p'},
@@ -92,6 +94,8 @@ int parse_options(int argc, char *argv[]) {
     options.autocommit      = TRUE;
     options.backend.host    = NULL;
     options.backend.port    = 0;
+    options.unix_socket     = FALSE;
+    options.socket_file     = NULL;
     options.user            = NULL;
     options.pass            = NULL;
     options.db              = NULL;
@@ -104,7 +108,7 @@ int parse_options(int argc, char *argv[]) {
     options.backend_threads = BACKEND_THREADS; 
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?h:P:n:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?h:P:s::n:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -115,6 +119,13 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'P':
                 options.backend.port = atoi(optarg);
+                break;
+            case 's':
+                options.unix_socket = TRUE;
+                if (optarg)
+                    options.socket_file = strdup(optarg);
+                else
+                    options.socket_file = strdup(MYSQL_UNIX_ADDR);
                 break;
             case 'n':
                 options.timeout = atoi(optarg);
@@ -166,7 +177,7 @@ int parse_options(int argc, char *argv[]) {
     options.db   = options.db   ? options.db   : strdup(BACKEND_DB);
 
     if (options.backend_file) {
-        if (options.backend.host || options.backend.port) {
+        if (options.backend.host || options.backend.port || options.unix_socket) {
             usage();
             return EX_USAGE;
         } else if (access(options.backend_file, R_OK)) {
@@ -174,6 +185,11 @@ int parse_options(int argc, char *argv[]) {
             return EX_NOINPUT;
         }
     } else {
+        if ((options.backend.host || options.backend.port) && options.unix_socket) {
+            usage();
+            return EX_USAGE;
+        }
+
         options.backend.host = options.backend.host ?
             options.backend.host : strdup(BACKEND_HOST);
         options.backend.port = options.backend.port ?

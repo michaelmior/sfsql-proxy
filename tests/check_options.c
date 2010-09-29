@@ -26,6 +26,7 @@
 
 #define TEST_HOST            "127.0.0.2"
 #define TEST_PORT            "3307"
+#define TEST_SOCKET          "/tmp/dummy.sock"
 #define TEST_DB              "db"
 #define TEST_USER            "test"
 #define TEST_PASS            "test"
@@ -41,6 +42,7 @@
 START_TEST (test_options_test) {
     fail_unless(strcmp(TEST_HOST, BACKEND_HOST));
     fail_unless(atoi(TEST_PORT) != BACKEND_PORT);
+    fail_unless(strcmp(TEST_SOCKET, MYSQL_UNIX_ADDR));
     fail_unless(strcmp(TEST_DB, BACKEND_DB));
     fail_unless(strcmp(TEST_USER, BACKEND_USER));
     fail_unless(strcmp(TEST_PASS, BACKEND_PASS));
@@ -128,6 +130,8 @@ START_TEST (test_options_defaults) {
     fail_unless(options.num_conns == NUM_CONNS);
     fail_unless(options.autocommit);
     fail_unless(strcmp(options.backend.host, BACKEND_HOST) == 0);
+    fail_unless(!options.unix_socket);
+    fail_unless(options.socket_file == NULL);
     fail_unless(options.backend.port == BACKEND_PORT);
     fail_unless(strcmp(options.user, BACKEND_USER) == 0);
     fail_unless(strcmp(options.pass, BACKEND_PASS) == 0);
@@ -162,6 +166,37 @@ START_TEST (test_options_backend_and_file) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
+/* Specification of both file and socket */
+START_TEST (test_options_file_and_socket) {
+    char *argv[] = { "./sfsql-proxy", "-fNOTHING.txt", "-s" };
+
+    FILE *null = fopen("/dev/null", "w");
+    if (null) { fclose(stderr); stderr = null; }
+    if (null) { fclose(stdout); stdout = null; }
+
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
+} END_TEST
+
+/* Specification of both backend and socket */
+START_TEST (test_options_backend_and_socket) {
+    char *argv[] = { "./sfsql-proxy", "-h" BACKEND_HOST, "-s" };
+
+    FILE *null = fopen("/dev/null", "w");
+    if (null) { fclose(stderr); stderr = null; }
+    if (null) { fclose(stdout); stdout = null; }
+
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
+} END_TEST
+
+/* Default socket path assigned if none specified */
+START_TEST (test_options_socket_default) {
+    char *argv[] = { "./sfsql-proxy", "-s" };
+
+    parse_options(sizeof(argv)/sizeof(*argv), argv);
+
+    fail_unless(strcmp(options.socket_file, MYSQL_UNIX_ADDR) == 0);
+} END_TEST
+
 Suite *options_suite(void) {
     Suite *s = suite_create("Options");
 
@@ -172,6 +207,9 @@ Suite *options_suite(void) {
     tcase_add_test(tc_cli, test_options_defaults);
     tcase_add_test(tc_cli, test_options_bad_file);
     tcase_add_test(tc_cli, test_options_backend_and_file);
+    tcase_add_test(tc_cli, test_options_file_and_socket);
+    tcase_add_test(tc_cli, test_options_backend_and_socket);
+    tcase_add_test(tc_cli, test_options_socket_default);
     suite_add_tcase(s, tc_cli);
 
     return s;

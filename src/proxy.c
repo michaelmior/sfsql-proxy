@@ -288,6 +288,7 @@ out:
 out_free:
     /* Free additional memory */
     free(options.backend.host);
+    free(options.socket_file);
     free(options.user);
     free(options.pass);
     free(options.db);

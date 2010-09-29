@@ -293,7 +293,7 @@ error:
  * \return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn) {
-    MYSQL *mysql;
+    MYSQL *mysql, *ret;
     my_bool reconnect = TRUE;
 
     mysql = conn->mysql = NULL;
@@ -307,10 +307,18 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
     /* Reconnect if a backend connection is lost */
     mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
-    printf("Connecting to %s:%d\n", backend->host, backend->port);
+    /* Connect to the backend */
+    if (options.unix_socket) {
+        printf("Connecting to %s\n", options.socket_file);
+        ret = mysql_real_connect(mysql, NULL, options.user, options.pass, options.db,
+                0, options.socket_file, 0);
+    } else {
+        printf("Connecting to %s:%d\n", backend->host, backend->port);
+        ret = mysql_real_connect(mysql, backend->host,
+                options.user, options.pass, options.db, backend->port, NULL, 0);
+    }
 
-    if (!mysql_real_connect(mysql,
-                backend->host, options.user, options.pass, options.db, backend->port, NULL, 0)) {
+    if (!ret) {
         proxy_error("Failed to connect to MySQL backend: %s",
                 mysql_error(mysql));
         return TRUE;
