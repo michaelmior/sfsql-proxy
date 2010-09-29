@@ -33,7 +33,7 @@
 #define PID_FILE      "/var/run/sfsql-proxy.pid"
 
 volatile sig_atomic_t run = 1;
-volatile sig_atomic_t cloning  = 1;
+volatile sig_atomic_t cloning  = 0;
 static proxy_thread_t *threads;
 pid_t signaller = -1;
 static char BUF[BUFSIZ];
@@ -170,6 +170,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
         case SIGUSR2:
             proxy_backends_update();
             cloning = 0;
+            printf("Resuming queries after clone completion\n");
 
             if (info->si_pid != signaller)
                 proxy_error("Different process sent cloning completion signal");

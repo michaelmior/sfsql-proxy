@@ -692,7 +692,11 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
         //printf("Query %s mapped to %d\n", query, (int) type);
     }
 
-    /* Speed things up with only backend
+    /* Spin until query can proceed */
+    while (!backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
+    while (cloning) { usleep(1000); }           /* Wait until cloning is done */
+
+    /* Speed things up with only one backend
      * by avoiding synchronization */
     if (backend_num == 1) {
         type = QUERY_MAP_ANY;
@@ -717,9 +721,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
              *      be unnecessary. */
             oq = (char*) malloc(length + 1);
             memcpy(oq, query, length+1);
-
-            while (!backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
-            while (cloning) { usleep(1000); }           /* Wait until cloning is done */
 
             /* Set up synchronization */
             query_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_cond_t));
