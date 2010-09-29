@@ -310,7 +310,7 @@ void client_do_work(proxy_work_t *work) {
     int error, optval;
     Vio *vio_tmp;
 
-    if (!work)
+    if (unlikely(!work))
         return;
 
     /* derived from sql/mysqld.cc:handle_connections_sockets */
@@ -344,7 +344,7 @@ void client_do_work(proxy_work_t *work) {
          * sure client has everything */
         proxy_net_flush(work->proxy);
 
-        if (error != 0) {
+        if (unlikely(error != 0)) {
             if (error < 0) {
                 proxy_error("Error in processing client query, disconnecting");
                 break;
@@ -375,7 +375,7 @@ int proxy_net_read_query(MYSQL *mysql) {
     fd_set sock;
     struct timeval tv, *timeout = NULL;
 
-    if (!mysql) {
+    if (unlikely(!mysql)) {
         proxy_error("Invalid MySQL object for reading query");
         return -1;
     }
@@ -411,7 +411,7 @@ int proxy_net_read_query(MYSQL *mysql) {
     //printf("Read %lu byte packet from client\n", pkt_len);
 
     packet = (char*) net->read_pos;
-    if (pkt_len == 0) {
+    if (unlikely(pkt_len == 0)) {
         packet[0] = (uchar) COM_SLEEP;
         pkt_len = 1;
     }
@@ -427,10 +427,6 @@ int proxy_net_read_query(MYSQL *mysql) {
     //printf("Got command %d\n", command);
 
     switch (command) {
-        case COM_INIT_DB:
-            /* XXX: using a single DB for now */
-            return -1;
-            break;
         case COM_QUERY:
             /* pass the query to the backend */
             return proxy_backend_query(mysql, packet, pkt_len) ? 1 : 0;
@@ -441,6 +437,10 @@ int proxy_net_read_query(MYSQL *mysql) {
         case COM_PING:
             /* Yep, still here */
             return proxy_net_send_ok(mysql, 0, 0, 0) ? 1 : 0;
+            break;
+        case COM_INIT_DB:
+            /* XXX: using a single DB for now */
+            return -1;
             break;
 
         /* Commands below not implemented */

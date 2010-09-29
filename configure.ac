@@ -16,6 +16,9 @@ AC_LANG([C])
 LT_INIT([dlopen shared])
 LTDL_INIT
 
+# Disable default CFLAGS
+CFLAGS=""
+
 # Checks for programs.
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -120,6 +123,8 @@ AC_ARG_WITH(debug,
   [AS_HELP_STRING([--with-debug], [enable debugging])])
 if test "$with_debug" = "yes"; then
   CFLAGS="$CFLAGS -g -O0 -DDEBUG"
+else
+  CFLAGS="$CFLAGS -O3"
 fi
 
 AC_CONFIG_FILES([Makefile libltdl/Makefile src/Makefile map/Makefile tests/Makefile])

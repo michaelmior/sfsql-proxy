@@ -84,7 +84,7 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
     pkt_len = my_net_read(net);
 
     /* XXX: need to return error to client */
-    if (pkt_len == packet_error || pkt_len == 0) {
+    if (unlikely(pkt_len == packet_error || pkt_len == 0)) {
         if (! (net->vio && vio_was_interrupted(net->vio))) {
             /* XXX: fatal error, close down 
              * should give soft error to client and reconnect with backend */
@@ -593,7 +593,7 @@ void* proxy_backend_new_thread(void *ptr) {
         proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         /* If no query specified, must be ready to exit */
-        if ((query->query == NULL)) {
+        if (unlikely(query->query == NULL)) {
             proxy_mutex_unlock(&(thread->lock));
             break;
         }
@@ -682,6 +682,12 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
         if (map->query)
             query = map->query;
         //printf("Query %s mapped to %d\n", query, (int) type);
+    }
+
+    /* Speed things up with only backend
+     * by avoiding synchronization */
+    if (backend_num == 1) {
+        type = QUERY_MAP_ANY;
     }
 
     switch (type) {
@@ -820,10 +826,10 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
 
         /* If the query doesn't return results, no more to do */
         pos = (uchar*) mysql->net.read_pos;
-        if (net_field_length(&pos) == 0) {
+        if (unlikely(net_field_length(&pos) == 0)) {
             error = FALSE;
             goto out;
-        } else if (mysql->net.read_pos[0] == 0xFF) {
+        } else if (unlikely(mysql->net.read_pos[0] == 0xFF)) {
             error = TRUE;
             goto out;
         }
