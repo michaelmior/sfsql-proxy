@@ -115,7 +115,7 @@ int parse_options(int argc, char *argv[]) {
                 usage();
                 return EXIT_SUCCESS;
             case 'h':
-                options.backend.host = strdup(optarg);
+                options.backend.host = optarg;
                 break;
             case 'P':
                 options.backend.port = atoi(optarg);
@@ -123,24 +123,24 @@ int parse_options(int argc, char *argv[]) {
             case 's':
                 options.unix_socket = TRUE;
                 if (optarg)
-                    options.socket_file = strdup(optarg);
+                    options.socket_file = optarg;
                 else
-                    options.socket_file = strdup(MYSQL_UNIX_ADDR);
+                    options.socket_file = MYSQL_UNIX_ADDR;
                 break;
             case 'n':
                 options.timeout = atoi(optarg);
                 break;
             case 'D':
-                options.db = strdup(optarg);
+                options.db = optarg;
                 break;
             case 'u':
-                options.user = strdup(optarg);
+                options.user = optarg;
                 break;
             case 'p':
-                options.pass = strdup(optarg);
+                options.pass = optarg;
                 break;
             case 'f':
-                options.backend_file = strdup(optarg);
+                options.backend_file = optarg;
                 break;
             case 'N':
                 options.num_conns = atoi(optarg);
@@ -149,13 +149,13 @@ int parse_options(int argc, char *argv[]) {
                 options.autocommit = FALSE;
                 break;
             case 'b':
-                options.phost = strdup(optarg);
+                options.phost = optarg;
                 break;
             case 'L':
                 options.pport = atoi(optarg);
                 break;
             case 'm':
-                options.mapper = strdup(optarg);
+                options.mapper = optarg;
                 break;
             case 't':
                 options.client_threads = atoi(optarg);
@@ -172,9 +172,9 @@ int parse_options(int argc, char *argv[]) {
     }
 
     /* Set defaults for unspecified options */
-    options.user = options.user ? options.user : strdup(BACKEND_USER);
-    options.pass = options.pass ? options.pass : strdup(BACKEND_PASS);
-    options.db   = options.db   ? options.db   : strdup(BACKEND_DB);
+    options.user = options.user ? options.user : BACKEND_USER;
+    options.pass = options.pass ? options.pass : BACKEND_PASS;
+    options.db   = options.db   ? options.db   : BACKEND_DB;
 
     if (options.backend_file) {
         if (options.backend.host || options.backend.port || options.unix_socket) {
@@ -191,7 +191,7 @@ int parse_options(int argc, char *argv[]) {
         }
 
         options.backend.host = options.backend.host ?
-            options.backend.host : strdup(BACKEND_HOST);
+            options.backend.host : BACKEND_HOST;
         options.backend.port = options.backend.port ?
             options.backend.port : BACKEND_PORT;
     }

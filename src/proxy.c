@@ -287,16 +287,6 @@ out:
     proxy_threading_end();
 
 out_free:
-    /* Free additional memory */
-    free(options.backend.host);
-    free(options.socket_file);
-    free(options.user);
-    free(options.pass);
-    free(options.db);
-    free(options.backend_file);
-    free(options.phost);
-    free(options.mapper);
-
     /* Delete PID file */
     if (wrote_pid && unlink(PID_FILE))
         proxy_error("Can't remove PID file: %s", errstr);
