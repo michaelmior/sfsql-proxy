@@ -344,15 +344,21 @@ void client_do_work(proxy_work_t *work) {
          * sure client has everything */
         proxy_net_flush(work->proxy);
 
-        if (unlikely(error != 0)) {
-            if (error < 0) {
-                proxy_error("Error in processing client query, disconnecting");
-                break;
+        if (unlikely(error != ERROR_OK)) {
+            switch (error) {
+                case ERROR_CLIENT:
+                    proxy_error("Error from client when processing query");
+                    return;
+                case ERROR_BACKEND:
+                    proxy_error("Error from backend when processing query");
+                    return;
+                case ERROR_OTHER:
+                default:
+                    proxy_error("Error in processing query, disconnecting");
+                    return;
             }
         }
     }
-
-    printf("Exited client work loop\n");
 }
 
 /**
@@ -366,7 +372,7 @@ void client_do_work(proxy_work_t *work) {
  * \return Positive to disconnect without error,
  *         negative for errors, 0 to keep going
  **/
-int proxy_net_read_query(MYSQL *mysql) {
+conn_error_t proxy_net_read_query(MYSQL *mysql) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -377,7 +383,7 @@ int proxy_net_read_query(MYSQL *mysql) {
 
     if (unlikely(!mysql)) {
         proxy_error("Invalid MySQL object for reading query");
-        return -1;
+        return ERROR_OTHER;
     }
 
     /* Start a new transaction and read the incoming packet */
@@ -392,20 +398,19 @@ int proxy_net_read_query(MYSQL *mysql) {
         tv.tv_usec = 0;
         timeout = &tv;
     }
-    if (select(FD_SETSIZE, &sock, NULL, NULL, timeout) != 1) {
+    if (select(FD_SETSIZE, &sock, NULL, NULL, timeout) != 1)
         proxy_error("Error in waiting on socket data");
-    }
 
     /* Check if the connection is gone */
     ioctl(net->vio->sd, FIONREAD, &nread);
     if (nread == 0) {
         proxy_error("Lost connection to client");
-        return -1;
+        return ERROR_CLIENT;
     }
 
     if ((pkt_len = my_net_read(net)) == packet_error) {
         proxy_error("Error reading query from client");
-        return -1;
+        return ERROR_CLIENT;
     }
 
     //printf("Read %lu byte packet from client\n", pkt_len);
@@ -429,18 +434,18 @@ int proxy_net_read_query(MYSQL *mysql) {
     switch (command) {
         case COM_QUERY:
             /* pass the query to the backend */
-            return proxy_backend_query(mysql, packet, pkt_len) ? 1 : 0;
+            return proxy_backend_query(mysql, packet, pkt_len) ? ERROR_BACKEND : ERROR_OK;
             break;
         case COM_QUIT:
             return 1;
             break;
         case COM_PING:
             /* Yep, still here */
-            return proxy_net_send_ok(mysql, 0, 0, 0) ? 1 : 0;
+            return proxy_net_send_ok(mysql, 0, 0, 0) ? ERROR_CLIENT : ERROR_OK;
             break;
         case COM_INIT_DB:
             /* XXX: using a single DB for now */
-            return -1;
+            return ERROR_CLIENT;
             break;
 
         /* Commands below not implemented */
@@ -470,7 +475,7 @@ int proxy_net_read_query(MYSQL *mysql) {
         case COM_END:
         default:
             /* XXX: send error */
-            return -1;
+            return ERROR_CLIENT;
             break;
     }
 }

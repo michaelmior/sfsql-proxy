@@ -12,9 +12,23 @@
 #ifndef _proxy_net_h
 #define _proxy_net_h
 
+/**
+ * Type of error on connection.
+ **/
+typedef enum {
+    /** No error, connection closed successfully. */
+    ERROR_OK,
+    /** Error from client. */
+    ERROR_CLIENT,
+    /** Error from backend. */
+    ERROR_BACKEND,
+    /** Miscellaneous error. */
+    ERROR_OTHER
+} conn_error_t;
+
 void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
-int proxy_net_read_query(MYSQL *mysql);
+conn_error_t proxy_net_read_query(MYSQL *mysql);
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 
 /**
