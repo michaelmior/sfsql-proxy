@@ -39,6 +39,8 @@ int parse_options(int argc, char *argv[]);
 struct {
     /** TRUE if the user asked for help */
     my_bool help;
+    /** TRUE if we need to daemonize */
+    my_bool daemonize;
 
     /** Backend address info. */
     proxy_backend_t backend;

@@ -197,6 +197,10 @@ int main(int argc, char *argv[]) {
         goto out_free;
     }
 
+    /* Daemonize if necessary */
+    if (options.daemonize)
+        daemon(1, 0);
+
     /* Write PID file */
     pid = getpid();
     pid_file = fopen(PID_FILE, "w");

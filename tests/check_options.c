@@ -58,6 +58,7 @@ START_TEST (test_options_test) {
 /* Short option parsing */
 START_TEST (test_options_short) {
     char *argv[] = { "./sfsql-proxy",
+        "-d",
         "-h" TEST_HOST,
         "-P" TEST_PORT,
         "-n" TEST_CLIENT_TIMEOUT,
@@ -74,6 +75,7 @@ START_TEST (test_options_short) {
 
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
+    fail_unless(options.daemonize);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(strcmp(options.db, TEST_DB) == 0);
@@ -92,6 +94,7 @@ START_TEST (test_options_short) {
 /* Long option parsing */
 START_TEST (test_options_long) {
     char *argv[] = { "./sfsql-proxy",
+        "--daemonize",
         "--backend-host="    TEST_HOST,
         "--backend-port="    TEST_PORT,
         "--backend-db="      TEST_DB,
@@ -107,6 +110,7 @@ START_TEST (test_options_long) {
 
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
+    fail_unless(options.daemonize);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(strcmp(options.db, TEST_DB) == 0);
@@ -127,6 +131,7 @@ START_TEST (test_options_defaults) {
     fail_unless(parse_options(0, NULL) == EXIT_SUCCESS);
 
     /* Check that all options have their correct values */
+    fail_unless(!options.daemonize);
     fail_unless(options.num_conns == NUM_CONNS);
     fail_unless(options.autocommit);
     fail_unless(strcmp(options.backend.host, BACKEND_HOST) == 0);

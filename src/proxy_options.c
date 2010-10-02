@@ -34,7 +34,8 @@ static void usage() {
     printf(
             "SnowFlock SQL proxy server - (C) Michael Mior <mmior@cs.toronto.edu>, 2010\n\n"
             "Options:\n"
-            "\t--help,             -?\tShow this message\n\n"
+            "\t--help,             -?\tShow this message\n"
+            "\t--daemonize,        -d\tDaemonize\n\n"
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
             "\t--backend-port,    -P\tPort of the backend host (default: 3306)\n"
@@ -70,6 +71,7 @@ int parse_options(int argc, char *argv[]) {
     int c, opt=0;
     static struct option long_options[] = {
         {"help",            no_argument,       0, '?'},
+        {"daemonize",       no_argument,       0, 'd'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
         {"socket",          optional_argument, 0, 's'},
@@ -89,6 +91,7 @@ int parse_options(int argc, char *argv[]) {
 
     /* Set options to default values */
     options.help            = FALSE;
+    options.daemonize       = FALSE;
 
     options.num_conns       = NUM_CONNS;
     options.autocommit      = TRUE;
@@ -108,12 +111,15 @@ int parse_options(int argc, char *argv[]) {
     options.backend_threads = BACKEND_THREADS; 
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?h:P:s::n:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
                 usage();
                 return EXIT_SUCCESS;
+            case 'd':
+                options.daemonize = TRUE;
+                break;
             case 'h':
                 options.backend.host = optarg;
                 break;
