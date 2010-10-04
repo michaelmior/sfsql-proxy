@@ -20,9 +20,9 @@
  *
  */
 
-#include <signal.h>
-
 #include "proxy.h"
+
+#include <signal.h>
 
 /** Signals which should be handled by the proxy */
 static int handle_sigs[] = { SIGINT, SIGUSR1, SIGUSR2 };

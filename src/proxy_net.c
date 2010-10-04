@@ -87,7 +87,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
                 (uchar*) buff, (size_t) (end-buff)) ||
             (pkt_len = my_net_read(net)) == packet_error ||
             pkt_len < MIN_HANDSHAKE_SIZE) {
-        proxy_error("Error sending handshake to client");
+        proxy_log(LOG_ERROR, "Error sending handshake to client");
         return;
     }
 
@@ -101,7 +101,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
     client_caps &= server_caps;
 
     if (end >= (char*) net->read_pos + pkt_len + 2) {
-        proxy_error("Error handshaking with client,"
+        proxy_log(LOG_ERROR, "Error handshaking with client,"
                 "expecting max size %d"
                 ", got size %d",
                 pkt_len + 2, end - (char*) (net->read_pos + pkt_len + 2));
@@ -125,7 +125,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
         db_len = db ? strlen(db) : 0;
 
         if (passwd + passwd_len + db_len > (char*) net->read_pos + pkt_len) {
-            proxy_error("Client sent oversized auth packet");
+            proxy_log(LOG_ERROR, "Client sent oversized auth packet");
             return;
         }
 
@@ -199,7 +199,7 @@ MYSQL* client_init(Vio *vio) {
     /* Initialize a MySQL object */
     mysql = mysql_init(NULL);
     if (mysql == NULL) {
-        proxy_error("Out of memory when allocating proxy server");
+        proxy_log(LOG_ERROR, "Out of memory when allocating proxy server");
         return NULL;
     }
 
@@ -225,7 +225,7 @@ void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
     char BUF[BUFSIZ];
 
-    printf("Called client_destroy on thread %d\n", thread->id);
+    proxy_log(LOG_DEBUG, "Called client_destroy on thread %d", thread->id);
 
     /* Clean up connection if still live */
     if (thread->data.work.proxy) {
@@ -233,7 +233,7 @@ void client_destroy(proxy_thread_t *thread) {
             /* XXX: may need to send error before closing connection */
             /* derived from sql/sql_mysqld.cc:close_connection */
             if (vio_close(mysql->net.vio) < 0)
-                proxy_error("Error closing client connection: %s", errstr);
+                proxy_log(LOG_ERROR, "Error closing client connection: %s", errstr);
 
             /* Clean up data structures */
             vio_delete(mysql->net.vio);
@@ -277,7 +277,7 @@ void* proxy_net_new_thread(void *ptr) {
         proxy_mutex_lock(&(thread->lock));
         proxy_cond_wait(&(thread->cv), &(thread->lock));
 
-        printf("Thread %d signaled\n", thread->id);
+        proxy_log(LOG_DEBUG, "Thread %d signaled", thread->id);
 
         /* If no work specified, must be ready to exit */
         if (thread->data.work.addr == NULL) {
@@ -295,7 +295,7 @@ void* proxy_net_new_thread(void *ptr) {
         proxy_mutex_unlock(&(thread->lock));
     }
 
-    printf("Exiting loop on client thead %d\n", thread->id);
+    proxy_log(LOG_DEBUG, "Exiting loop on client thead %d", thread->id);
 
     pthread_cleanup_pop(1);
     pthread_exit(NULL);
@@ -347,14 +347,14 @@ void client_do_work(proxy_work_t *work) {
         if (unlikely(error != ERROR_OK)) {
             switch (error) {
                 case ERROR_CLIENT:
-                    proxy_error("Error from client when processing query");
+                    proxy_log(LOG_ERROR, "Error from client when processing query");
                     return;
                 case ERROR_BACKEND:
-                    proxy_error("Error from backend when processing query");
+                    proxy_log(LOG_ERROR, "Error from backend when processing query");
                     return;
                 case ERROR_OTHER:
                 default:
-                    proxy_error("Error in processing query, disconnecting");
+                    proxy_log(LOG_ERROR, "Error in processing query, disconnecting");
                     return;
             }
         }
@@ -382,7 +382,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     struct timeval tv, *timeout = NULL;
 
     if (unlikely(!mysql)) {
-        proxy_error("Invalid MySQL object for reading query");
+        proxy_log(LOG_ERROR, "Invalid MySQL object for reading query");
         return ERROR_OTHER;
     }
 
@@ -399,21 +399,21 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
         timeout = &tv;
     }
     if (select(FD_SETSIZE, &sock, NULL, NULL, timeout) != 1)
-        proxy_error("Error in waiting on socket data");
+        proxy_log(LOG_ERROR, "Error in waiting on socket data");
 
     /* Check if the connection is gone */
     ioctl(net->vio->sd, FIONREAD, &nread);
     if (nread == 0) {
-        proxy_error("Lost connection to client");
+        proxy_log(LOG_ERROR, "Lost connection to client");
         return ERROR_CLIENT;
     }
 
     if ((pkt_len = my_net_read(net)) == packet_error) {
-        proxy_error("Error reading query from client");
+        proxy_log(LOG_ERROR, "Error reading query from client");
         return ERROR_CLIENT;
     }
 
-    //printf("Read %lu byte packet from client\n", pkt_len);
+    proxy_log(LOG_DEBUG, "Read %lu byte packet from client", pkt_len);
 
     packet = (char*) net->read_pos;
     if (unlikely(pkt_len == 0)) {
@@ -429,7 +429,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    //printf("Got command %d\n", command);
+    proxy_log(LOG_DEBUG, "Got command %d", command);
 
     switch (command) {
         case COM_QUERY:
@@ -515,7 +515,7 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
 
     /* Send an ok back to the client */
     if (my_net_write(net, buff, (size_t) (pos - buff))) {
-        proxy_error("Error writing OK to client");
+        proxy_log(LOG_ERROR, "Error writing OK to client");
         return TRUE;
     } else {
         return proxy_net_flush(mysql);

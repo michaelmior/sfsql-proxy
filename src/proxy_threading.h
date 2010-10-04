@@ -58,6 +58,10 @@ void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);
 void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);
 
 #ifdef DEBUG
+#define __proxy_error(loc, str) proxy_log(LOG_DEBUG, str " at :%s", loc)
+#endif
+
+#ifdef DEBUG
 pthread_mutexattr_t __proxy_mutexattr;
 
 static inline int __proxy_mutex_init(pthread_mutex_t *m, char *loc) {

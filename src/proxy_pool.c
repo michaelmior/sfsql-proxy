@@ -253,7 +253,7 @@ void proxy_pool_return(pool_t *pool, int idx) {
     /* Update the item availability */
     pthread_mutex_lock(&(pool->lock));
     if (pool->avail[idx])
-        proxy_error("Trying to free lock from already free pool");
+        proxy_log(LOG_ERROR, "Trying to free lock from already free pool");
     else
         pool->avail[idx] = TRUE;
     pthread_mutex_unlock(&(pool->lock));

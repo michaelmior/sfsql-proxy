@@ -187,7 +187,7 @@ int parse_options(int argc, char *argv[]) {
             usage();
             return EX_USAGE;
         } else if (access(options.backend_file, R_OK)) {
-            proxy_error("Error accessing backend file %s:%s", options.backend_file, errstr);
+            proxy_log(LOG_ERROR, "Error accessing backend file %s:%s", options.backend_file, errstr);
             return EX_NOINPUT;
         }
     } else {

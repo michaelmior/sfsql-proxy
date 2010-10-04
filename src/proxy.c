@@ -80,7 +80,7 @@ static void server_run(char *host, int port) {
     if (host) {
         hostinfo = gethostbyname(host);
         if (!hostinfo) {
-            proxy_error("Invalid binding address %s\n", host);
+            proxy_log(LOG_ERROR, "Invalid binding address %s\n", host);
             return;
         } else {
             serveraddr.sin.sin_addr = *(struct in_addr*) hostinfo->h_addr;
@@ -93,12 +93,12 @@ static void server_run(char *host, int port) {
 
     /* Bind the socket and start accepting connections */
     if (bind(serverfd, &(serveraddr.sa), sizeof(serveraddr)) < 0) {
-        proxy_error("Error binding server socket on port %d", port);
+        proxy_log(LOG_ERROR, "Error binding server socket on port %d", port);
         return;
     }
 
     if (listen(serverfd, QUEUE_LENGTH) < 0) {
-        proxy_error("Error listening on server socket: %s", errstr);
+        proxy_log(LOG_ERROR, "Error listening on server socket: %s", errstr);
         return;
     }
 
@@ -114,7 +114,7 @@ static void server_run(char *host, int port) {
         clientfd = accept(serverfd, &(clientaddr.sa), &clientlen);
         if (clientfd < 0) {
             if (errno != EINTR)
-                proxy_error("Error accepting client connection: %s", errstr);
+                proxy_log(LOG_ERROR, "Error accepting client connection: %s", errstr);
             continue;
         }
 
@@ -140,6 +140,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
     switch (sig) {
         /* Tell the server to stop */
         case SIGINT:
+        case SIGTERM:
             /* Stop the server loop */
             run = 0;
 
@@ -153,7 +154,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
             cloning = 1;
 
             if (signaller > 0)
-                proxy_error("Received second cloning signal before clone complete");
+                proxy_log(LOG_ERROR, "Received second cloning signal before clone complete");
 
             signaller = info->si_pid;
 
@@ -161,7 +162,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
             while (querying) { usleep(1000); }
 
             /* Signal the process to clone */
-            printf("Signaling back %d\n", signaller);
+            proxy_log(LOG_INFO, "Signaling back %d", signaller);
             kill(signaller, SIGUSR1);
 
             break;
@@ -170,10 +171,10 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
         case SIGUSR2:
             proxy_backends_update();
             cloning = 0;
-            printf("Resuming queries after clone completion\n");
+            proxy_log(LOG_INFO, "Resuming queries after clone completion");
 
             if (info->si_pid != signaller)
-                proxy_error("Different process sent cloning completion signal");
+                proxy_log(LOG_ERROR, "Different process sent cloning completion signal");
             signaller = -1;
             break;
     }
@@ -182,7 +183,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
 int main(int argc, char *argv[]) {
     int error, i, ret=EXIT_SUCCESS;
     pthread_attr_t attr;
-    struct sigaction new_action, old_action;
+    struct sigaction new_action;
     FILE *pid_file;
     pid_t pid;
     my_bool wrote_pid = FALSE;
@@ -193,40 +194,37 @@ int main(int argc, char *argv[]) {
 
     /* Check for existing process */
     if (access(PID_FILE, F_OK) == 0) {
-        proxy_error("PID file already exists in %s", PID_FILE);
+        printf("PID file already exists in %s\n", PID_FILE);
         goto out_free;
     }
 
     /* Daemonize if necessary */
     if (options.daemonize)
         daemon(1, 0);
+    proxy_log_open();
 
     /* Write PID file */
     pid = getpid();
     pid_file = fopen(PID_FILE, "w");
 
     if (!pid_file || (fprintf(pid_file, "%d\n", (int) pid) < 0)) {
-        proxy_error("Couldn't write PID file");
+        proxy_log(LOG_ERROR, "Couldn't write PID file");
     } else {
         wrote_pid = TRUE;
         fclose(pid_file);
     }
 
-    /* Threading initialization */
+    /* Initialization */
     proxy_threading_init();
 
     /* Install signal handler */
     new_action.sa_sigaction = catch_sig;
     sigemptyset(&new_action.sa_mask);
-    sigaddset(&new_action.sa_mask, SIGINT);
-    sigaddset(&new_action.sa_mask, SIGUSR1);
     new_action.sa_flags = SA_SIGINFO;
 
 #define HANDLE_SIG(sig) \
-    sigaction(sig, NULL, &old_action); \
-    if (old_action.sa_handler != SIG_IGN) \
-        sigaction(sig, &new_action, NULL); \
-    sigaction(sig, NULL, &old_action);
+    sigaddset(&new_action.sa_mask, sig); \
+    sigaction(sig, &new_action, NULL);
 
     /* Set up signal handlers */
     HANDLE_SIG(SIGTERM);
@@ -274,13 +272,13 @@ int main(int argc, char *argv[]) {
     }
 
     /* Start proxying */
-    printf("Starting proxy on %s:%d\n",
+    proxy_log(LOG_INFO, "Starting proxy on %s:%d",
         options.phost ? options.phost : "0.0.0.0", options.pport);
     server_run(options.phost, options.pport);
 
     /* Shutdown */
 out:
-    printf("Shutting down...\n");
+    proxy_log(LOG_INFO, "Shutting down...");
 
     /* Cancel any outstanding client threads */
     proxy_threading_cancel(threads, options.client_threads, thread_pool);
@@ -293,7 +291,9 @@ out:
 out_free:
     /* Delete PID file */
     if (wrote_pid && unlink(PID_FILE))
-        proxy_error("Can't remove PID file: %s", errstr);
+        proxy_log(LOG_ERROR, "Can't remove PID file: %s", errstr);
+
+    proxy_log_close();
 
     return ret;
 }

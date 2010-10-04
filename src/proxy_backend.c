@@ -88,9 +88,9 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
         if (! (net->vio && vio_was_interrupted(net->vio))) {
             /* XXX: fatal error, close down 
              * should give soft error to client and reconnect with backend */
-            proxy_error("Interrupted when reading backend response");
+            proxy_log(LOG_ERROR, "Interrupted when reading backend response");
         } else
-            proxy_error("Received error from backend");
+            proxy_log(LOG_ERROR, "Received error from backend");
 
         return (packet_error);
     }
@@ -103,7 +103,7 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
     if (proxy) {
         /* Read from the backend and forward to the proxy connection */
         if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
-            proxy_error("Couldn't forward backend packet to proxy");
+            proxy_log(LOG_ERROR, "Couldn't forward backend packet to proxy");
             return (packet_error);
         }
     }
@@ -184,7 +184,7 @@ my_bool proxy_backend_init() {
             free(buf);
 
             buf = (char*) lt_dlerror();
-            proxy_error("Couldn't get handle to mapper %s:%s", options.mapper, buf);
+            proxy_log(LOG_ERROR, "Couldn't get handle to mapper %s:%s", options.mapper, buf);
             return TRUE;
         }
 
@@ -196,7 +196,7 @@ my_bool proxy_backend_init() {
         buf = (char*) lt_dlerror();
 
         if (buf) {
-            proxy_error("Couldn't load mapper %s:%s", options.mapper, buf);
+            proxy_log(LOG_ERROR, "Couldn't load mapper %s:%s", options.mapper, buf);
             return TRUE;
         }
     }
@@ -300,7 +300,7 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
     mysql = mysql_init(NULL);
 
     if (mysql == NULL) {
-        proxy_error("Out of memory when allocating MySQL backend");
+        proxy_log(LOG_ERROR, "Out of memory when allocating MySQL backend");
         return TRUE;
     }
 
@@ -309,17 +309,17 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
 
     /* Connect to the backend */
     if (options.unix_socket) {
-        printf("Connecting to %s\n", options.socket_file);
+        proxy_log(LOG_INFO, "Connecting to %s", options.socket_file);
         ret = mysql_real_connect(mysql, NULL, options.user, options.pass, options.db,
                 0, options.socket_file, 0);
     } else {
-        printf("Connecting to %s:%d\n", backend->host, backend->port);
+        proxy_log(LOG_INFO, "Connecting to %s:%d", backend->host, backend->port);
         ret = mysql_real_connect(mysql, backend->host,
                 options.user, options.pass, options.db, backend->port, NULL, 0);
     }
 
     if (!ret) {
-        proxy_error("Failed to connect to MySQL backend: %s",
+        proxy_log(LOG_ERROR, "Failed to connect to MySQL backend: %s",
                 mysql_error(mysql));
         return TRUE;
     }
@@ -352,14 +352,14 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     /* This case might happen when user sends SIGUSR1
      * without previously specifying a backend file */
     if (!filename) {
-        proxy_error("No filename specified when reading backends");
+        proxy_log(LOG_ERROR, "No filename specified when reading backends");
         return NULL;
     }
 
     /* Open the file */
     f = fopen(filename, "r");
     if (!f) {
-        proxy_error("Couldn't open backend file %s:%s", filename, errstr);
+        proxy_log(LOG_ERROR, "Couldn't open backend file %s:%s", filename, errstr);
         return NULL;
     }
 
@@ -372,11 +372,11 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     buf = (char*) malloc(pos+1);
     if (fread(buf, 1, pos, f) != pos) {
         if (ferror(f))
-            proxy_error("Error reading from backend file %s:%s", filename, errstr);
+            proxy_log(LOG_ERROR, "Error reading from backend file %s:%s", filename, errstr);
         else if (feof(f))
-            proxy_error("End of file when reading backends from %s", filename);
+            proxy_log(LOG_ERROR, "End of file when reading backends from %s", filename);
         else
-            proxy_error("Unknown error reading backend file %s", filename);
+            proxy_log(LOG_ERROR, "Unknown error reading backend file %s", filename);
 
         fclose(f);
         free(buf);
@@ -400,7 +400,7 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
 
     /* Make sure number of backends is valid */
     if (*num == 0 || *num > MAX_BACKENDS) {
-        proxy_error("Invalid number of backends %d\n", *num);
+        proxy_log(LOG_ERROR, "Invalid number of backends %d\n", *num);
         free(buf);
         return NULL;
     }
@@ -605,7 +605,7 @@ void proxy_backends_update() {
         }
     } else {
         free(new_backends);
-        printf("No backends changed. Done.\n");
+        proxy_log(LOG_INFO, "No backends changed. Done.");
         return;
     }
 
@@ -665,7 +665,7 @@ void* proxy_backend_new_thread(void *ptr) {
         proxy_mutex_unlock(&(thread->lock));
     }
 
-    printf("Exiting loop on backend thead %d\n", thread->id);
+    proxy_log(LOG_INFO, "Exiting loop on backend thead %d", thread->id);
 
     pthread_exit(NULL);
 }
@@ -726,7 +726,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
         type = map->map;
         if (map->query)
             query = map->query;
-        //printf("Query %s mapped to %d\n", query, (int) type);
+        proxy_log(LOG_DEBUG, "Query %s mapped to %d", query, (int) type);
     }
 
     /* Spin until query can proceed */
@@ -808,7 +808,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             for (i=0; i<count; i++)
                 if (result[i]) {
                     error = TRUE;
-                    proxy_error("Failure for query on backend %d\n", i);
+                    proxy_log(LOG_ERROR, "Failure for query on backend %d\n", i);
                 }
 
             break;
@@ -854,7 +854,7 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
     conn = backend_conns[bi][ci];
     mysql = conn->mysql;
 
-    //printf("Sending query %s to backend %d\n", query, bi);
+    proxy_log(LOG_DEBUG, "Sending query %s to backend %d", query, bi);
     mysql_send_query(mysql, query, length);
 
     /* derived from sql/client.c:cli_read_query_result */
