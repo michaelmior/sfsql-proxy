@@ -16,8 +16,10 @@
  * Type of error on connection.
  **/
 typedef enum {
-    /** No error, connection closed successfully. */
+    /** No error, keep going */
     ERROR_OK,
+    /** No error, connection closed successfully. */
+    ERROR_CLOSE,
     /** Error from client. */
     ERROR_CLIENT,
     /** Error from backend. */

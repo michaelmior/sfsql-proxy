@@ -346,6 +346,8 @@ void client_do_work(proxy_work_t *work) {
 
         if (unlikely(error != ERROR_OK)) {
             switch (error) {
+                case ERROR_CLOSE:
+                    return;
                 case ERROR_CLIENT:
                     proxy_log(LOG_ERROR, "Error from client when processing query");
                     return;
@@ -435,18 +437,14 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
         case COM_QUERY:
             /* pass the query to the backend */
             return proxy_backend_query(mysql, packet, pkt_len) ? ERROR_BACKEND : ERROR_OK;
-            break;
         case COM_QUIT:
-            return 1;
-            break;
+            return ERROR_CLOSE;
         case COM_PING:
             /* Yep, still here */
             return proxy_net_send_ok(mysql, 0, 0, 0) ? ERROR_CLIENT : ERROR_OK;
-            break;
         case COM_INIT_DB:
             /* XXX: using a single DB for now */
             return ERROR_CLIENT;
-            break;
 
         /* Commands below not implemented */
         case COM_REGISTER_SLAVE:
