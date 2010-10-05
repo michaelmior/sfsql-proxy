@@ -22,6 +22,8 @@
 
 #include "proxy.h"
 
+#include <mysqld_error.h>
+
 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
 #define MIN_HANDSHAKE_SIZE 6
 
@@ -44,8 +46,10 @@ static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_l
  * \param mysql MySQL object corresponding to the client connection.
  * \param clientaddr Address of the newly connected client.
  * \param thread_id Identifier of the thread handling the connection.
+ *
+ * \return TRUE on error, FALSE otherwise
  **/
-void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
+my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
     ulong server_caps, client_caps, pkt_len=0;
@@ -88,7 +92,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
             (pkt_len = my_net_read(net)) == packet_error ||
             pkt_len < MIN_HANDSHAKE_SIZE) {
         proxy_log(LOG_ERROR, "Error sending handshake to client");
-        return;
+        return TRUE;
     }
 
     /* XXX: pre-4.1 protocol not supported (or even checked) */
@@ -105,7 +109,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
                 "expecting max size %d"
                 ", got size %d",
                 pkt_len + 2, end - (char*) (net->read_pos + pkt_len + 2));
-        return;
+        return TRUE;
     }
 
     {
@@ -126,7 +130,7 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
 
         if (passwd + passwd_len + db_len > (char*) net->read_pos + pkt_len) {
             proxy_log(LOG_ERROR, "Client sent oversized auth packet");
-            return;
+            return TRUE;
         }
 
         /* If a DB was specified, read it */
@@ -148,6 +152,13 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
             user_len -= 2;
         }
 
+        /* Tell pre-4.1 clients to get lost */
+#if 0
+        if (passwd_len == SCRAMBLE_LENGTH_323)
+            proxy_net_send_error(mysql, ER_NOT_SUPPORTED_AUTH_MODE,
+                    "Clients using the pre-4.1 protocol are not supported");
+#endif
+
         /* Authenticate the user */
         if (check_user(user, user_len, passwd, passwd_len, db, db_len)) {
             if (db && db[0]) {
@@ -155,11 +166,15 @@ void proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribu
             }
         } else {
             /* XXX: send error, not authenticated */
+            proxy_net_send_error(mysql, ER_HANDSHAKE_ERROR, "Error authenticating user");
+            return TRUE;
         }
 
         /* Ok, client. You're good to go */
         proxy_net_send_ok(mysql, 0, 0, 0);
     }
+
+    return FALSE;
 }
 
 /**
@@ -334,7 +349,8 @@ void client_do_work(proxy_work_t *work) {
         return;
 
     /* Perform "authentication" (credentials not checked) */
-    proxy_net_handshake(work->proxy, work->addr, 0);
+    if (proxy_net_handshake(work->proxy, work->addr, 0))
+        return;
 
     /* from sql/sql_connect.cc:handle_one_connection */
     while (!work->proxy->net.error && work->proxy->net.vio != 0) {
@@ -518,4 +534,33 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
     } else {
         return proxy_net_flush(mysql);
     }
+}
+
+/**
+ * Send an an error message to a connected client.
+ *
+ * \param mysql     MYSQL object where the error should be sent.
+ * \param sql_errno MySQL error code.
+ * \param err       Error message string.
+ **/
+my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
+    /* derived from libmysql/lib_sql.cc:net_send_error_packet */
+    NET *net = &(mysql->net);
+    uint length;
+    uchar buff[2+1+SQLSTATE_LENGTH+MYSQL_ERRMSG_SIZE], *pos;
+
+    if (unlikely(!net->vio))
+        return FALSE;
+
+#if PROTOCOL_VERSION > 9
+    int2store(buff, sql_errno);
+    pos = buff+2;
+    length = (uint) (strmake((char*) pos, err, MYSQL_ERRMSG_SIZE-1) - (char*) buff);
+    err = (char*) buff;
+#else
+    length = (uint) strlen(err);
+    set_if_smaller(length, MYSQL_ERRMSG_SIZE-1);
+#endif
+
+    return net_write_command(net, (uchar) 255, (uchar*) "", 0, (uchar*) err, length);
 }
