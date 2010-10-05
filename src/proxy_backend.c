@@ -446,7 +446,7 @@ my_bool proxy_backend_connect() {
 
     /* Connect to all backends */
     for (i=0; i<options.num_conns; i++) {
-        if (backend_connect(backends[0], backend_conns[0][i]) < 0)
+        if (backend_connect(backends[0], backend_conns[0][i]))
             return TRUE;
     }
 
