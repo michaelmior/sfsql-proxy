@@ -30,7 +30,8 @@ typedef struct {
     pthread_mutex_t *avail_mutex;
 } pool_t;
 
-pool_t* proxy_pool_new(int size);
+pool_t* proxy_pool_new(int size)
+    __attribute__((malloc));
 void proxy_pool_lock(pool_t *pool);
 void proxy_pool_unlock(pool_t *pool);
 void proxy_pool_set_size(pool_t *pool, int size);

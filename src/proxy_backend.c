@@ -58,7 +58,8 @@ volatile sig_atomic_t querying = 0;
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy);
 static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn);
-static proxy_backend_t** backend_read_file(char *filename, int *num);
+static proxy_backend_t** backend_read_file(char *filename, int *num)
+    __attribute__((malloc));
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_backend_t *backend);
 static my_bool backends_alloc(int num_backends);
@@ -638,7 +639,7 @@ void* proxy_backend_new_thread(void *ptr) {
         proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         /* If no query specified, must be ready to exit */
-        if (unlikely(query->query == NULL)) {
+        if (query->query == NULL) {
             proxy_mutex_unlock(&(thread->lock));
             break;
         }
@@ -872,10 +873,10 @@ static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong 
 
         /* If the query doesn't return results, no more to do */
         pos = (uchar*) mysql->net.read_pos;
-        if (unlikely(net_field_length(&pos) == 0)) {
+        if (net_field_length(&pos) == 0) {
             error = FALSE;
             goto out;
-        } else if (unlikely(mysql->net.read_pos[0] == 0xFF)) {
+        } else if (mysql->net.read_pos[0] == 0xFF) {
             error = TRUE;
             goto out;
         }

@@ -54,7 +54,7 @@ void proxy_log_open() {
  * \param level Log level.
  * \param fmt   Format string.
  **/
-void proxy_log(log_level_t level, char *fmt, ...) {
+void proxy_log(log_level_t level, const char *fmt, ...) {
     va_list arg;
 
     /* Check if the message should be logged */

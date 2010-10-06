@@ -18,5 +18,6 @@ typedef enum {
 } log_level_t;
 
 void proxy_log_open();
-void proxy_log(log_level_t level, char *fmt, ...);
+void proxy_log(log_level_t level, const char *fmt, ...)
+    __attribute__((format (printf, 2, 3)));
 void proxy_log_close();

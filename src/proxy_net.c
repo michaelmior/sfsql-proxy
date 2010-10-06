@@ -106,8 +106,8 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attr
 
     if (end >= (char*) net->read_pos + pkt_len + 2) {
         proxy_log(LOG_ERROR, "Error handshaking with client,"
-                "expecting max size %d"
-                ", got size %d",
+                "expecting max size %lu"
+                ", got size %lu",
                 pkt_len + 2, end - (char*) (net->read_pos + pkt_len + 2));
         return TRUE;
     }
@@ -360,7 +360,7 @@ void client_do_work(proxy_work_t *work) {
          * sure client has everything */
         proxy_net_flush(work->proxy);
 
-        if (unlikely(error != ERROR_OK)) {
+        if (error != ERROR_OK) {
             switch (error) {
                 case ERROR_CLOSE:
                     return;

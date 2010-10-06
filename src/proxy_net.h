@@ -42,7 +42,7 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
  * /return TRUE on error, FALSE otherwise.
  **/
 static inline my_bool proxy_net_flush(MYSQL *proxy) {
-    if (likely((intptr_t) proxy))
+    if ((intptr_t) proxy)
         return net_flush(&(proxy->net));
     else
         return FALSE;
