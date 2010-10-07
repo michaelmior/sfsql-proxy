@@ -25,6 +25,7 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sysexits.h>
 
 #include "proxy.h"
 
@@ -181,7 +182,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
 }
 
 int main(int argc, char *argv[]) {
-    int error, i, ret=EXIT_SUCCESS;
+    int error, i, ret=EX_OK;
     pthread_attr_t attr;
     struct sigaction new_action;
     FILE *pid_file;
@@ -189,18 +190,24 @@ int main(int argc, char *argv[]) {
     my_bool wrote_pid = FALSE;
 
     ret = parse_options(argc, argv);
-    if (ret != EXIT_SUCCESS || options.help)
+    if (ret != EX_OK || options.help)
         goto out_free;
 
     /* Check for existing process */
     if (access(PID_FILE, F_OK) == 0) {
-        printf("PID file already exists in %s\n", PID_FILE);
+        fprintf(stderr, "PID file already exists in %s\n", PID_FILE);
+        ret = EX_SOFTWARE;
         goto out_free;
     }
 
     /* Daemonize if necessary */
-    if (options.daemonize)
-        daemon(1, 0);
+    if (options.daemonize) {
+        if (daemon(1, 0)) {
+            fprintf(stderr, "Couldn't daemonize: %s", strerror(errno));
+            ret = EX_OSERR;
+            goto out_free;
+        }
+    }
     proxy_log_open();
 
     /* Write PID file */
@@ -256,7 +263,7 @@ int main(int argc, char *argv[]) {
 
     /* Initialize backend data */
     if (proxy_backend_init()) {
-        ret = EXIT_FAILURE;
+        ret = EX_SOFTWARE;
         goto out;
     }
 
@@ -267,7 +274,7 @@ int main(int argc, char *argv[]) {
         error = proxy_backend_connect();
 
     if (error) {
-        ret = EXIT_FAILURE;
+        ret = EX_SOFTWARE;
         goto out;
     }
 
