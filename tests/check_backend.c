@@ -42,9 +42,6 @@ volatile sig_atomic_t cloning = 0;
 START_TEST (test_backend_read_no_filename) {
     int num;
 
-    FILE *null = fopen("/dev/null", "w");
-    if (null) { fclose(stderr); stderr = null; }
-
     fail_unless(backend_read_file(NULL, &num) == NULL);
     fail_unless(num < 0);
 } END_TEST
@@ -52,9 +49,6 @@ START_TEST (test_backend_read_no_filename) {
 /* Error for reading empty backend file */
 START_TEST (test_backend_read_not_exists) {
     int num;
-
-    FILE *null = fopen("/dev/null", "w");
-    if (null) { fclose(stderr); stderr = null; }
 
     fail_unless(backend_read_file(TESTS_DIR "backend/NOTHING.txt", &num) == NULL);
     fail_unless(num < 0);
@@ -64,9 +58,6 @@ START_TEST (test_backend_read_not_exists) {
 START_TEST (test_backend_read_empty_file) {
     int num;
     proxy_backend_t **backends;
-
-    FILE *null = fopen("/dev/null", "w");
-    if (null) { fclose(stderr); stderr = null; }
 
     backends = backend_read_file(TESTS_DIR "backend/backends-empty.txt", &num);
 
@@ -120,9 +111,6 @@ START_TEST (test_backend_read_file_noport) {
 START_TEST (test_backend_read_too_many) {
     int num;
     proxy_backend_t **backends;
-
-    FILE *null = fopen("/dev/null", "w");
-    if (null) { fclose(stderr); stderr = null; }
 
     backends = backend_read_file(TESTS_DIR "backend/backends-too-many.txt", &num);
 
