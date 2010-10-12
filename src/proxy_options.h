@@ -43,7 +43,7 @@ struct {
     my_bool daemonize;
 
     /** Backend address info. */
-    proxy_backend_t backend;
+    proxy_host_t backend;
     /** Whether or not to use UNIX sockets*/
     my_bool unix_socket;
     /** UNIX socket filename */

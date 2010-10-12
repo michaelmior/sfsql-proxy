@@ -36,7 +36,7 @@ static char BUF[BUFSIZ];
 #define MAX_BACKENDS      128
 
 /** Array of backends currently available */
-static proxy_backend_t **backends = NULL;
+static proxy_host_t **backends = NULL;
 /** Backend MySQL connections */
 static proxy_backend_conn_t ***backend_conns;
 /** Lock pool for controlling backend access */
@@ -48,22 +48,23 @@ static proxy_map_query_t backend_mapper = NULL;
 /** ltdl handle to the mapper library */
 static lt_dlhandle backend_mapper_handle = NULL;
 /** Thread data structures for backend query threads */
-static proxy_thread_t *backend_threads = NULL;
+static proxy_thread_t **backend_threads = NULL;
 /** Pool for locking access to backend threads */
-static pool_t *backend_thread_pool = NULL;
+static pool_t **backend_thread_pool = NULL;
 
 /** Signify that a backend is currently querying */
 volatile sig_atomic_t querying = 0;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy);
-static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn);
-static proxy_backend_t** backend_read_file(char *filename, int *num)
+static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn);
+static proxy_host_t** backend_read_file(char *filename, int *num)
     __attribute__((malloc));
 static void conn_free(proxy_backend_conn_t *conn);
-static void backend_free(proxy_backend_t *backend);
+static void backend_free(proxy_host_t *backend);
 static my_bool backends_alloc(int num_backends);
-static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier);
+static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length);
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier);
 
 /**
  * Read a MySQL packet from the backend and forward to the client.
@@ -164,9 +165,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
  *  \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_init() {
-    int i;
     char *buf = NULL;
-    pthread_attr_t attr;
 
     /* Load the query mapper */
     if (options.mapper != NULL) {
@@ -205,28 +204,6 @@ my_bool proxy_backend_init() {
     /* Seed the RNG for later use */
     srand(time(NULL));
 
-    /* Create a thread pool */
-    if (!backend_thread_pool)
-        backend_thread_pool = proxy_pool_new(options.backend_threads);
-
-    /* Set up thread attributes */
-    if (!backend_threads) {
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-        /* Start backend threads */
-        backend_threads = calloc(options.backend_threads, sizeof(proxy_thread_t));
-
-        for (i=0; i<options.backend_threads; i++) {
-            backend_threads[i].id = i;
-            proxy_cond_init(&(backend_threads[i].cv));
-            proxy_mutex_init(&(backend_threads[i].lock));
-            backend_threads[i].data.query.query = NULL;
-
-            pthread_create(&(backend_threads[i].thread), &attr, proxy_backend_new_thread, (void*) &(backend_threads[i]));
-        }
-    }
-
     return FALSE;
 }
 
@@ -234,16 +211,19 @@ my_bool proxy_backend_init() {
  * Allocated data structures for storing backend info
  *
  * \param num_backends Number of backends to allocate.
+ * \param threading    TRUE to perform threading setup, FALSE otherwise.
  **/
 static my_bool backends_alloc(int num_backends)  {
     int i, j;
+    pthread_attr_t attr;
+    proxy_thread_t *thread;
 
     backend_num = num_backends;
     
     /* Allocate memory for backends and connections */
     if (num_backends > 0) {
         if (!backends) {
-            backends = (proxy_backend_t**) calloc(backend_num, sizeof(proxy_backend_t*));
+            backends = (proxy_host_t**) calloc(backend_num, sizeof(proxy_host_t*));
             if (!backends)
                 goto error;
         }
@@ -271,12 +251,49 @@ static my_bool backends_alloc(int num_backends)  {
     }
 
     /* Initialize pools for locking backend access */
-    backend_pools = (pool_t**) calloc(backend_num, sizeof(proxy_backend_t**));
+    backend_pools = (pool_t**) calloc(backend_num, sizeof(proxy_host_t**));
     if (!backend_pools)
         goto error;
 
     for (i=0; i<num_backends; i++)
         backend_pools[i] = proxy_pool_new(backend_num);
+
+    /* Check if we skip threading setup */
+    if (!options.backend_file)
+        return FALSE;
+
+    /* Create a thread pool */
+    if (!backend_thread_pool) {
+        backend_thread_pool = (pool_t**) calloc(backend_num, sizeof(pool_t*));
+        for (i=0; i<backend_num; i++)
+            backend_thread_pool[i] = proxy_pool_new(options.backend_threads);
+    }
+
+    /* Create backend threads */
+    if (!backend_threads) {
+        /* Set up thread attributes */
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+        /* Start backend threads */
+        backend_threads = calloc(backend_num, sizeof(proxy_thread_t));
+
+        for (i=0; i<backend_num; i++) {
+            backend_threads[i] = calloc(options.backend_threads, sizeof(proxy_thread_t));
+
+            for (j=0; j<options.backend_threads; j++) {
+                thread = &(backend_threads[i][j]);
+                thread->id = j;
+                proxy_cond_init(&(thread->cv));
+                proxy_mutex_init(&(thread->lock));
+                thread->data.backend.bi = i;
+                thread->data.backend.conn.mysql = NULL;
+                thread->data.backend.query.query = NULL;
+
+                pthread_create(&(backend_threads[i][j].thread), &attr, proxy_backend_new_thread, (void*) &(backend_threads[i][j]));
+            }
+        }
+    }
 
     return FALSE;
 
@@ -293,7 +310,7 @@ error:
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *conn) {
+static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn) {
     MYSQL *mysql, *ret;
     my_bool reconnect = TRUE;
 
@@ -339,14 +356,14 @@ static my_bool backend_connect(proxy_backend_t *backend, proxy_backend_conn_t *c
  *  \param filename Filename to read from.
  *  \param num      A pointer where the number of found backends will be stored.
  *
- *  \return An array of ::proxy_backend_t structs representing the read backends.
+ *  \return An array of ::proxy_host_t structs representing the read backends.
  **/
-proxy_backend_t** backend_read_file(char *filename, int *num) {
+proxy_host_t** backend_read_file(char *filename, int *num) {
     FILE *f;
     char *buf, *buf2, *pch;
     ulong pos;
     uint i, c=0;
-    proxy_backend_t **new_backends;
+    proxy_host_t **new_backends;
 
     *num = -1;
 
@@ -407,11 +424,11 @@ proxy_backend_t** backend_read_file(char *filename, int *num) {
     }
 
     /* Allocate and read backends */
-    new_backends = (proxy_backend_t**) calloc(*num, sizeof(proxy_backend_t*));
+    new_backends = (proxy_host_t**) calloc(*num, sizeof(proxy_host_t*));
     i = 0;
     pch = strtok(buf, " \r\n\t");
     while (pch != NULL && (int)i<*num) {
-        new_backends[i] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
+        new_backends[i] = (proxy_host_t*) malloc(sizeof(proxy_host_t));
 
         /* If we have a colon, then a port number must have been specified */
         if ((buf2 = strchr(pch, ':'))) {
@@ -441,7 +458,7 @@ my_bool proxy_backend_connect() {
     if (backends_alloc(1))
         return TRUE;
 
-    backends[0] = (proxy_backend_t*) malloc(sizeof(proxy_backend_t));
+    backends[0] = (proxy_host_t*) malloc(sizeof(proxy_host_t));
     backends[0]->host = strdup(options.backend.host);
     backends[0]->port = options.backend.port;
 
@@ -474,6 +491,10 @@ my_bool proxy_backends_connect() {
             if (backend_connect(backends[i], backend_conns[i][j]))
                 return TRUE;
         }
+        for (j=0; j<options.backend_threads; j++) {
+            if (backend_connect(backends[i], &(backend_threads[i][j].data.backend.conn)))
+                return TRUE;
+        }
     }
 
      return FALSE;
@@ -487,11 +508,11 @@ my_bool proxy_backends_connect() {
  * \param new_pools    New pools to use.
  * \param new_conns    New connection structure to use;
  **/
-static inline void backends_switch(int new_num, proxy_backend_t ***new_backends,
+static inline void backends_switch(int new_num, proxy_host_t ***new_backends,
         pool_t ***new_pools, proxy_backend_conn_t ****new_conns) {
     int oldnum;
     pool_t **old_pools;
-    proxy_backend_t **old_backends;
+    proxy_host_t **old_backends;
     proxy_backend_conn_t ***old_conns;
 
     /* Switch to the new set of backends */
@@ -519,6 +540,7 @@ static inline void backends_new_connect() {
 
     for (i=0; i<backend_num; i++) {
         if (!backend_conns[i]) {
+            proxy_log(LOG_INFO, "Connecting to new backend %d\n", i);
             backend_conns[i] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
 
             for (j=0; j<options.num_conns; j++) {
@@ -569,7 +591,7 @@ static inline void backend_conns_free(int bi) {
 void proxy_backends_update() {
     int num, i, j, keep[backend_num];
     my_bool changed = FALSE;
-    proxy_backend_t **new_backends = backend_read_file(options.backend_file, &num);
+    proxy_host_t **new_backends = backend_read_file(options.backend_file, &num);
     pool_t **new_pools = NULL;
     proxy_backend_conn_t ***new_conns = NULL;
 
@@ -613,6 +635,7 @@ void proxy_backends_update() {
     /* Clean up old backends */
     for (i=0; i<backend_num; i++) {
         if (keep[i] < 0) {
+            proxy_log(LOG_INFO, "Disconnecting backend %d", i);
             backend_conns_free(i);
         } else {
             /* Save existing data */
@@ -628,8 +651,9 @@ void proxy_backends_update() {
 
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
-    proxy_backend_query_t *query = &(thread->data.query);
+    proxy_backend_query_t *query = &(thread->data.backend.query);
     char *oq;
+    int bi = thread->data.backend.bi;
 
     proxy_threading_mask();
 
@@ -649,20 +673,20 @@ void* proxy_backend_new_thread(void *ptr) {
         /* We make a copy of the query string since MySQL destroys it */
         oq = (char*) malloc(*(query->length) + 1);
         memcpy(oq, query->query, *(query->length) + 1);
-        query->result[query->bi] = backend_query_idx(query->bi, query->proxy, oq, *(query->length), query->barrier);
+        query->result[bi] = backend_query(&(thread->data.backend.conn), query->proxy, oq, *(query->length), query->barrier);
         free(oq);
 
         __sync_fetch_and_sub(&querying, 1);
 
         /* Check and signal if all backends have received the query */
-        proxy_mutex_lock(thread->data.query.mutex);
-        if (++(*(thread->data.query.count)) == backend_num)
-            proxy_cond_signal(thread->data.query.cv);
-        proxy_mutex_unlock(thread->data.query.mutex);
+        proxy_mutex_lock(query->mutex);
+        if (++(*(query->count)) == backend_num)
+            proxy_cond_signal(query->cv);
+        proxy_mutex_unlock(query->mutex);
 
         /* Signify thread availability */
-        thread->data.query.query = NULL;
-        proxy_pool_return(backend_thread_pool, thread->id);
+        query->query = NULL;
+        proxy_pool_return(backend_thread_pool[thread->data.backend.bi], thread->id);
         proxy_mutex_unlock(&(thread->lock));
     }
 
@@ -718,6 +742,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     pthread_cond_t *query_cv;
     pthread_mutex_t *query_mutex;
     pthread_barrier_t *query_barrier;
+    proxy_backend_query_t *bquery;
+    proxy_thread_t *thread;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -747,7 +773,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
              * backends are in the process of changing */
             bi = rand() % backend_num;
             while (!backend_pools[bi]) { bi = rand() % backend_num; }
-            if (backend_query_idx(bi, proxy, query, length, NULL)) {
+            if (backend_query_idx(bi, proxy, query, length)) {
                 error = TRUE;
                 goto out;
             }
@@ -774,22 +800,23 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 bi = lcg(bi, backend_num);
 
                 /* Dispatch threads for backend queries */
-                ti = proxy_pool_get(backend_thread_pool);
+                ti = proxy_pool_get(backend_thread_pool[bi]);
+                thread = &(backend_threads[bi][ti]);
 
-                proxy_mutex_lock(&(backend_threads[ti].lock));
+                proxy_mutex_lock(&(thread->lock));
 
-                backend_threads[ti].data.query.query = oq;
-                backend_threads[ti].data.query.length = &length;
-                backend_threads[ti].data.query.proxy = (i == 0) ? proxy : NULL;
-                backend_threads[ti].data.query.bi = bi;
-                backend_threads[ti].data.query.result = result;
-                backend_threads[ti].data.query.count = &count;
-                backend_threads[ti].data.query.mutex = query_mutex;
-                backend_threads[ti].data.query.cv = query_cv;
-                backend_threads[ti].data.query.barrier = query_barrier;
+                bquery = &(thread->data.backend.query);
+                bquery->query = oq;
+                bquery->length = &length;
+                bquery->proxy = (i == 0) ? proxy : NULL;
+                bquery->result = result;
+                bquery->count = &count;
+                bquery->mutex = query_mutex;
+                bquery->cv = query_cv;
+                bquery->barrier = query_barrier;
 
-                proxy_cond_signal(&(backend_threads[ti].cv));
-                proxy_mutex_unlock(&(backend_threads[ti].lock));
+                proxy_cond_signal(&(thread->cv));
+                proxy_mutex_unlock(&(thread->lock));
             }
 
             /* Wait until all queries are complete */
@@ -838,24 +865,55 @@ out:
  * \param proxy   MYSQL object to forward results to.
  * \param query   Query string to execute.
  * \param length  Length of the query.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length) {
+    int ci;
+    proxy_backend_conn_t *conn;
+    my_bool error;
+
+    /* Get a backend to use */
+    ci = proxy_pool_get(backend_pools[bi]);
+    conn = backend_conns[bi][ci];
+
+    /*Send the query */
+    error = backend_query(conn, proxy, query, length, NULL);
+
+    if (!conn->freed)
+        proxy_pool_return(backend_pools[bi], ci);
+
+    return error;
+}
+
+/**
+ * Forward a query to a backend connection
+ *
+ * \param conn    Connection where the query should be sent.
+ * \param proxy   MYSQL object to forward results to.
+ * \param query   Query string to execute.
+ * \param length  Length of the query.
  * \param barrier Optional barrier which blocks query response
  *                until all backends have received the query.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier) {
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
     uchar *pos;
-    int ci, i;
+    int i;
     MYSQL *mysql;
-    proxy_backend_conn_t *conn;
 
-    ci = proxy_pool_get(backend_pools[bi]);
-    conn = backend_conns[bi][ci];
     mysql = conn->mysql;
+    if (unlikely(!mysql)) {
+        proxy_log(LOG_ERROR, "Query with uninitialized MySQL object");
+        error = TRUE;
+        goto out;
+    }
 
-    proxy_log(LOG_DEBUG, "Sending query %s to backend %d", query, bi);
+    /* Send the query to the backend */
+    proxy_log(LOG_DEBUG, "Sending query %s", query);
     mysql_send_query(mysql, query, length);
 
     /* derived from sql/client.c:cli_read_query_result */
@@ -909,8 +967,6 @@ out:
      * has gone away, otherwise, return to pool */
     if (conn->freed)
         conn_free(conn);
-    else
-        proxy_pool_return(backend_pools[bi], ci);
 
     return error;
 }
@@ -935,7 +991,7 @@ static void conn_free(proxy_backend_conn_t *conn) {
  *
  * \param backend Backend to free.
  **/
-static void backend_free(proxy_backend_t *backend) {
+static void backend_free(proxy_host_t *backend) {
     if (!backend)
         return;
 
@@ -971,8 +1027,10 @@ void proxy_backend_close() {
 
     /* Free threads */
     if (backend_threads) {
-        proxy_threading_cancel(backend_threads, options.backend_threads, backend_thread_pool);
-        proxy_threading_cleanup(backend_threads, options.backend_threads, backend_thread_pool);
+        for (i=0; i<backend_num; i++) {
+            proxy_threading_cancel(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
+            proxy_threading_cleanup(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
+        }
     }
 
     /* Free allocated memory */

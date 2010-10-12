@@ -20,7 +20,7 @@ typedef struct {
     char *host;
     /** Port number of the associated host. */
     int port;
-} proxy_backend_t;
+} proxy_host_t;
 
 /**
  * Backend connection information.
@@ -53,13 +53,18 @@ typedef struct {
     /** Barrier for ensuring all queries execute
         before sending results. */
     pthread_barrier_t *barrier;
-    /** Index of the backend the query should be sent to. */
-    int bi;
     /** Success array from various backends. */
     my_bool *result;
     /** Count of backends which have executed the query. */
     int *count;
 } proxy_backend_query_t;
+
+typedef struct {
+    int bi;
+    proxy_backend_conn_t conn;
+    proxy_backend_query_t query;
+}
+proxy_backend_data_t;
 
 my_bool proxy_backend_init();
 my_bool proxy_backend_connect();

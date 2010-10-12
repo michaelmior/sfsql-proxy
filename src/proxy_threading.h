@@ -47,7 +47,7 @@ typedef struct {
     /** Work for different types of threads. */
     union {
         proxy_work_t work;
-        proxy_backend_query_t query;
+        proxy_backend_data_t backend;
     } data;
 } proxy_thread_t;
 

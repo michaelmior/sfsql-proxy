@@ -110,9 +110,13 @@ void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool) {
     }
 
     /* Free extra memory */
-    free(threads);
-    threads = NULL;
+    if (threads) {
+        free(threads);
+        threads = NULL;
+    }
 
-    proxy_pool_destroy(pool);
-    pool = NULL;
+    if (pool) {
+        proxy_pool_destroy(pool);
+        pool = NULL;
+    }
 }
