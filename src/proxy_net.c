@@ -337,6 +337,7 @@ void client_do_work(proxy_work_t *work) {
      *   tcp_keepalive_probes = 4
      *   tcp_keepalive_time   = 60
      *   tcp_keepalive_intvl  = 60 */
+    optval = 1;
     setsockopt(vio_tmp->sd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
     optval = 4;
     setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPCNT, &optval, sizeof(optval));
