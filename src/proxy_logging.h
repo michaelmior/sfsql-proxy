@@ -9,6 +9,9 @@
  *
  */
 
+#ifndef _proxy_logging_h
+#define _proxy_logging_h
+
 #define LOG_FILE "/var/log/sfsql-proxy.log"
 
 typedef enum {
@@ -21,3 +24,5 @@ void proxy_log_open();
 void proxy_log(log_level_t level, const char *fmt, ...)
     __attribute__((format (printf, 2, 3)));
 void proxy_log_close();
+
+#endif /* _proxy_logging_h */
