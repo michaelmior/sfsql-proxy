@@ -57,7 +57,7 @@ START_TEST (test_backend_read_not_exists) {
 /* NULL produced when reading empty f ile */
 START_TEST (test_backend_read_empty_file) {
     int num;
-    proxy_backend_t **backends;
+    proxy_host_t **backends;
 
     backends = backend_read_file(TESTS_DIR "backend/backends-empty.txt", &num);
 
@@ -68,7 +68,7 @@ START_TEST (test_backend_read_empty_file) {
 /* Correct parsing of backend file */
 START_TEST (test_backend_read_file) {
     int num;
-    proxy_backend_t **backends;
+    proxy_host_t **backends;
 
     backends = backend_read_file(TESTS_DIR "backend/backends.txt", &num);
 
@@ -89,7 +89,7 @@ START_TEST (test_backend_read_file) {
 /* Correct parsing of backend file with a missing port number*/
 START_TEST (test_backend_read_file_noport) {
     int num;
-    proxy_backend_t **backends;
+    proxy_host_t **backends;
 
     backends = backend_read_file(TESTS_DIR "backend/backends-noport.txt", &num);
 
@@ -110,7 +110,7 @@ START_TEST (test_backend_read_file_noport) {
 /* Error when reading more than maximum backends from file */
 START_TEST (test_backend_read_too_many) {
     int num;
-    proxy_backend_t **backends;
+    proxy_host_t **backends;
 
     backends = backend_read_file(TESTS_DIR "backend/backends-too-many.txt", &num);
 
