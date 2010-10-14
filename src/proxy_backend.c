@@ -62,9 +62,11 @@ static proxy_host_t** backend_read_file(char *filename, int *num)
     __attribute__((malloc));
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_host_t *backend);
+static void backends_free(proxy_host_t **backends, int num);
 static my_bool backends_alloc(int num_backends);
 static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length);
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier);
+void backend_new_threads(int bi);
 
 /**
  * Read a MySQL packet from the backend and forward to the client.
@@ -215,8 +217,6 @@ my_bool proxy_backend_init() {
  **/
 static my_bool backends_alloc(int num_backends)  {
     int i, j;
-    pthread_attr_t attr;
-    proxy_thread_t *thread;
 
     backend_num = num_backends;
     
@@ -271,28 +271,11 @@ static my_bool backends_alloc(int num_backends)  {
 
     /* Create backend threads */
     if (!backend_threads) {
-        /* Set up thread attributes */
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
         /* Start backend threads */
         backend_threads = calloc(backend_num, sizeof(proxy_thread_t));
 
-        for (i=0; i<backend_num; i++) {
-            backend_threads[i] = calloc(options.backend_threads, sizeof(proxy_thread_t));
-
-            for (j=0; j<options.backend_threads; j++) {
-                thread = &(backend_threads[i][j]);
-                thread->id = j;
-                proxy_cond_init(&(thread->cv));
-                proxy_mutex_init(&(thread->lock));
-                thread->data.backend.bi = i;
-                thread->data.backend.conn.mysql = NULL;
-                thread->data.backend.query.query = NULL;
-
-                pthread_create(&(backend_threads[i][j].thread), &attr, proxy_backend_new_thread, (void*) &(backend_threads[i][j]));
-            }
-        }
+        for (i=0; i<backend_num; i++)
+            backend_new_threads(i);
     }
 
     return FALSE;
@@ -300,6 +283,39 @@ static my_bool backends_alloc(int num_backends)  {
 error:
     proxy_backend_close();
     return TRUE;
+}
+
+/**
+ * Start new threads for a particular backend.
+ *
+ * \param bi Index of the backend whose threads should be started.
+ **/
+void backend_new_threads(int bi) {
+    int i;
+    proxy_thread_t *thread;
+    pthread_attr_t attr;
+
+    /* Set up thread attributes */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    /* Allocate space for the new threads */
+    backend_threads[bi] = calloc(options.backend_threads, sizeof(proxy_thread_t));
+
+    for (i=0; i<options.backend_threads; i++) {
+        thread = &(backend_threads[bi][i]);
+        thread->id = i;
+        proxy_cond_init(&(thread->cv));
+        proxy_mutex_init(&(thread->lock));
+        thread->data.backend.bi = bi;
+
+        thread->data.backend.conn = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+        thread->data.backend.conn->mysql = NULL;
+
+        thread->data.backend.query.query = NULL;
+
+        pthread_create(&(thread->thread), &attr, proxy_backend_new_thread, (void*) thread);
+    }
 }
 
 /**
@@ -491,8 +507,9 @@ my_bool proxy_backends_connect() {
             if (backend_connect(backends[i], backend_conns[i][j]))
                 return TRUE;
         }
+
         for (j=0; j<options.backend_threads; j++) {
-            if (backend_connect(backends[i], &(backend_threads[i][j].data.backend.conn)))
+            if (backend_connect(backends[i], backend_threads[i][j].data.backend.conn))
                 return TRUE;
         }
     }
@@ -505,56 +522,58 @@ my_bool proxy_backends_connect() {
  *
  * \param new_num      New number of backends.
  * \param new_backends New backends to use.
- * \param new_pools    New pools to use.
- * \param new_conns    New connection structure to use;
  **/
-static inline void backends_switch(int new_num, proxy_host_t ***new_backends,
-        pool_t ***new_pools, proxy_backend_conn_t ****new_conns) {
+static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
     int oldnum;
-    pool_t **old_pools;
     proxy_host_t **old_backends;
-    proxy_backend_conn_t ***old_conns;
 
     /* Switch to the new set of backends */
     old_backends = backends;
-    backends = *new_backends;
-    free(old_backends);
+    backends = new_backends;
+
     oldnum = backend_num;
+    backends_free(old_backends, oldnum);
     backend_num = new_num;
-
-    /* Switch to new resources */
-    old_pools = backend_pools;
-    backend_pools = *new_pools;
-    free(old_pools);
-
-    old_conns = backend_conns;
-    backend_conns = *new_conns;
-    free(old_conns);
 }
 
 /**
  * Connect to new backends after an update.
  **/
-static inline void backends_new_connect() {
+static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools) {
     int i, j;
 
     for (i=0; i<backend_num; i++) {
-        if (!backend_conns[i]) {
+        if (!conns[i]) {
             proxy_log(LOG_INFO, "Connecting to new backend %d\n", i);
-            backend_conns[i] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
+            conns[i] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
 
             for (j=0; j<options.num_conns; j++) {
-                backend_conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
-                backend_connect(backends[i], backend_conns[i][j]);
+                conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+                backend_connect(backends[i], conns[i][j]);
             }
         }
 
         /* Allocate a new pool if necessary */
-        if (!backend_pools[i]) {
-            backend_pools[i] = proxy_pool_new(options.num_conns);
+        if (!pools[i]) {
+            pools[i] = proxy_pool_new(options.num_conns);
         } else {
             /* Unlock pool */
-            proxy_pool_unlock(backend_pools[i]);
+            proxy_pool_unlock(pools[i]);
+        }
+
+        /* Start new backend threads */
+        if (!backend_threads[i])
+            backend_new_threads(i);
+
+        if (!backend_thread_pool[i]) {
+            backend_thread_pool[i] = proxy_pool_new(options.backend_threads);
+        for (j=0; j<options.backend_threads; j++) {
+            if (!backend_threads[i][j].data.backend.conn->mysql)
+                backend_connect(backends[i], backend_threads[i][j].data.backend.conn);
+        }
+
+        } else {
+            proxy_pool_unlock(backend_thread_pool[i]);
         }
     }
 }
@@ -569,20 +588,73 @@ static inline void backend_conns_free(int bi) {
 
     /* Free connections */
     for (i=0; i<options.num_conns; i++) {
-        if (proxy_pool_is_free(backend_pools[bi], i)) {
-            proxy_pool_remove(backend_pools[bi], i);
+        if (proxy_pool_is_free(backend_pools[bi], i))
             conn_free(backend_conns[bi][i]);
-        } else {
+        else
             backend_conns[bi][i]->freed = TRUE;
-        }
     }
 
     free(backend_conns[bi]);
+    backend_conns[bi] = NULL;
     backend_free(backends[bi]);
 
     /* Destroy the pool */
     proxy_pool_destroy(backend_pools[bi]);
     backend_pools[bi] = NULL;
+
+    /* Stop backend threads */
+    for (i=0; i<options.backend_threads; i++)
+        backend_threads[bi][i].data.backend.conn->freed = TRUE;
+
+    proxy_threading_cancel(backend_threads[bi], options.backend_threads, backend_thread_pool[bi]);
+    proxy_threading_cleanup(backend_threads[bi], options.backend_threads, backend_thread_pool[bi]);
+}
+
+/**
+ * Reize the backend pool and connection data structures on update.
+ *
+ * \param num    Number of backends to allocate in new structure.
+ * \param before TRUE if allocation is before reshuffling, FALSE otherwise.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+my_bool backend_resize(int num, my_bool before) {
+    int i;
+    void *ptr;
+
+    /* Reallocate memory */
+    if ((before && num > backend_num) || (!before && num < backend_num)) {
+        /* XXX: A little ugly below, but it ensures the proxy
+         *      can continue without new backends if realloc fails */
+
+#define SAFE_REALLOC(mem, size) \
+        ptr = realloc(mem, num * size); \
+        if (!ptr) { \
+            return TRUE; \
+            proxy_log(LOG_ERROR, "Could not allocate new memory for backends"); \
+        } else { \
+            mem = ptr; \
+        }
+
+        SAFE_REALLOC(backend_pools, sizeof(pool_t*));
+        SAFE_REALLOC(backend_conns, sizeof(proxy_backend_conn_t**));
+        SAFE_REALLOC(backend_threads, sizeof(proxy_thread_t*));
+        SAFE_REALLOC(backend_thread_pool, sizeof(pool_t*));
+
+#undef SAFE_REALLOC
+    }
+
+    /* Set new elements to NULL */
+    if (!before && num > backend_num) {
+        for (i=backend_num; i<num; i++) {
+            backend_pools[i] = NULL;
+            backend_conns[i] = NULL;
+            backend_threads[i] = NULL;
+            backend_thread_pool[i] = NULL;
+        }
+    }
+
+    return FALSE;
 }
 
 /**
@@ -592,12 +664,12 @@ void proxy_backends_update() {
     int num, i, j, keep[backend_num];
     my_bool changed = FALSE;
     proxy_host_t **new_backends = backend_read_file(options.backend_file, &num);
-    pool_t **new_pools = NULL;
-    proxy_backend_conn_t ***new_conns = NULL;
 
     /* Block others from getting backends */
-    for (i=0; i<backend_num; i++)
+    for (i=0; i<backend_num; i++) {
         proxy_pool_lock(backend_pools[i]);
+        proxy_pool_lock(backend_thread_pool[i]);
+    }
 
     /* Compare the current backends with the new ones to
      * see if there are any which can be reused */
@@ -619,15 +691,12 @@ void proxy_backends_update() {
 
     /* Reallocate data structures if necessary */
     if (backend_num != num || changed) {
-        new_pools = (pool_t**) calloc(num, sizeof(pool_t*));
-        new_conns = (proxy_backend_conn_t***) calloc(num, sizeof(proxy_backend_conn_t**));
-
-        for (j=0; j<num; j++) {
-            new_pools[j] = NULL;
-            new_conns[j] = NULL;
+        if (backend_resize(num, TRUE)) {
+            backends_free(new_backends, num);
+            return;
         }
     } else {
-        free(new_backends);
+        backends_free(new_backends, num);
         proxy_log(LOG_INFO, "No backends changed. Done.");
         return;
     }
@@ -639,14 +708,19 @@ void proxy_backends_update() {
             backend_conns_free(i);
         } else {
             /* Save existing data */
-            new_pools[keep[i]] = backend_pools[i];
-            new_conns[keep[i]] = backend_conns[i];
+            backend_pools[i] = backend_pools[keep[i]];
+            backend_conns[i] = backend_conns[keep[i]];
+            backend_thread_pool[i] = backend_thread_pool[keep[i]];
+            backend_threads[i] = backend_threads[keep[i]];
         }
     }
 
+    /* Finish resizing */
+    backend_resize(num, FALSE);
+
     /* Switch to the new set of backends */
-    backends_switch(num, &new_backends, &new_pools, &new_conns);
-    backends_new_connect();
+    backends_switch(num, new_backends);
+    backends_new_connect(backend_conns, backend_pools);
 }
 
 void* proxy_backend_new_thread(void *ptr) {
@@ -673,7 +747,7 @@ void* proxy_backend_new_thread(void *ptr) {
         /* We make a copy of the query string since MySQL destroys it */
         oq = (char*) malloc(*(query->length) + 1);
         memcpy(oq, query->query, *(query->length) + 1);
-        query->result[bi] = backend_query(&(thread->data.backend.conn), query->proxy, oq, *(query->length), query->barrier);
+        query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, oq, *(query->length), query->barrier);
         free(oq);
 
         __sync_fetch_and_sub(&querying, 1);
@@ -690,8 +764,7 @@ void* proxy_backend_new_thread(void *ptr) {
         proxy_mutex_unlock(&(thread->lock));
     }
 
-    proxy_log(LOG_INFO, "Exiting loop on backend thead %d", thread->id);
-
+    proxy_log(LOG_INFO, "Exiting loop on backend %d, thead %d", thread->data.backend.bi, thread->id);
     pthread_exit(NULL);
 }
 
@@ -963,8 +1036,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
 out:
-    /* Free connection resources if this connection
-     * has gone away, otherwise, return to pool */
+    /* Free connection resources if necessary */
     if (conn->freed)
         conn_free(conn);
 
@@ -1000,6 +1072,26 @@ static void backend_free(proxy_host_t *backend) {
 }
 
 /**
+ * Free an array of backends.
+ *
+ * \param backends Array of backends to free.
+ * \param num      Number of backends in the array.
+ **/
+static void backends_free(proxy_host_t **backends, int num) {
+    int i;
+
+    if (!backends)
+        return;
+
+    /* Free all backends in the array */
+    for (i=0; i<num; i++)
+        backend_free(backends[i]);
+
+    free(backends);
+    backends = NULL;
+}
+
+/**
  * Close the open connections to the backend
  * and destroy mutexes.
  **/
@@ -1010,9 +1102,9 @@ void proxy_backend_close() {
     for (i=0; i<backend_num; i++) {
         for (j=0; j<options.num_conns; j++)
             conn_free(backend_conns[i][j]);
-        free(backend_conns[i]);
 
-        backend_free(backends[i]);
+        free(backend_conns[i]);
+        backend_conns[i] = NULL;
 
         if (backend_pools)
             proxy_pool_destroy(backend_pools[i]);
@@ -1025,16 +1117,24 @@ void proxy_backend_close() {
     if (backend_mapper)
         lt_dlexit();
 
+    /* Free allocated memory */
+    free(backend_pools);
+    backends_free(backends, backend_num);
+    free(backend_conns);
+
     /* Free threads */
     if (backend_threads) {
         for (i=0; i<backend_num; i++) {
+            /* Close connections */
+            for (j=0; j<options.backend_threads; j++)
+                conn_free(backend_threads[i][j].data.backend.conn);
+
+            /* Shut down threads */
             proxy_threading_cancel(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
             proxy_threading_cleanup(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
         }
-    }
 
-    /* Free allocated memory */
-    free(backend_pools);
-    free(backends);
-    free(backend_conns);
+        free(backend_threads);
+        free(backend_thread_pool);
+    }
 }

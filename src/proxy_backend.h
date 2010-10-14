@@ -61,7 +61,7 @@ typedef struct {
 
 typedef struct {
     int bi;
-    proxy_backend_conn_t conn;
+    proxy_backend_conn_t *conn;
     proxy_backend_query_t query;
 }
 proxy_backend_data_t;
