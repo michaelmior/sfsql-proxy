@@ -107,8 +107,8 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attr
     if (end >= (char*) net->read_pos + pkt_len + 2) {
         proxy_log(LOG_ERROR, "Error handshaking with client,"
                 "expecting max size %lu"
-                ", got size %d",
-                pkt_len + 2, end - (char*) (net->read_pos + pkt_len + 2));
+                ", got size %lu",
+                pkt_len + 2, (ulong) (end - (char*) (net->read_pos + pkt_len + 2)));
         return TRUE;
     }
 
