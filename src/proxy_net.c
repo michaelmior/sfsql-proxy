@@ -288,6 +288,9 @@ void* proxy_net_new_thread(void *ptr) {
     pthread_cleanup_push(net_thread_destroy, ptr);
 
     while (1) {
+        if(thread->exit)
+            break;
+
         /* Wait for work to be available */
         proxy_mutex_lock(&(thread->lock));
         proxy_cond_wait(&(thread->cv), &(thread->lock));

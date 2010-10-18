@@ -732,6 +732,9 @@ void* proxy_backend_new_thread(void *ptr) {
     proxy_threading_mask();
 
     while (1) {
+        if(thread->exit)
+            break;
+
         /* Wait for work to be available */
         proxy_mutex_lock(&(thread->lock));
         proxy_cond_wait(&(thread->cv), &(thread->lock));

@@ -256,6 +256,8 @@ int main(int argc, char *argv[]) {
         threads[i].id = i;
         proxy_cond_init(&(threads[i].cv));
         proxy_mutex_init(&(threads[i].lock));
+        threads[i].exit = 0;
+        threads[i].data.work.addr = NULL;
         threads[i].data.work.proxy = NULL;
 
         pthread_create(&(threads[i].thread), &attr, proxy_net_new_thread, (void*) &(threads[i]));

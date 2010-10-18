@@ -43,6 +43,8 @@ typedef struct {
     pthread_cond_t cv;
     /** Lock associated with condition variable. */
     pthread_mutex_t lock;
+    /** Signal that that the thread should now exit */
+    volatile sig_atomic_t exit;
 
     /** Work for different types of threads. */
     union {

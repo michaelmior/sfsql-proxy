@@ -75,6 +75,8 @@ void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool) {
     int i;
 
     for (i=0; i<num; i++) {
+        threads[i].exit = 1;
+
         /* Make sure worker threads release their mutex */
         proxy_mutex_lock(&(threads[i].lock));
         proxy_cond_signal(&(threads[i].cv));
