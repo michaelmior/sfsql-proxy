@@ -310,6 +310,7 @@ void backend_new_threads(int bi) {
         thread->data.backend.bi = bi;
 
         thread->data.backend.conn = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+        thread->data.backend.conn->freed = FALSE;
         thread->data.backend.conn->mysql = NULL;
 
         thread->data.backend.query.query = NULL;
