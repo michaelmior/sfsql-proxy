@@ -465,7 +465,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
             return proxy_net_send_ok(mysql, 0, 0, 0) ? ERROR_CLIENT : ERROR_OK;
         case COM_INIT_DB:
             /* XXX: using a single DB for now */
-            return ERROR_CLIENT;
+            proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only a single database is supported by " PACKAGE_NAME);
 
         /* Commands below not implemented */
         case COM_REGISTER_SLAVE:
@@ -493,9 +493,8 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
         case COM_DELAYED_INSERT:
         case COM_END:
         default:
-            /* XXX: send error */
-            return ERROR_CLIENT;
-            break;
+            proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Command currently not supported by " PACKAGE_NAME);
+            return ERROR_OK;
     }
 }
 
