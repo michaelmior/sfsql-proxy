@@ -286,13 +286,15 @@ void* proxy_net_new_thread(void *ptr) {
 
     proxy_threading_mask();
     pthread_cleanup_push(net_thread_destroy, ptr);
+    proxy_mutex_lock(&(thread->lock));
 
     while (1) {
-        if(thread->exit)
+        if(thread->exit) {
+            proxy_mutex_unlock(&(thread->lock));
             break;
+        }
 
         /* Wait for work to be available */
-        proxy_mutex_lock(&(thread->lock));
         proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         proxy_log(LOG_DEBUG, "Thread %d signaled", thread->id);
@@ -310,7 +312,6 @@ void* proxy_net_new_thread(void *ptr) {
 
         /* Signify that we are available for work again */
         proxy_pool_return(thread_pool, thread->id);
-        proxy_mutex_unlock(&(thread->lock));
     }
 
     proxy_log(LOG_DEBUG, "Exiting loop on client thead %d", thread->id);

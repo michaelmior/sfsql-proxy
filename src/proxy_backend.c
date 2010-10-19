@@ -731,13 +731,15 @@ void* proxy_backend_new_thread(void *ptr) {
     int bi = thread->data.backend.bi;
 
     proxy_threading_mask();
+    proxy_mutex_lock(&(thread->lock));
 
     while (1) {
-        if(thread->exit)
+        if(thread->exit) {
+            proxy_mutex_unlock(&(thread->lock));
             break;
+        }
 
         /* Wait for work to be available */
-        proxy_mutex_lock(&(thread->lock));
         proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         /* If no query specified, must be ready to exit */
@@ -765,7 +767,6 @@ void* proxy_backend_new_thread(void *ptr) {
         /* Signify thread availability */
         query->query = NULL;
         proxy_pool_return(backend_thread_pool[thread->data.backend.bi], thread->id);
-        proxy_mutex_unlock(&(thread->lock));
     }
 
     proxy_log(LOG_INFO, "Exiting loop on backend %d, thead %d", thread->data.backend.bi, thread->id);
