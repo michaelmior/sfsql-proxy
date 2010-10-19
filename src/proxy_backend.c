@@ -932,7 +932,8 @@ out:
 
     free(oq);
 
-    return error;
+    /* XXX: error reporting should be more verbose */
+    return FALSE;
 }
 
 /**
