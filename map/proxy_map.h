@@ -19,24 +19,14 @@
 /**
  * Types of query mappings.
  **/
-enum QUERY_MAP {
+typedef enum QUERY_MAP {
     /** Map to any available backend. */
     QUERY_MAP_ANY,
     /** Map to all backends. */
     QUERY_MAP_ALL
-};
-
-/**
- * Information about mapping for a
- * particular query. */
-typedef struct {
-    /** Result of query mapping. */
-    enum QUERY_MAP map;
-    /** Modified query, or NULL if unchanged. */
-    char *query;
 } proxy_query_map_t;
 
 /** Function pointer for query mapping. */
-typedef proxy_query_map_t* (*proxy_map_query_t) (char*);
+typedef proxy_query_map_t (*proxy_map_query_t) (char*, char*);
 
 #endif /* _proxy_map_h */

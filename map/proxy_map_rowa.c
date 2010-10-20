@@ -29,14 +29,8 @@
 #define DESCRIBE "DESCRIBE"
 #define EXPLAIN  "EXPLAIN"
 
-proxy_query_map_t* proxy_map_query(char *query) {
-    proxy_query_map_t *map = NULL;
-    
-    map = (proxy_query_map_t*) malloc(sizeof(proxy_query_map_t));
-    if (!map)
-        return NULL;
-
-    map->query = NULL;
+proxy_query_map_t proxy_map_query(char *query, char *new_query) {
+    new_query = NULL;
 
     /* Anything which starts with the keywords above
      * goes to any backend, otherwise, go everywhere */
@@ -44,9 +38,7 @@ proxy_query_map_t* proxy_map_query(char *query) {
         || strncasecmp(query, SHOW, sizeof(SHOW)-1) == 0
         || strncasecmp(query, DESCRIBE, sizeof(DESCRIBE)-1) == 0
         || strncasecmp(query, EXPLAIN, sizeof(EXPLAIN)-1) == 0)
-        map->map = QUERY_MAP_ANY;
+        return QUERY_MAP_ANY;
     else
-        map->map = QUERY_MAP_ALL;
-
-    return map;
+        return QUERY_MAP_ALL;
 }

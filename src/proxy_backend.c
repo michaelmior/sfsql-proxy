@@ -813,10 +813,9 @@ int lcg(int X, int N) {
  **/
 my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     int bi = -1, i, ti, count = 0;
-    proxy_query_map_t *map = NULL;
-    enum QUERY_MAP type = QUERY_MAP_ANY;
+    proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE, *result;
-    char *oq = NULL;
+    char *oq = NULL, *newq = NULL;
     pthread_cond_t *query_cv;
     pthread_mutex_t *query_mutex;
     pthread_barrier_t *query_barrier;
@@ -826,12 +825,13 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     /* Get the query map and modified query
      * if a mapper was specified */
     if (backend_mapper) {
-        map = (*backend_mapper)(query);
+        map = (*backend_mapper)(query, newq);
 
-        type = map->map;
-        if (map->query)
-            query = map->query;
-        proxy_log(LOG_DEBUG, "Query %s mapped to %d", query, (int) type);
+        if (newq) {
+            free(query);
+            query = newq;
+        }
+        proxy_log(LOG_DEBUG, "Query %s mapped to %d", query, (int) map);
     }
 
     /* Spin until query can proceed */
@@ -841,10 +841,10 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     /* Speed things up with only one backend
      * by avoiding synchronization */
     if (backend_num == 1) {
-        type = QUERY_MAP_ANY;
+        map = QUERY_MAP_ANY;
     }
 
-    switch (type) {
+    switch (map) {
         case QUERY_MAP_ANY:
             /* Pick a random backend and get a connection.
              * We check for an unallocated pool in case
@@ -924,13 +924,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     }
 
 out:
-    /* Free resources associated with the map */
-    if (map) {
-        if (map->query)
-            free(map->query);
-        free(map);
-    }
-
     free(oq);
 
     /* XXX: error reporting should be more verbose */
