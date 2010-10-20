@@ -914,7 +914,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             for (i=0; i<count; i++)
                 if (result[i]) {
                     error = TRUE;
-                    proxy_log(LOG_ERROR, "Failure for query on backend %d\n", i);
+                    /* XXX should print a message if failure is not a malformed query */
+                    //proxy_log(LOG_ERROR, "Failure for query on backend %d\n", i);
                 }
 
             break;
