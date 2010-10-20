@@ -33,7 +33,9 @@ static char BUF[BUFSIZ];
 /** Maximum TCP packet length (from sql/net_serv.cc) */
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
 /** Maximum number of backends. Must be a power of 2 for LCG. */
-#define MAX_BACKENDS      128
+#define MAX_BACKENDS      16
+/** Maxmimum length of a query string */
+#define MAX_QUERY_LEN     8192
 
 /** Array of backends currently available */
 static proxy_host_t **backends = NULL;
@@ -727,7 +729,7 @@ void proxy_backends_update() {
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     proxy_backend_query_t *query = &(thread->data.backend.query);
-    char *oq;
+    char oq[MAX_QUERY_LEN];
     int bi = thread->data.backend.bi;
 
     proxy_threading_mask();
@@ -751,10 +753,8 @@ void* proxy_backend_new_thread(void *ptr) {
         __sync_fetch_and_add(&querying, 1);
 
         /* We make a copy of the query string since MySQL destroys it */
-        oq = (char*) malloc(*(query->length) + 1);
         memcpy(oq, query->query, *(query->length) + 1);
         query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, oq, *(query->length), query->barrier);
-        free(oq);
 
         __sync_fetch_and_sub(&querying, 1);
 
