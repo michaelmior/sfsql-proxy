@@ -46,17 +46,11 @@ typedef struct {
    /** Proxy MySQL object where results
        should be sent, or NULL to discard. */
     MYSQL *proxy;             
-    /** Condition variable for syncing access to count. */
-    pthread_cond_t *cv;
-    /** Mutex associated with condition variable. */
-    pthread_mutex_t *mutex;
     /** Barrier for ensuring all queries execute
         before sending results. */
     pthread_barrier_t *barrier;
     /** Success array from various backends. */
     my_bool *result;
-    /** Count of backends which have executed the query. */
-    int *count;
 } proxy_backend_query_t;
 
 typedef struct {

@@ -758,12 +758,6 @@ void* proxy_backend_new_thread(void *ptr) {
 
         __sync_fetch_and_sub(&querying, 1);
 
-        /* Check and signal if all backends have received the query */
-        proxy_mutex_lock(query->mutex);
-        if (++(*(query->count)) == backend_num)
-            proxy_cond_signal(query->cv);
-        proxy_mutex_unlock(query->mutex);
-
         /* Signify thread availability */
         query->query = NULL;
         proxy_pool_return(backend_thread_pool[thread->data.backend.bi], thread->id);
@@ -812,12 +806,10 @@ int lcg(int X, int N) {
  * \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
-    int bi = -1, i, ti, count = 0;
+    int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE, *result;
     char *oq = NULL, *newq = NULL;
-    pthread_cond_t *query_cv;
-    pthread_mutex_t *query_mutex;
     pthread_barrier_t *query_barrier;
     proxy_backend_query_t *bquery;
     proxy_thread_t *thread;
@@ -865,12 +857,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             memcpy(oq, query, length+1);
 
             /* Set up synchronization */
-            query_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_cond_t));
-            proxy_mutex_init(query_mutex);
-            query_cv = (pthread_cond_t*) malloc(sizeof(pthread_cond_t));
-            proxy_cond_init(query_cv);
             query_barrier = (pthread_barrier_t*) malloc(sizeof(pthread_barrier_t));
-            pthread_barrier_init(query_barrier, NULL, backend_num);
+            pthread_barrier_init(query_barrier, NULL, backend_num + 1);
             result = (my_bool*) calloc(backend_num, sizeof(my_bool));
 
             for (i=0; i<backend_num; i++) {
@@ -888,9 +876,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 bquery->length = &length;
                 bquery->proxy = (i == 0) ? proxy : NULL;
                 bquery->result = result;
-                bquery->count = &count;
-                bquery->mutex = query_mutex;
-                bquery->cv = query_cv;
                 bquery->barrier = query_barrier;
 
                 proxy_cond_signal(&(thread->cv));
@@ -898,20 +883,14 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             }
 
             /* Wait until all queries are complete */
-            proxy_mutex_lock(query_mutex);
-            while (count < backend_num) { proxy_cond_wait(query_cv, query_mutex); }
-            proxy_mutex_unlock(query_mutex);
+            pthread_barrier_wait(query_barrier);
 
             /* Free synchronization primitives */
-            proxy_mutex_destroy(query_mutex);
-            free(query_mutex);
-            proxy_cond_destroy(query_cv);
-            free(query_cv);
             pthread_barrier_destroy(query_barrier);
             free(query_barrier);
 
             /* XXX: should do better at handling failures */
-            for (i=0; i<count; i++)
+            for (i=0; i<backend_num; i++)
                 if (result[i]) {
                     error = TRUE;
                     /* XXX should print a message if failure is not a malformed query */
