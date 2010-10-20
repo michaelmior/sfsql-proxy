@@ -38,12 +38,12 @@ proxy_query_map_t* proxy_map_query(char *query) {
 
     map->query = NULL;
 
-    /* Anything which starts with SELECT goes to
-     * any backend, otherwise, go everywhere */
-    if (strncasecmp(query, SELECT, strlen(SELECT)) == 0
-        || strncasecmp(query, SHOW, strlen(SHOW)) == 0
-        || strncasecmp(query, DESCRIBE, strlen(DESCRIBE)) == 0
-        || strncasecmp(query, EXPLAIN, strlen(EXPLAIN)) == 0)
+    /* Anything which starts with the keywords above
+     * goes to any backend, otherwise, go everywhere */
+    if (strncasecmp(query, SELECT, sizeof(SELECT)-1) == 0
+        || strncasecmp(query, SHOW, sizeof(SHOW)-1) == 0
+        || strncasecmp(query, DESCRIBE, sizeof(DESCRIBE)-1) == 0
+        || strncasecmp(query, EXPLAIN, sizeof(EXPLAIN)-1) == 0)
         map->map = QUERY_MAP_ANY;
     else
         map->map = QUERY_MAP_ALL;
