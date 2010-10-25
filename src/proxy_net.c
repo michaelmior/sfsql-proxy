@@ -400,9 +400,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     ulong pkt_len;
     char *packet = 0;
     enum enum_server_command command;
-    size_t nread = 0;
-    fd_set sock;
-    struct timeval tv, *timeout = NULL;
+    struct pollfd polls[1];
 
     if (unlikely(!mysql)) {
         proxy_log(LOG_ERROR, "Invalid MySQL object for reading query");
@@ -413,20 +411,14 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     net_new_transaction(net);
 
     /* Wait for new data */
-    FD_ZERO(&sock);
-    FD_SET(net->vio->sd, &sock);
+    polls[0].fd = net->vio->sd;
+    polls[0].events = POLLIN | POLLRDHUP;
 
-    if (options.timeout >= 0) {
-        tv.tv_sec  = options.timeout;
-        tv.tv_usec = 0;
-        timeout = &tv;
-    }
-    if (select(FD_SETSIZE, &sock, NULL, NULL, timeout) != 1)
+    if (poll(polls, 1, options.timeout * 1000) != 1)
         proxy_log(LOG_ERROR, "Error in waiting on socket data");
 
     /* Check if the connection is gone */
-    ioctl(net->vio->sd, FIONREAD, &nread);
-    if (nread == 0) {
+    if (polls[0].revents & POLLRDHUP) {
         proxy_log(LOG_ERROR, "Lost connection to client");
         return ERROR_CLIENT;
     }
