@@ -57,26 +57,28 @@ void teardown() {
 
 /* Read queries should be mapped to any backend with ROWA mapper */
 START_TEST (test_rowa_read) {
-    proxy_query_map_t *map;
+    proxy_query_map_t map;
+    char *newq = NULL;
 
-    map = (*func)("SELECT 1;");
-    fail_unless(map->map == QUERY_MAP_ANY);
+    map = (*func)("SELECT 1;", newq);
+    fail_unless(map == QUERY_MAP_ANY);
 
-    map = (*func)("SHOW TABLES;");
-    fail_unless(map->map == QUERY_MAP_ANY);
+    map = (*func)("SHOW TABLES;", newq);
+    fail_unless(map == QUERY_MAP_ANY);
 
-    map = (*func)("DESCRIBE TABLE `test`;");
-    fail_unless(map->map == QUERY_MAP_ANY);
+    map = (*func)("DESCRIBE TABLE `test`;", newq);
+    fail_unless(map == QUERY_MAP_ANY);
 
-    map = (*func)("EXPLAIN SELECT 1;");
-    fail_unless(map->map == QUERY_MAP_ANY);
+    map = (*func)("EXPLAIN SELECT 1;", newq);
+    fail_unless(map == QUERY_MAP_ANY);
 } END_TEST
 
 /* Non-read queries should be mapped to all backends with ROWA mapper */
 START_TEST (test_rowa_other) {
-    proxy_query_map_t *map = (*func)("INSERT INTO test VALUES(1);");
+    char *newq = NULL;
+    proxy_query_map_t map = (*func)("INSERT INTO test VALUES(1);", newq);
 
-    fail_unless(map->map == QUERY_MAP_ALL);
+    fail_unless(map == QUERY_MAP_ALL);
 } END_TEST
 
 Suite *map_suite(void) {
