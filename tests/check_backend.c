@@ -107,39 +107,6 @@ START_TEST (test_backend_read_file_noport) {
     free(backends);
 } END_TEST
 
-/* Error when reading more than maximum backends from file */
-START_TEST (test_backend_read_too_many) {
-    int num;
-    proxy_host_t **backends;
-
-    backends = backend_read_file(TESTS_DIR "backend/backends-too-many.txt", &num);
-
-    fail_unless(backends == NULL);
-    fail_unless(num > MAX_BACKENDS);
-} END_TEST
-
-/* LCG must produce all values */
-START_TEST (test_backend_lcg) {
-    int i, X = -1, N = 10;
-    my_bool p[N];
-
-    /* Mark all numbers as not picked */
-    for (i=0; i < N; i++)
-        p[i] = FALSE;
-
-    /* Run through the LCG and update
-     * values selected */
-    for (i=0; i < N; i++) {
-        X = lcg(X, N);
-        fail_unless(!p[X]);
-        p[X] = TRUE;
-    }
-
-    /* Ensure all values were selected */
-    for (i=0; i < N; i++)
-        fail_unless(p[i]);
-} END_TEST
-
 Suite *backend_suite(void) {
     Suite *s = suite_create("Backend");
 
@@ -149,12 +116,7 @@ Suite *backend_suite(void) {
     tcase_add_test(tc_file, test_backend_read_empty_file);
     tcase_add_test(tc_file, test_backend_read_file);
     tcase_add_test(tc_file, test_backend_read_file_noport);
-    tcase_add_test(tc_file, test_backend_read_too_many);
     suite_add_tcase(s, tc_file);
-
-    TCase *tc_lcg = tcase_create("LCG");
-    tcase_add_test(tc_lcg, test_backend_lcg);
-    suite_add_tcase(s, tc_lcg);
 
     return s;
 }

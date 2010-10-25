@@ -32,8 +32,6 @@ static char BUF[BUFSIZ];
 
 /** Maximum TCP packet length (from sql/net_serv.cc) */
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
-/** Maximum number of backends. Must be a power of 2 for LCG. */
-#define MAX_BACKENDS      16
 /** Maxmimum length of a query string */
 #define MAX_QUERY_LEN     8192
 
@@ -436,7 +434,7 @@ proxy_host_t** backend_read_file(char *filename, int *num) {
     }
 
     /* Make sure number of backends is valid */
-    if (*num == 0 || *num > MAX_BACKENDS) {
+    if (*num == 0) {
         proxy_log(LOG_ERROR, "Invalid number of backends %d\n", *num);
         free(buf);
         return NULL;
@@ -768,35 +766,6 @@ void* proxy_backend_new_thread(void *ptr) {
 }
 
 /**
- * Linear congruential generator for picking backends in random order.
- *
- * \param X Previous value returned by ::lcg, -1 for first value.
- * \param N Maximum value to generate (must be less than ::MAX_BACKENDS).
- *
- * \return The next value in the random sequence.
- **/
-int lcg(int X, int N) {
-    static int m = MAX_BACKENDS;
-    static int c = 17;
-    static int s;
-    int a;
-
-    /* Give an invalid result for inavlid input */
-    if (N > MAX_BACKENDS)
-        return -1;
-
-    /* Pick a new random starting value */
-    if (X < 0)
-        s = rand();
-
-    a = ((s * 4) + 1) & (m - 1);
-
-    do { X = (a * X + c) & (m - 1); } while (X >= N);
-
-    return X;
-}
-
-/**
  * Send a query to the backend and return the results to the client.
  *
  * \param proxy  MySQL object corresponding to the client connection.
@@ -861,9 +830,10 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             pthread_barrier_init(query_barrier, NULL, backend_num + 1);
             result = (my_bool*) calloc(backend_num, sizeof(my_bool));
 
+            bi = rand() % backend_num;
             for (i=0; i<backend_num; i++) {
-                /* Get the next backend from the LCG */
-                bi = lcg(bi, backend_num);
+                /* Get the next backend */
+                bi = (bi + 1) % backend_num;
 
                 /* Dispatch threads for backend queries */
                 ti = proxy_pool_get(backend_thread_pool[bi]);
