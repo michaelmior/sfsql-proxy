@@ -823,7 +823,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             free(query);
             query = newq;
         }
-        proxy_log(LOG_DEBUG, "Query %s mapped to %d", query, (int) map);
+        proxy_debug("Query %s mapped to %d", query, (int) map);
     }
 
     /* Spin until query can proceed */
@@ -965,7 +965,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* Send the query to the backend */
-    proxy_log(LOG_DEBUG, "Sending query %s", query);
+    proxy_debug("Sending query %s", query);
     mysql_send_query(mysql, query, length);
 
     /* derived from sql/client.c:cli_read_query_result */

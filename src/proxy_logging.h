@@ -25,4 +25,10 @@ void proxy_log(log_level_t level, const char *fmt, ...)
     __attribute__((format (printf, 2, 3)));
 void proxy_log_close();
 
+#ifdef DEBUG
+#define proxy_debug(fmt, ...) proxy_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+#else
+#define proxy_debug(fmt, ...)
+#endif
+
 #endif /* _proxy_logging_h */

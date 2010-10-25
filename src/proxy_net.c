@@ -240,7 +240,7 @@ void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
     char BUF[BUFSIZ];
 
-    proxy_log(LOG_DEBUG, "Called client_destroy on thread %d", thread->id);
+    proxy_debug("Called client_destroy on thread %d", thread->id);
 
     /* Clean up connection if still live */
     if (thread->data.work.proxy) {
@@ -297,7 +297,7 @@ void* proxy_net_new_thread(void *ptr) {
         /* Wait for work to be available */
         proxy_cond_wait(&(thread->cv), &(thread->lock));
 
-        proxy_log(LOG_DEBUG, "Thread %d signaled", thread->id);
+        proxy_debug("Thread %d signaled", thread->id);
 
         /* If no work specified, must be ready to exit */
         if (thread->data.work.addr == NULL) {
@@ -314,7 +314,7 @@ void* proxy_net_new_thread(void *ptr) {
         proxy_pool_return(thread_pool, thread->id);
     }
 
-    proxy_log(LOG_DEBUG, "Exiting loop on client thead %d", thread->id);
+    proxy_debug("Exiting loop on client thead %d", thread->id);
 
     pthread_cleanup_pop(1);
     pthread_exit(NULL);
@@ -436,7 +436,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
         return ERROR_CLIENT;
     }
 
-    proxy_log(LOG_DEBUG, "Read %lu byte packet from client", pkt_len);
+    proxy_debug("Read %lu byte packet from client", pkt_len);
 
     packet = (char*) net->read_pos;
     if (unlikely(pkt_len == 0)) {
@@ -452,7 +452,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    proxy_log(LOG_DEBUG, "Got command %d", command);
+    proxy_debug("Got command %d", command);
 
     switch (command) {
         case COM_QUERY:
