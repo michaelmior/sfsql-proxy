@@ -49,8 +49,6 @@ pool_t* proxy_pool_new(int size) {
         alloc <<= 1;
 
     new_pool->avail = (my_bool*) calloc(alloc, sizeof(my_bool));
-    new_pool->avail_cv = (pthread_cond_t*) malloc(sizeof(pthread_cond_t));
-    new_pool->avail_mutex = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
 
     /* Set up availability */
     for (i=0; i<alloc; i++)
@@ -63,8 +61,8 @@ pool_t* proxy_pool_new(int size) {
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
     pthread_mutex_init(&(new_pool->lock), &attr);
 
-    proxy_cond_init(new_pool->avail_cv);
-    proxy_mutex_init(new_pool->avail_mutex);
+    proxy_cond_init(&new_pool->avail_cv);
+    proxy_mutex_init(&new_pool->avail_mutex);
 
     return new_pool;
 }
@@ -187,12 +185,12 @@ int proxy_pool_get(pool_t *pool) {
 
     /* Wait for something to become available */
     while (1) {
-        proxy_mutex_lock(pool->avail_mutex);
-        proxy_cond_wait(pool->avail_cv, pool->avail_mutex);
+        proxy_mutex_lock(&pool->avail_mutex);
+        proxy_cond_wait(&pool->avail_cv, &pool->avail_mutex);
 
         idx = pool_try_locks(pool);
 
-        proxy_mutex_unlock(pool->avail_mutex);
+        proxy_mutex_unlock(&pool->avail_mutex);
 
         if (idx >= 0)
             return idx;
@@ -259,9 +257,9 @@ void proxy_pool_return(pool_t *pool, int idx) {
     pthread_mutex_unlock(&(pool->lock));
 
     /* Signify availability in case someone is waiting */
-    proxy_mutex_lock(pool->avail_mutex);
-    proxy_cond_signal(pool->avail_cv);
-    proxy_mutex_unlock(pool->avail_mutex);
+    proxy_mutex_lock(&pool->avail_mutex);
+    proxy_cond_signal(&pool->avail_cv);
+    proxy_mutex_unlock(&pool->avail_mutex);
 }
 
 /**
@@ -280,10 +278,8 @@ void proxy_pool_destroy(pool_t *pool) {
 
     free(pool->avail);
 
-    proxy_cond_destroy(pool->avail_cv);
-    free(pool->avail_cv);
-    proxy_mutex_destroy(pool->avail_mutex);
-    free(pool->avail_mutex);
+    proxy_cond_destroy(&pool->avail_cv);
+    proxy_mutex_destroy(&pool->avail_mutex);
 
     /* Finally, free the pool itself */
     free(pool);

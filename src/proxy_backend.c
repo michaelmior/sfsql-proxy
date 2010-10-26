@@ -167,7 +167,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
  *  \return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_init() {
-    char *buf = NULL;
+    char buf[BUFSIZ], *err;
 
     /* Load the query mapper */
     if (options.mapper != NULL) {
@@ -179,14 +179,11 @@ my_bool proxy_backend_init() {
         lt_dladdsearchdir("map/" LT_OBJDIR);
         lt_dladdsearchdir(PKG_LIB_DIR);
 
-        buf = (char*) malloc(BUFSIZ);
         snprintf(buf, BUFSIZ, "libproxymap-%s", options.mapper);
 
         if (!(backend_mapper_handle = lt_dlopenext(buf))) {
-            free(buf);
-
-            buf = (char*) lt_dlerror();
-            proxy_log(LOG_ERROR, "Couldn't get handle to mapper %s:%s", options.mapper, buf);
+            err = (char*) lt_dlerror();
+            proxy_log(LOG_ERROR, "Couldn't get handle to mapper %s:%s", options.mapper, err);
             return TRUE;
         }
 
@@ -194,11 +191,10 @@ my_bool proxy_backend_init() {
         backend_mapper = (proxy_map_query_t) (intptr_t) lt_dlsym(backend_mapper_handle, "proxy_map_query");
 
         /* Check for errors */
-        free(buf);
-        buf = (char*) lt_dlerror();
+        err = (char*) lt_dlerror();
 
-        if (buf) {
-            proxy_log(LOG_ERROR, "Couldn't load mapper %s:%s", options.mapper, buf);
+        if (err) {
+            proxy_log(LOG_ERROR, "Couldn't load mapper %s:%s", options.mapper, err);
             return TRUE;
         }
     }
@@ -778,8 +774,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE, *result;
-    char *oq = NULL, *newq = NULL;
-    pthread_barrier_t *query_barrier;
+    char oq[MAX_QUERY_LEN], *newq = NULL;
+    pthread_barrier_t query_barrier;
     proxy_backend_query_t *bquery;
     proxy_thread_t *thread;
 
@@ -822,12 +818,10 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             /* XXX: For some reason, mysql_send_query messes with the value of
              *      query even though it's declared const. The strdup-ing should
              *      be unnecessary. */
-            oq = (char*) malloc(length + 1);
             memcpy(oq, query, length+1);
 
             /* Set up synchronization */
-            query_barrier = (pthread_barrier_t*) malloc(sizeof(pthread_barrier_t));
-            pthread_barrier_init(query_barrier, NULL, backend_num + 1);
+            pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
             result = (my_bool*) calloc(backend_num, sizeof(my_bool));
 
             bi = rand() % backend_num;
@@ -846,18 +840,17 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 bquery->length = &length;
                 bquery->proxy = (i == 0) ? proxy : NULL;
                 bquery->result = result;
-                bquery->barrier = query_barrier;
+                bquery->barrier = &query_barrier;
 
                 proxy_cond_signal(&(thread->cv));
                 proxy_mutex_unlock(&(thread->lock));
             }
 
             /* Wait until all queries are complete */
-            pthread_barrier_wait(query_barrier);
+            pthread_barrier_wait(&query_barrier);
 
             /* Free synchronization primitives */
-            pthread_barrier_destroy(query_barrier);
-            free(query_barrier);
+            pthread_barrier_destroy(&query_barrier);
 
             /* XXX: should do better at handling failures */
             for (i=0; i<backend_num; i++)
@@ -874,8 +867,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     }
 
 out:
-    free(oq);
-
     /* XXX: error reporting should be more verbose */
     return FALSE;
 }

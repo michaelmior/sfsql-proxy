@@ -543,8 +543,7 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
     /* derived from libmysql/lib_sql.cc:net_send_error_packet */
     NET *net = &(mysql->net);
     uint length;
-    uchar *buff, *pos;
-    buff = (uchar*) malloc(2+1+SQLSTATE_LENGTH+MYSQL_ERRMSG_SIZE);
+    uchar buff[2+1+SQLSTATE_LENGTH+MYSQL_ERRMSG_SIZE], *pos;
 
     if (unlikely(!net->vio))
         return FALSE;
@@ -558,8 +557,6 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
     length = (uint) strlen(err);
     set_if_smaller(length, MYSQL_ERRMSG_SIZE-1);
 #endif
-
-    free(buff);
 
     return net_write_command(net, (uchar) 255, (uchar*) "", 0, (uchar*) err, length);
 }

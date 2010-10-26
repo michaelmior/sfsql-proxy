@@ -25,9 +25,9 @@ typedef struct {
     /** Lock to block pool access. */
     pthread_mutex_t lock;
     /** Condition variable for signifying new availability. */
-    pthread_cond_t *avail_cv;
+    pthread_cond_t avail_cv;
     /** Lock assocated with condition variable. */
-    pthread_mutex_t *avail_mutex;
+    pthread_mutex_t avail_mutex;
 } pool_t;
 
 pool_t* proxy_pool_new(int size)
