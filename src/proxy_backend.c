@@ -32,8 +32,6 @@ static char BUF[BUFSIZ];
 
 /** Maximum TCP packet length (from sql/net_serv.cc) */
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
-/** Maxmimum length of a query string */
-#define MAX_QUERY_LEN     8192
 
 /** Array of backends currently available */
 static proxy_host_t **backends = NULL;
@@ -723,7 +721,6 @@ void proxy_backends_update() {
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     proxy_backend_query_t *query = &(thread->data.backend.query);
-    char oq[MAX_QUERY_LEN];
     int bi = thread->data.backend.bi;
 
     proxy_threading_mask();
@@ -747,8 +744,7 @@ void* proxy_backend_new_thread(void *ptr) {
         __sync_fetch_and_add(&querying, 1);
 
         /* We make a copy of the query string since MySQL destroys it */
-        memcpy(oq, query->query, *(query->length) + 1);
-        query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, oq, *(query->length), query->barrier);
+        query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, query->query, *(query->length), query->barrier);
 
         __sync_fetch_and_sub(&querying, 1);
 
@@ -774,7 +770,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE, *result;
-    char oq[MAX_QUERY_LEN], *newq = NULL;
+    char *newq = NULL;
     pthread_barrier_t query_barrier;
     proxy_backend_query_t *bquery;
     proxy_thread_t *thread;
@@ -815,10 +811,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
             break;
         case QUERY_MAP_ALL:
             /* Send a query to the other backends and keep only the first result */
-            /* XXX: For some reason, mysql_send_query messes with the value of
-             *      query even though it's declared const. The strdup-ing should
-             *      be unnecessary. */
-            memcpy(oq, query, length+1);
 
             /* Set up synchronization */
             pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
@@ -836,7 +828,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 proxy_mutex_lock(&(thread->lock));
 
                 bquery = &(thread->data.backend.query);
-                bquery->query = oq;
+                bquery->query = query;
                 bquery->length = &length;
                 bquery->proxy = (i == 0) ? proxy : NULL;
                 bquery->result = result;
@@ -859,6 +851,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                     /* XXX should print a message if failure is not a malformed query */
                     //proxy_log(LOG_ERROR, "Failure for query on backend %d\n", i);
                 }
+            free(result);
 
             break;
         default:
