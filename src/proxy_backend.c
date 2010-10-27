@@ -812,6 +812,12 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
         case QUERY_MAP_ALL:
             /* Send a query to the other backends and keep only the first result */
 
+            /* Add an identifier to the query if necessary */
+            if (options.add_ids) {
+                __sync_fetch_and_add(&transaction_id, 1);
+                length += sprintf(query + length, "-- %lu", transaction_id);
+            }
+
             /* Set up synchronization */
             pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
             result = (my_bool*) calloc(backend_num, sizeof(my_bool));
@@ -920,7 +926,10 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* Send the query to the backend */
     proxy_debug("Sending query %s", query);
-    mysql_send_query(mysql, query, length);
+    if (!options.add_ids)
+        mysql_send_query(mysql, query, length);
+    else
+        simple_command(mysql, COM_PROXY_QUERY, (uchar*) query, length, 1);
 
     /* derived from sql/client.c:cli_read_query_result */
     /* read info and result header packets */

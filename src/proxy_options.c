@@ -33,28 +33,35 @@ static char BUF[BUFSIZ];
 static void usage() {
     printf(
             "SnowFlock SQL proxy server - (C) Michael Mior <mmior@cs.toronto.edu>, 2010\n\n"
+
             "Options:\n"
             "\t--help,             -?\tShow this message\n"
             "\t--daemonize,        -d\tDaemonize\n\n"
+
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
             "\t--backend-port,    -P\tPort of the backend host (default: 3306)\n"
             "\t--socket,          -s\tUse a UNIX socket for the backend connection\n\n"
+
             "\t--backend-db,      -D\tName of database on the backend (default: test)\n"
             "\t--backend-user,    -u\tUser for backend server (default: root)\n"
             "\t--backend-pass,    -p\tPassword for backend user\n\n"
             "\t--backend-file,    -f\tFile listing available backends\n"
             "\t                     \t(cannot be specified with above options)\n\n"
             "\t--num-conns,       -N\tNumber connections per backend\n"
-            "\t                   -a\tDisable autocommit (default is enabled)\n\n"
+            "\t                   -a\tDisable autocommit (default is enabled)\n"
+            "\t--add-ids,         -i\tTag transactions with unique identifiers\n\n"
+
             "Proxy options:\n"
             "\t--proxy-host,      -b\tBinding address (default is 0.0.0.0)\n"
             "\t--proxy-port,      -L\tPort for the proxy server to listen on (default: 4040)\n"
             "\t--timeout,         -n\tSeconds to wait wihout data before disconnecting clients,\n"
             "\t                     \tnegative to wait forever (default: 5)\n\n"
+
             "Mapper options:\n"   
             "\t--mapper,          -m\tMapper to use for mapping queryies to backends\n"
             "\t                     \t(default is first available)\n\n"
+
             "Thread options:\n"
             "\t--client-threads,  -t\tNumber of threads to handle client connections\n"
             "\t--backend-threads, -T\tNumber of threads to dispatch backend queries\n\n"
@@ -80,6 +87,7 @@ int parse_options(int argc, char *argv[]) {
         {"backend-pass",    required_argument, 0, 'p'},
         {"backend-file",    required_argument, 0, 'f'},
         {"num-conns",       required_argument, 0, 'N'},
+        {"add-ids",         no_argument,       0, 'i'},
         {"proxy-host",      required_argument, 0, 'b'},
         {"proxy-port",      required_argument, 0, 'L'},
         {"timeout",         required_argument, 0, 'n'},
@@ -94,6 +102,7 @@ int parse_options(int argc, char *argv[]) {
     options.daemonize       = FALSE;
 
     options.num_conns       = NUM_CONNS;
+    options.add_ids         = FALSE;
     options.autocommit      = TRUE;
     options.backend.host    = NULL;
     options.backend.port    = 0;
@@ -111,7 +120,7 @@ int parse_options(int argc, char *argv[]) {
     options.backend_threads = BACKEND_THREADS; 
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:iaAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -150,6 +159,9 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'N':
                 options.num_conns = atoi(optarg);
+                break;
+            case 'i':
+                options.add_ids = TRUE;
                 break;
             case 'a':
                 options.autocommit = FALSE;

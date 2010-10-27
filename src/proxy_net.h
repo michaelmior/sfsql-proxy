@@ -12,6 +12,24 @@
 #ifndef _proxy_net_h
 #define _proxy_net_h
 
+/* Define the size of the ID string added to queries
+ * which is 3 for the comment specifier plus the
+ * length of the maximum length of a long converted
+ * to a string */
+#if __WORDSIZE == 64
+#define ID_SIZE 3 + 20
+#else
+#define ID_SIZE 3 + 10
+#endif
+
+/** Current transaction identifier */
+ulong transaction_id;
+
+/** Command to send for queries which must be tracked */
+/* XXX: This will break if COM_END is equal to the size
+ *      of an enum, but this will never happen */
+#define COM_PROXY_QUERY COM_END+1
+
 /**
  * Type of error on connection.
  **/

@@ -60,6 +60,8 @@ struct {
     char *backend_file;
     /** Number of connections per backend. */
     int num_conns;
+    /** Whether an identifier should be added */
+    my_bool add_ids;
     /** Autocommit option for backends. */
     my_bool autocommit;
     /** Host for proxy to bind to. */

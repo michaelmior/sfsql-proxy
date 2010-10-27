@@ -66,6 +66,7 @@ START_TEST (test_options_short) {
         "-u" TEST_USER,
         "-p" TEST_PASS,
         "-N" TEST_NUM_CONNS,
+        "-i",
         "-a",
         "-b" TEST_PROXY_HOST,
         "-L" TEST_PROXY_PORT,
@@ -82,6 +83,7 @@ START_TEST (test_options_short) {
     fail_unless(strcmp(options.user, TEST_USER) == 0);
     fail_unless(strcmp(options.pass, TEST_PASS) == 0);
     fail_unless(options.num_conns == atoi(TEST_NUM_CONNS));
+    fail_unless(options.add_ids);
     fail_unless(!options.autocommit);
     fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
     fail_unless(options.pport == atoi(TEST_PROXY_PORT));
@@ -101,6 +103,7 @@ START_TEST (test_options_long) {
         "--backend-user="    TEST_USER,
         "--backend-pass="    TEST_PASS,
         "--num-conns="       TEST_NUM_CONNS,
+        "--add-ids",
         "--proxy-host="      TEST_PROXY_HOST,
         "--proxy-port="      TEST_PROXY_PORT,
         "--timeout="         TEST_CLIENT_TIMEOUT,
@@ -117,6 +120,7 @@ START_TEST (test_options_long) {
     fail_unless(strcmp(options.user, TEST_USER) == 0);
     fail_unless(strcmp(options.pass, TEST_PASS) == 0);
     fail_unless(options.num_conns == atoi(TEST_NUM_CONNS));
+    fail_unless(options.add_ids);
     fail_unless(strcmp(options.phost, TEST_PROXY_HOST) == 0);
     fail_unless(options.pport == atoi(TEST_PROXY_PORT));
     fail_unless(options.timeout == atoi(TEST_CLIENT_TIMEOUT));
@@ -133,6 +137,7 @@ START_TEST (test_options_defaults) {
     /* Check that all options have their correct values */
     fail_unless(!options.daemonize);
     fail_unless(options.num_conns == NUM_CONNS);
+    fail_unless(!options.add_ids);
     fail_unless(options.autocommit);
     fail_unless(strcmp(options.backend.host, BACKEND_HOST) == 0);
     fail_unless(!options.unix_socket);

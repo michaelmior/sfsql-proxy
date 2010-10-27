@@ -224,6 +224,7 @@ MYSQL* client_init(Vio *vio) {
 
     /* Initialize the client network structure */
     net = &(mysql->net);
+    net->max_packet += ID_SIZE;
     my_net_init(net, vio);
     my_net_set_write_timeout(net, NET_WRITE_TIMEOUT);
     my_net_set_read_timeout(net, NET_READ_TIMEOUT);
@@ -425,6 +426,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
 
     if ((pkt_len = my_net_read(net)) == packet_error) {
         proxy_log(LOG_ERROR, "Error reading query from client");
+        printf("%s\n", mysql_error(mysql));
         return ERROR_CLIENT;
     }
 
@@ -447,6 +449,8 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     proxy_debug("Got command %d", command);
 
     switch (command) {
+        case COM_PROXY_QUERY:
+            /* XXX: for now, we do nothing different here */
         case COM_QUERY:
             /* pass the query to the backend */
             return proxy_backend_query(mysql, packet, pkt_len) ? ERROR_BACKEND : ERROR_OK;
