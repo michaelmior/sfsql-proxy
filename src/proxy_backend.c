@@ -53,8 +53,8 @@ static pool_t **backend_thread_pool = NULL;
 /** Signify that a backend is currently querying */
 volatile sig_atomic_t querying = 0;
 
-static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields);
-static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy);
+static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status);
+static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
 static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn);
 static proxy_host_t** backend_read_file(char *filename, int *num)
     __attribute__((malloc));
@@ -62,8 +62,8 @@ static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_host_t *backend);
 static void backends_free(proxy_host_t **backends, int num);
 static my_bool backends_alloc(int num_backends);
-static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length);
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier);
+static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status);
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier, status_t *status);
 void backend_new_threads(int bi);
 
 /**
@@ -73,10 +73,11 @@ void backend_new_threads(int bi);
  *
  * \param backend Backend to read from.
  * \param proxy   Client to write to.
+ * \param status    Status information for the connection.
  *
  * \return Length of the packet which was read.
  **/
-static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy) {
+static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status) {
     NET *net = &(backend->net);
     ulong pkt_len;
 
@@ -105,6 +106,7 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
     if (proxy) {
         /* Read from the backend and forward to the proxy connection */
         if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
+            status->bytes_sent += pkt_len;
             proxy_log(LOG_ERROR, "Couldn't forward backend packet to proxy");
             return (packet_error);
         }
@@ -122,10 +124,11 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
  * \param backend Backend where results are being read from.
  * \param proxy   Client where results are written to.
  * \param fields  Number of fields in the result set.
+ * \param status    Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
+static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status) {
     uchar *cp;
     uint field;
     ulong pkt_len = 8, len, total_len=0;
@@ -141,7 +144,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields) {
         }
 
         /* Read and forward the row to the proxy */
-        if ((pkt_len = backend_read_to_proxy(backend, proxy)) == packet_error)
+        if ((pkt_len = backend_read_to_proxy(backend, proxy, status)) == packet_error)
             return TRUE;
 
         total_len += pkt_len;
@@ -744,7 +747,7 @@ void* proxy_backend_new_thread(void *ptr) {
         __sync_fetch_and_add(&querying, 1);
 
         /* We make a copy of the query string since MySQL destroys it */
-        query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, query->query, *(query->length), query->barrier);
+        query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, query->query, *(query->length), query->barrier, thread->status);
 
         __sync_fetch_and_sub(&querying, 1);
 
@@ -763,10 +766,11 @@ void* proxy_backend_new_thread(void *ptr) {
  * \param proxy  MySQL object corresponding to the client connection.
  * \param query  A query string received from the client.
  * \param length Length of the query string.
+ * \param status    Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
+my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *status) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE, *result;
@@ -804,7 +808,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
              * backends are in the process of changing */
             bi = rand() % backend_num;
             while (!backend_pools[bi]) { bi = rand() % backend_num; }
-            if (backend_query_idx(bi, proxy, query, length)) {
+            if (backend_query_idx(bi, proxy, query, length, status)) {
                 error = TRUE;
                 goto out;
             }
@@ -830,6 +834,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length) {
                 /* Dispatch threads for backend queries */
                 ti = proxy_pool_get(backend_thread_pool[bi]);
                 thread = &(backend_threads[bi][ti]);
+                thread->status = status;
 
                 proxy_mutex_lock(&(thread->lock));
 
@@ -877,10 +882,11 @@ out:
  * \param proxy   MYSQL object to forward results to.
  * \param query   Query string to execute.
  * \param length  Length of the query.
+ * \param status    Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length) {
+static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status) {
     int ci;
     proxy_backend_conn_t *conn;
     my_bool error;
@@ -890,7 +896,7 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
     conn = backend_conns[bi][ci];
 
     /*Send the query */
-    error = backend_query(conn, proxy, query, length, NULL);
+    error = backend_query(conn, proxy, query, length, NULL, status);
 
     if (!conn->freed)
         proxy_pool_return(backend_pools[bi], ci);
@@ -907,10 +913,11 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
  * \param length  Length of the query.
  * \param barrier Optional barrier which blocks query response
  *                until all backends have received the query.
+ * \param status    Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier) {
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier, status_t *status) {
     my_bool error = FALSE;
     ulong pkt_len = 8;
     uchar *pos;
@@ -926,6 +933,8 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* Send the query to the backend */
     proxy_debug("Sending query %s", query);
+
+    /* Add an ID if necessary */
     if (!options.add_ids)
         mysql_send_query(mysql, query, length);
     else
@@ -934,7 +943,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* derived from sql/client.c:cli_read_query_result */
     /* read info and result header packets */
     for (i=0; i<2; i++) {
-        if ((pkt_len = backend_read_to_proxy(mysql, proxy)) == packet_error) {
+        if ((pkt_len = backend_read_to_proxy(mysql, proxy, status)) == packet_error) {
             error = TRUE;
             goto out;
         }
@@ -959,7 +968,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     proxy_net_flush(proxy);
 
     /* read field info */
-    if (backend_read_rows(mysql, proxy, 7)) {
+    if (backend_read_rows(mysql, proxy, 7, status)) {
         error = TRUE;
         goto out;
     }
@@ -972,7 +981,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
      * decide when to fetch rows. (Clients using mysql_use_result()
      * should still function, but with possible network overhead.
      * */
-    if (backend_read_rows(mysql, proxy, mysql->field_count)) {
+    if (backend_read_rows(mysql, proxy, mysql->field_count, status)) {
         error = TRUE;
         goto out;
     }

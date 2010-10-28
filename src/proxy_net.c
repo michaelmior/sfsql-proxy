@@ -32,10 +32,11 @@ extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
 static MYSQL* client_init(Vio *vio);
-void client_do_work(proxy_work_t *work);
+void client_do_work(proxy_work_t *work, status_t *status);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
 static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
+static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 
 /**
  * Perform client authentication.
@@ -266,11 +267,14 @@ void client_destroy(proxy_thread_t *thread) {
  * Destroy all data structures associated with the thread
  * and additional shut down the MySQL library for the thread.
  *
+ * thread->status = (status_t*) malloc(sizeof(status_t));
+ *
  * \param ptr A pointer to a #proxy_thread_t struct
  *            corresponding to the thread to be destroyed.
  **/
 void net_thread_destroy(void *ptr) {
-    client_destroy((proxy_thread_t*) ptr);
+    proxy_thread_t *thread = (proxy_thread_t*) ptr;
+    client_destroy(thread);
 
     /* Free any remaining resources */
     mysql_thread_end();
@@ -288,6 +292,11 @@ void* proxy_net_new_thread(void *ptr) {
     proxy_threading_mask();
     pthread_cleanup_push(net_thread_destroy, ptr);
     proxy_mutex_lock(&(thread->lock));
+
+    thread->status = (status_t*) malloc(sizeof(status_t));
+    thread->status->bytes_sent = 0;
+    thread->status->bytes_recv = 0;
+    thread->status->queries = 0;
 
     while (1) {
         if(thread->exit) {
@@ -307,9 +316,18 @@ void* proxy_net_new_thread(void *ptr) {
         }
 
         /* Handle client requests */
-        client_do_work(&(thread->data.work));
+        __sync_fetch_and_add(&global_connections, 1);
+        client_do_work(&thread->data.work, thread->status);
         client_destroy(thread);
         thread->data.work.addr = NULL;
+
+        /* Update global statistics */
+        __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_sent);
+        __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_recv);
+        __sync_fetch_and_add(&global_status.queries, thread->status->queries);
+        thread->status->bytes_sent = 0;
+        thread->status->bytes_recv = 0;
+        thread->status->queries = 0;
 
         /* Signify that we are available for work again */
         proxy_pool_return(thread_pool, thread->id);
@@ -317,6 +335,7 @@ void* proxy_net_new_thread(void *ptr) {
 
     proxy_debug("Exiting loop on client thead %d", thread->id);
 
+    free(thread->status);
     pthread_cleanup_pop(1);
     pthread_exit(NULL);
 }
@@ -326,7 +345,7 @@ void* proxy_net_new_thread(void *ptr) {
  *
  * \param work Information on the work to be done
  **/
-void client_do_work(proxy_work_t *work) {
+void client_do_work(proxy_work_t *work, status_t *status) {
     int error, optval;
     Vio *vio_tmp;
 
@@ -360,7 +379,7 @@ void client_do_work(proxy_work_t *work) {
 
     /* from sql/sql_connect.cc:handle_one_connection */
     while (!work->proxy->net.error && work->proxy->net.vio != 0) {
-        error = proxy_net_read_query(work->proxy);
+        error = proxy_net_read_query(work->proxy, status);
 
         /* One more flush the write buffer to make
          * sure client has everything */
@@ -396,7 +415,7 @@ void client_do_work(proxy_work_t *work) {
  * \return Positive to disconnect without error,
  *         negative for errors, 0 to keep going
  **/
-conn_error_t proxy_net_read_query(MYSQL *mysql) {
+conn_error_t proxy_net_read_query(MYSQL *mysql, status_t *status) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -431,6 +450,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     }
 
     proxy_debug("Read %lu byte packet from client", pkt_len);
+    status->bytes_recv += pkt_len;
 
     packet = (char*) net->read_pos;
     if (unlikely(pkt_len == 0)) {
@@ -451,9 +471,17 @@ conn_error_t proxy_net_read_query(MYSQL *mysql) {
     switch (command) {
         case COM_PROXY_QUERY:
             /* XXX: for now, we do nothing different here */
+            return proxy_backend_query(mysql, packet, pkt_len, status) ? ERROR_BACKEND : ERROR_OK;
         case COM_QUERY:
-            /* pass the query to the backend */
-            return proxy_backend_query(mysql, packet, pkt_len) ? ERROR_BACKEND : ERROR_OK;
+            status->queries++;
+
+            if (strncasecmp(packet, PROXY_CMD, sizeof(PROXY_CMD)-1)) {
+                /* pass the query to the backend */
+                return proxy_backend_query(mysql, packet, pkt_len, status) ? ERROR_BACKEND : ERROR_OK;
+            } else {
+                /* Execute the proxy command */
+                return net_proxy_cmd(mysql, packet + sizeof(PROXY_CMD)-1, pkt_len, status) ? ERROR_CLIENT : ERROR_OK;
+            }
         case COM_QUIT:
             return ERROR_CLOSE;
         case COM_PING:
@@ -563,4 +591,202 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
 #endif
 
     return net_write_command(net, (uchar) 255, (uchar*) "", 0, (uchar*) err, length);
+}
+
+/**
+ * Send an EOF packet to connected client.
+ *
+ * \param mysql  MYSQL object where the EOF packet should be sent.
+ * \param status Status information for the connection.
+ **/
+static void proxy_net_send_eof(MYSQL *mysql, status_t *status) {
+    uchar buff[BUFSIZ], *pos;
+
+    pos = buff;
+    pos[0] = 0xfe; pos++;
+    int2store(pos, 0);
+    pos += 2;
+    int2store(pos, 0);
+    pos += 2;
+    my_net_write(&mysql->net, buff, (size_t) (pos - buff));
+    status->bytes_sent += pos-buff;
+    proxy_net_flush(mysql);
+}
+
+/* taken from sql/protocol.cc */
+static uchar *net_store_data(uchar *to, const uchar *from, size_t length) {
+  to = net_store_length(to,length);
+  memcpy(to,from,length);
+  return to+length;
+}
+
+/**
+ * Send information on a SHOW STATUS field to the client.
+ *
+ * This function is only called twice and exists for convenience.
+ *
+ * \param mysql     MYSQL object where the field packet should be sent.
+ * \param name      Column identifer after AS clause.
+ * \param org_name  Column identifer before AS clause.
+ * \param status    Status information for the connection.
+ **/
+static inline void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t *status) {
+    uchar buff[BUFSIZ], *pos;
+
+    /* These values are the same for SHOW STATUS */
+    static int len = 0x0400;
+    static int type = FIELD_TYPE_VAR_STRING;
+    static int flags = NOT_NULL_FLAG;
+
+    /* For protocol details, see
+     * http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol#Field_Packet */
+    pos = buff;
+    pos = net_store_data(buff, (uchar*) "def", 3);                  /* catalog */
+    pos = net_store_data(pos, (uchar*) "", 0);                      /* database */
+
+    pos = net_store_data(pos, (uchar*) "STATUS", 6);                /* table */
+    pos = net_store_data(pos, (uchar*) "", 0);                      /* org_table */
+    pos = net_store_data(pos, (uchar*) name, strlen(name));         /* name */
+    pos = net_store_data(pos, (uchar*) org_name, strlen(org_name)); /* org_name */
+    pos[0] = (uchar) 0xc; pos++;
+    int2store(pos, system_charset_info->number);
+    pos += 2;
+    int4store(pos, len);
+    pos += 4;
+    pos[0] = type; pos++;
+
+    int2store(pos, flags);
+    pos += 2;
+
+    pos[0] = 0; pos++;
+    int2store(pos, 0x00);
+    pos += 2;
+
+    my_net_write(&mysql->net, buff, (size_t) (pos - buff));
+    status->bytes_sent += pos-buff;
+    proxy_net_flush(mysql);
+}
+
+/* String defines for PROXY commands */
+#define GLOBAL  "GLOBAL"
+#define SESSION "SESSION"
+#define STATUS  "STATUS"
+
+/**
+ * Send one row of output from a PROXY STATUS command.
+ *
+ * \param mysql  MYSQL object where the row packet should be sent.
+ * \param buff   A buffer which can be used to store data.
+ * \param name   Name of the variable to send.
+ * \param value  Value of the variable to send.
+ * \param status Status information for the connection.
+ **/
+static inline void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status) {
+    uchar *pos;
+    char val[LONG_LEN];
+    int len;
+
+    pos = buff;
+    pos = net_store_data(pos, (uchar*) name, strlen(name));
+    len = snprintf(val, LONG_LEN, "%lu", value);
+    pos = net_store_data(pos, (uchar*) val, len);
+    my_net_write(&mysql->net, buff, (size_t) (pos - buff));
+    status->bytes_sent += pos-buff;
+}
+
+/**
+ * Respond to a PROXY STATUS command.
+ *
+ * \param mysql     MYSQL object where status should be sent.
+ * \param query     Query string from client.
+ * \param query_len Length of query string.
+ * \param status    Status information for the connection.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+static my_bool net_status(MYSQL *mysql, char *query,
+        __attribute__((unused)) ulong query_len,
+        status_t *status) {
+    uchar buff[BUFSIZ], *pos;
+    NET *net = &mysql->net;
+    char *last_tok = strrchr(query, ' ')+1;
+    char *pch, *t = NULL;
+    my_bool global = FALSE, session = FALSE;
+    status_t total_status, *send_status;
+    int i;
+
+    /* Get status request type */
+    pch = strtok_r(query, " ", &t);
+    global = (pch == last_tok) || (strncasecmp(pch, GLOBAL, sizeof(GLOBAL)-1) == 0) ? TRUE : FALSE;
+    if (!global)
+        session = (strncasecmp(pch, SESSION, sizeof(SESSION)-1) == 0) ? TRUE : FALSE;
+
+    /* Invalid status request */
+    if (!(global || session) && pch != last_tok)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Status type must be GLOBAL or SESSION");
+
+    /* Send result header packet specifying two fields */
+    pos = buff;
+    pos[0] = 2; pos++;
+    pos[0] = 0; pos++;
+    my_net_write(net, buff, (size_t) (pos - buff));
+    status->bytes_sent += pos-buff;
+
+    /* Send list of fields */
+    send_status_field(mysql, "Variable_name", "VARIABLE_NAME", status);
+    send_status_field(mysql, "Value", "VARIABLE_VALUE", status);
+    proxy_net_send_eof(mysql, status);
+
+    /* Gather status data */
+    if (session) {
+        send_status = status;
+    } else {
+        /* Start with global data */
+        total_status.bytes_recv = global_status.bytes_recv;
+        total_status.bytes_sent = global_status.bytes_sent;
+        total_status.queries = global_status.queries;
+
+        /* Accumulate data from client threads */
+        for (i=0; i<options.client_threads; i++) {
+            total_status.bytes_recv += net_threads[i].status->bytes_recv;
+            total_status.bytes_sent += net_threads[i].status->bytes_sent;
+            total_status.queries += net_threads[i].status->queries;
+        }
+
+        send_status = &total_status;
+    }
+
+    /* Send status info to client */
+    pos = buff;
+    add_row(mysql, buff, "Connections",    global_connections, status);
+    add_row(mysql, buff, "Bytes_Received", send_status->bytes_recv, status);
+    add_row(mysql, buff, "Bytes_sent",     send_status->bytes_sent, status);
+    add_row(mysql, buff, "Queries",        send_status->queries, status);
+    add_row(mysql, buff, "Uptime",         (long) (time(NULL) - proxy_start_time), status);
+
+    proxy_net_send_eof(mysql, status);
+    proxy_net_flush(mysql);
+
+    return FALSE;
+}
+
+/**
+ * Respond to a PROXY command received from a client.
+ *
+ * \param mysql     Client MYSQL object.
+ * \param query     Query string from client.
+ * \param query_len Length of query string.
+ * \param status    Status information for the connection.
+ *
+ * \return TRUE on error, FALSE otherwise.
+ **/
+static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) {
+    char *last_tok = strrchr(query, ' ')+1;
+
+    status->bytes_recv += query_len;
+
+    if (strncasecmp(last_tok, STATUS, sizeof(STATUS)-1) == 0)
+        return net_status(mysql, query, query_len, status);
+
+    return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Unrecognized proxy command");
 }

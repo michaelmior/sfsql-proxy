@@ -50,6 +50,9 @@ extern volatile sig_atomic_t cloning;
 #include "proxy_threading.h"
 #include "proxy_options.h"
 
+/** Threads for dealing with connected clients. */
+proxy_thread_t *net_threads;
+/** Thread pool for managing connected clients. */
 pool_t *thread_pool;
 
 #define STRINGIFY(x) #x

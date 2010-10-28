@@ -51,6 +51,10 @@ typedef struct {
         proxy_work_t work;
         proxy_backend_data_t backend;
     } data;
+
+    /** Status info for the connection associated
+     *  with this thread. */
+    status_t *status;
 } proxy_thread_t;
 
 void proxy_threading_init();

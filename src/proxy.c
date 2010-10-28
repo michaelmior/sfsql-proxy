@@ -35,7 +35,6 @@
 
 volatile sig_atomic_t run = 1;
 volatile sig_atomic_t cloning  = 0;
-static proxy_thread_t *threads;
 pid_t signaller = -1;
 static char BUF[BUFSIZ];
 
@@ -104,6 +103,7 @@ static void server_run(char *host, int port) {
     }
 
     /* Server event loop */
+    proxy_start_time = time(NULL);
     clientlen = sizeof(clientaddr);
     while(run) {
         FD_ZERO(&fds);
@@ -120,7 +120,7 @@ static void server_run(char *host, int port) {
         }
 
         /* Pick a thread to execute the work */
-        thread = &(threads[proxy_pool_get(thread_pool)]);
+        thread = &(net_threads[proxy_pool_get(thread_pool)]);
 
         /* Give work to thread and signal it to go */
         proxy_mutex_lock(&(thread->lock));
@@ -146,7 +146,7 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
             run = 0;
 
             /* Cancel running threads */
-            proxy_threading_cancel(threads, options.client_threads, thread_pool);
+            proxy_threading_cancel(net_threads, options.client_threads, thread_pool);
 
             break;
 
@@ -250,17 +250,17 @@ int main(int argc, char *argv[]) {
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
     /* Create the new threads */
-    threads = (proxy_thread_t*) calloc(options.client_threads, sizeof(proxy_thread_t));
+    net_threads = (proxy_thread_t*) calloc(options.client_threads, sizeof(proxy_thread_t));
 
     for (i=0; i<options.client_threads; i++) {
-        threads[i].id = i;
-        proxy_cond_init(&(threads[i].cv));
-        proxy_mutex_init(&(threads[i].lock));
-        threads[i].exit = 0;
-        threads[i].data.work.addr = NULL;
-        threads[i].data.work.proxy = NULL;
+        net_threads[i].id = i;
+        proxy_cond_init(&(net_threads[i].cv));
+        proxy_mutex_init(&(net_threads[i].lock));
+        net_threads[i].exit = 0;
+        net_threads[i].data.work.addr = NULL;
+        net_threads[i].data.work.proxy = NULL;
 
-        pthread_create(&(threads[i].thread), &attr, proxy_net_new_thread, (void*) &(threads[i]));
+        pthread_create(&(net_threads[i].thread), &attr, proxy_net_new_thread, (void*) &(net_threads[i]));
     }
 
     /* Initialize backend data */
@@ -280,6 +280,12 @@ int main(int argc, char *argv[]) {
         goto out;
     }
 
+    /* Initialize global status */
+    global_connections = 0;
+    global_status.bytes_recv = 0;
+    global_status.bytes_sent = 0;
+    global_status.queries = 0;
+
     /* Start proxying */
     proxy_log(LOG_INFO, "Starting proxy on %s:%d",
         options.phost ? options.phost : "0.0.0.0", options.pport);
@@ -290,8 +296,8 @@ out:
     proxy_log(LOG_INFO, "Shutting down...");
 
     /* Cancel any outstanding client threads */
-    proxy_threading_cancel(threads, options.client_threads, thread_pool);
-    proxy_threading_cleanup(threads, options.client_threads, thread_pool);
+    proxy_threading_cancel(net_threads, options.client_threads, thread_pool);
+    proxy_threading_cleanup(net_threads, options.client_threads, thread_pool);
 
     proxy_backend_close();
     mysql_library_end();

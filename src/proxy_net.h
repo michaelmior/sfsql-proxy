@@ -12,15 +12,20 @@
 #ifndef _proxy_net_h
 #define _proxy_net_h
 
+/** Name of proxy commands */
+#define PROXY_CMD "PROXY"
+
+#if __WORDSIZE == 64
+#define LONG_LEN 20
+#else
+#define LONG_LEN 10
+#endif
+
 /* Define the size of the ID string added to queries
  * which is 3 for the comment specifier plus the
  * length of the maximum length of a long converted
  * to a string */
-#if __WORDSIZE == 64
-#define ID_SIZE 3 + 20
-#else
-#define ID_SIZE 3 + 10
-#endif
+#define ID_SIZE 3 + LONG_LEN
 
 /** Current transaction identifier */
 ulong transaction_id;
@@ -46,9 +51,25 @@ typedef enum {
     ERROR_OTHER
 } conn_error_t;
 
+typedef struct {
+    /** Bytes received from clients by proxy. */
+    long bytes_recv;
+    /** Bytes sent by proxy to client. */
+    long bytes_sent;
+    /** Number of queries received by proxy. */
+    long queries;
+} status_t;
+
+/** Total number of connections. */
+long global_connections;
+/** Globally accumulated status. */
+status_t global_status;
+/** Start time of the proxy server. */
+time_t proxy_start_time;
+
 my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
-conn_error_t proxy_net_read_query(MYSQL *mysql);
+conn_error_t proxy_net_read_query(MYSQL *mysql, status_t *status);
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
 
