@@ -28,7 +28,7 @@ void proxy_log_close();
 #ifdef DEBUG
 #define proxy_debug(fmt, ...) proxy_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #else
-#define proxy_debug(fmt, ...)
+#define proxy_debug(fmt, ...) do {} while(0)
 #endif
 
 #endif /* _proxy_logging_h */
