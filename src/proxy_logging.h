@@ -1,6 +1,8 @@
 /*
  * proxy_logging.h
  *
+ * Message logging.
+ *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file "COPYING" in the main directory of
  * this archive for more details.
@@ -14,9 +16,13 @@
 
 #define LOG_FILE "/var/log/sfsql-proxy.log"
 
+/** Level of message to log. */
 typedef enum {
+    /** Errors which are always logged. */
     LOG_ERROR,
+    /** Informational messages. */
     LOG_INFO,
+    /** Only used when DEBUG is defined. */
     LOG_DEBUG
 } log_level_t;
 
@@ -25,6 +31,7 @@ void proxy_log(log_level_t level, const char *fmt, ...)
     __attribute__((format (printf, 2, 3)));
 void proxy_log_close();
 
+/* Macro to disable debug messages when DEBUG is not defined */
 #ifdef DEBUG
 #define proxy_debug(fmt, ...) proxy_log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #else

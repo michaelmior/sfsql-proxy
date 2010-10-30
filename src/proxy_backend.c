@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_backend.c
  *
- * Connect with backend servers and forward requests and replies
+ * Connect with backend servers and forward requests and replies.
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -78,7 +78,7 @@ void backend_new_threads(int bi);
  * \return Length of the packet which was read.
  **/
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status) {
-    NET *net = &(backend->net);
+    NET *net = &backend->net;
     ulong pkt_len;
 
     if (unlikely(!net->vio))
@@ -95,20 +95,20 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
         } else
             proxy_log(LOG_ERROR, "Received error from backend");
 
-        return (packet_error);
+        return packet_error;
     }
 
     /* XXX: could probably generate soft error
      * for client in below case */
     if (net->read_pos[0] == 255 && pkt_len <= 3)
-        return (packet_error);
+        return packet_error;
 
     if (proxy) {
         /* Read from the backend and forward to the proxy connection */
         if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
             status->bytes_sent += pkt_len;
             proxy_log(LOG_ERROR, "Couldn't forward backend packet to proxy");
-            return (packet_error);
+            return packet_error;
         }
     }
 
@@ -207,7 +207,7 @@ my_bool proxy_backend_init() {
 }
 
 /**
- * Allocated data structures for storing backend info
+ * Allocated data structures for storing backend info.
  *
  * \param num_backends Number of backends to allocate.
  * \param threading    TRUE to perform threading setup, FALSE otherwise.
@@ -300,10 +300,10 @@ void backend_new_threads(int bi) {
     backend_threads[bi] = calloc(options.backend_threads, sizeof(proxy_thread_t));
 
     for (i=0; i<options.backend_threads; i++) {
-        thread = &(backend_threads[bi][i]);
+        thread = &backend_threads[bi][i];
         thread->id = i;
-        proxy_cond_init(&(thread->cv));
-        proxy_mutex_init(&(thread->lock));
+        proxy_cond_init(&thread->cv);
+        proxy_mutex_init(&thread->lock);
         thread->data.backend.bi = bi;
 
         thread->data.backend.conn = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
@@ -312,7 +312,8 @@ void backend_new_threads(int bi) {
 
         thread->data.backend.query.query = NULL;
 
-        pthread_create(&(thread->thread), &attr, proxy_backend_new_thread, (void*) thread);
+        /* Start a backend thread */
+        pthread_create(&thread->thread, &attr, proxy_backend_new_thread, (void*) thread);
     }
 }
 
@@ -536,6 +537,9 @@ static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
 
 /**
  * Connect to new backends after an update.
+ *
+ * \param conns List of connections to open.
+ * \param pools List of pools to initialize.
  **/
 static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools) {
     int i, j;
@@ -721,26 +725,33 @@ void proxy_backends_update() {
     backends_new_connect(backend_conns, backend_pools);
 }
 
+/**
+ * Start a new backend thread.
+ *
+ * \param ptr Pointer to a thread object.
+ *
+ * \return NULL.
+ **/
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
-    proxy_backend_query_t *query = &(thread->data.backend.query);
+    proxy_backend_query_t *query = &thread->data.backend.query;
     int bi = thread->data.backend.bi;
 
     proxy_threading_mask();
-    proxy_mutex_lock(&(thread->lock));
+    proxy_mutex_lock(&thread->lock);
 
     while (1) {
         if(thread->exit) {
-            proxy_mutex_unlock(&(thread->lock));
+            proxy_mutex_unlock(&thread->lock);
             break;
         }
 
         /* Wait for work to be available */
-        proxy_cond_wait(&(thread->cv), &(thread->lock));
+        proxy_cond_wait(&thread->cv, &thread->lock);
 
         /* If no query specified, must be ready to exit */
         if (query->query == NULL) {
-            proxy_mutex_unlock(&(thread->lock));
+            proxy_mutex_unlock(&thread->lock);
             break;
         }
 
@@ -845,8 +856,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *s
                 bquery->result = result;
                 bquery->barrier = &query_barrier;
 
-                proxy_cond_signal(&(thread->cv));
-                proxy_mutex_unlock(&(thread->lock));
+                proxy_cond_signal(&thread->cv);
+                proxy_mutex_unlock(&thread->lock);
             }
 
             /* Wait until all queries are complete */

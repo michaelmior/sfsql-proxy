@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_logging.c
  *
- * Message logging
+ * Message logging.
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -25,7 +25,9 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+/** File object corresponding to log file descriptor */
 FILE *log_file = NULL;
+/** Maximum level of messages to log */
 log_level_t log_level;
 
 /**

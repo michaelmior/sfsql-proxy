@@ -1,6 +1,8 @@
 /*
  * proxy_backend.h
  *
+ * Connect with backend servers and forward requests and replies.
+ *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file "COPYING" in the main directory of
  * this archive for more details.
@@ -53,9 +55,13 @@ typedef struct {
     my_bool *result;
 } proxy_backend_query_t;
 
+/** Data required to process a backend query. */
 typedef struct {
+    /** Index of the backend being used. */
     int bi;
+    /** Backend connection. */
     proxy_backend_conn_t *conn;
+    /** Query information. */
     proxy_backend_query_t query;
 }
 proxy_backend_data_t;

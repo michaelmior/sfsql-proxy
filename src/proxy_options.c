@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_options.c
  *
- * Proxy command-line options parsing
+ * Proxy command-line options parsing.
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -194,6 +194,7 @@ int parse_options(int argc, char *argv[]) {
     options.pass = options.pass ? options.pass : BACKEND_PASS;
     options.db   = options.db   ? options.db   : BACKEND_DB;
 
+    /* If a file was specified, make sure no other host options were used */
     if (options.backend_file) {
         if (options.backend.host || options.backend.port || options.unix_socket) {
             usage();

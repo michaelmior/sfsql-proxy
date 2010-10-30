@@ -1,7 +1,7 @@
 /*
  * proxy_threading.h
  *
- * Hide pthreads functions to provide useful debugging
+ * Initialize necessary data structures for threading.
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file "COPYING" in the main directory of
@@ -43,7 +43,7 @@ typedef struct {
     pthread_cond_t cv;
     /** Lock associated with condition variable. */
     pthread_mutex_t lock;
-    /** Signal that that the thread should now exit */
+    /** Signal that that the thread should now exit. */
     volatile sig_atomic_t exit;
 
     /** Work for different types of threads. */
@@ -62,6 +62,8 @@ void proxy_threading_mask();
 void proxy_threading_end();
 void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);
 void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);
+
+/* Debugging macros for catching errors on mutexes and condition variables*/
 
 #ifdef DEBUG
 #define __proxy_error(loc, str) proxy_log(LOG_DEBUG, str " at :%s", loc)

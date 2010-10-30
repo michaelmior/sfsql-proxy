@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_threading.c
  *
- * Initialize necessary data structures for threading
+ * Initialize necessary data structures for threading.
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -78,14 +78,14 @@ void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool) {
         threads[i].exit = 1;
 
         /* Make sure worker threads release their mutex */
-        proxy_mutex_lock(&(threads[i].lock));
-        proxy_cond_signal(&(threads[i].cv));
-        proxy_mutex_unlock(&(threads[i].lock));
+        proxy_mutex_lock(&threads[i].lock);
+        proxy_cond_signal(&threads[i].cv);
+        proxy_mutex_unlock(&threads[i].lock);
 
         /* Try to acquire the lock again to ensure threads
          * have exited and cleaned up */
-        proxy_mutex_lock(&(threads[i].lock));
-        proxy_mutex_unlock(&(threads[i].lock));
+        proxy_mutex_lock(&threads[i].lock);
+        proxy_mutex_unlock(&threads[i].lock);
     }
 
     /* Return any locked threads to the pool */
@@ -107,8 +107,8 @@ void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool) {
     for (i=0; i<num; i++) {
         pthread_join(threads[i].thread, NULL);
 
-        proxy_cond_destroy(&(threads[i].cv));
-        proxy_mutex_destroy(&(threads[i].lock));
+        proxy_cond_destroy(&threads[i].cv);
+        proxy_mutex_destroy(&threads[i].lock);
     }
 
     /* Free extra memory */

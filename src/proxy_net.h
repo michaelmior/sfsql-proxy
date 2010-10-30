@@ -51,6 +51,10 @@ typedef enum {
     ERROR_OTHER
 } conn_error_t;
 
+/**
+ * Status information for a client
+ * connection or global statistics.
+ **/
 typedef struct {
     /** Bytes received from clients by proxy. */
     long bytes_recv;

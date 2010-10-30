@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_pool.c
  *
- * Maintain a pool of locks to control access to resources
+ * Maintain a pool of locks to control access to resources.
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -59,7 +59,7 @@ pool_t* proxy_pool_new(int size) {
     /* Initialize mutexes */
     pthread_mutexattr_init(&attr);
     pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&(new_pool->lock), &attr);
+    pthread_mutex_init(&new_pool->lock, &attr);
 
     proxy_cond_init(&new_pool->avail_cv);
     proxy_mutex_init(&new_pool->avail_mutex);
@@ -69,16 +69,20 @@ pool_t* proxy_pool_new(int size) {
 
 /**
  * Block others from accessing the pool.
+ *
+ * \param pool Pool to be blocked.
  **/
 void proxy_pool_lock(pool_t *pool) {
-    proxy_mutex_lock(&(pool->lock));
+    proxy_mutex_lock(&pool->lock);
 }
 
 /**
  * Unblock others from accessing the pool.
+ *
+ * \param pool Pool to be unblocked.
  **/
 void proxy_pool_unlock(pool_t *pool) {
-    proxy_mutex_unlock(&(pool->lock));
+    proxy_mutex_unlock(&pool->lock);
 }
 
 /**
@@ -94,7 +98,7 @@ void proxy_pool_set_size(pool_t *pool, int size) {
     if (size == pool->size)
         return;
 
-    pthread_mutex_lock(&(pool->lock));
+    pthread_mutex_lock(&pool->lock);
 
     /* Get the new allocated size */
     while (alloc < size)
@@ -123,7 +127,7 @@ void proxy_pool_set_size(pool_t *pool, int size) {
 
     pool->size = size;
 
-    pthread_mutex_unlock(&(pool->lock));
+    pthread_mutex_unlock(&pool->lock);
 }
 
 /**
@@ -155,18 +159,18 @@ void proxy_pool_remove(pool_t *pool, int idx) {
 static int pool_try_locks(pool_t *pool) {
     int i;
 
-    pthread_mutex_lock(&(pool->lock));
+    pthread_mutex_lock(&pool->lock);
 
     /* Check availability of items in the pool */
     for (i=0; i<pool->size; i++) {
         if (pool->avail[i]) {
             pool->avail[i] = FALSE;
-            pthread_mutex_unlock(&(pool->lock));
+            pthread_mutex_unlock(&pool->lock);
             return i;
         }
     }
 
-    pthread_mutex_unlock(&(pool->lock));
+    pthread_mutex_unlock(&pool->lock);
     return -1;
 }
 
@@ -211,9 +215,9 @@ my_bool proxy_pool_is_free(pool_t *pool, int idx) {
     if (idx > pool->size)
         return FALSE;
 
-    pthread_mutex_lock(&(pool->lock));
+    pthread_mutex_lock(&pool->lock);
     ret = pool->avail[idx];
-    pthread_mutex_unlock(&(pool->lock));
+    pthread_mutex_unlock(&pool->lock);
 
     return ret;
 }
@@ -228,16 +232,16 @@ my_bool proxy_pool_is_free(pool_t *pool, int idx) {
 int proxy_pool_get_locked(pool_t *pool) {
     int i;
 
-    pthread_mutex_lock(&(pool->lock));
+    pthread_mutex_lock(&pool->lock);
 
     for (i=0; i<pool->size; i++) {
         if (!(pool->avail[i])) {
-            pthread_mutex_unlock(&(pool->lock));
+            pthread_mutex_unlock(&pool->lock);
             return i;
         }
     }
 
-    pthread_mutex_unlock(&(pool->lock));
+    pthread_mutex_unlock(&pool->lock);
     return -1;
 }
 
@@ -249,12 +253,12 @@ int proxy_pool_get_locked(pool_t *pool) {
  **/
 void proxy_pool_return(pool_t *pool, int idx) {
     /* Update the item availability */
-    pthread_mutex_lock(&(pool->lock));
+    pthread_mutex_lock(&pool->lock);
     if (pool->avail[idx])
         proxy_log(LOG_ERROR, "Trying to free lock from already free pool");
     else
         pool->avail[idx] = TRUE;
-    pthread_mutex_unlock(&(pool->lock));
+    pthread_mutex_unlock(&pool->lock);
 
     /* Signify availability in case someone is waiting */
     proxy_mutex_lock(&pool->avail_mutex);
@@ -272,9 +276,9 @@ void proxy_pool_destroy(pool_t *pool) {
         return;
 
     /* Unlock the mutex if locked */
-    pthread_mutex_trylock(&(pool->lock));
-    pthread_mutex_unlock(&(pool->lock));
-    pthread_mutex_destroy(&(pool->lock));
+    pthread_mutex_trylock(&pool->lock);
+    pthread_mutex_unlock(&pool->lock);
+    pthread_mutex_destroy(&pool->lock);
 
     free(pool->avail);
 

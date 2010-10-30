@@ -1,7 +1,7 @@
 /* 
  * proxy_options.h
  *
- * Includes for command-line parsing
+ * Proxy command-line options parsing.
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file "COPYING" in the main directory of
@@ -48,8 +48,7 @@ struct {
     my_bool unix_socket;
     /** UNIX socket filename */
     char *socket_file;
-    /** Seconds to wait before disconnecting client. */
-    int timeout;
+
     /** Backend database */
     char *db;
     /** Backend username. */
@@ -60,16 +59,21 @@ struct {
     char *backend_file;
     /** Number of connections per backend. */
     int num_conns;
-    /** Whether an identifier should be added */
-    my_bool add_ids;
     /** Autocommit option for backends. */
     my_bool autocommit;
+    /** Whether an identifier should be added */
+    my_bool add_ids;
+
     /** Host for proxy to bind to. */
     char *phost;
     /** Port for proxy to listen on. */
     int pport;
+    /** Seconds to wait before disconnecting client. */
+    int timeout;
+
     /** Name of the query mapper to use. */
     char *mapper;
+
     /** Numberof client threads. */
     int client_threads;
     /** Numbr of backend threads. */

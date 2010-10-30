@@ -92,7 +92,7 @@ static void server_run(char *host, int port) {
     serveraddr.sin.sin_port = htons((unsigned short) port);
 
     /* Bind the socket and start accepting connections */
-    if (bind(serverfd, &(serveraddr.sa), sizeof(serveraddr)) < 0) {
+    if (bind(serverfd, &serveraddr.sa, sizeof(serveraddr)) < 0) {
         proxy_log(LOG_ERROR, "Error binding server socket on port %d", port);
         return;
     }
@@ -112,7 +112,7 @@ static void server_run(char *host, int port) {
         if (select(FD_SETSIZE, &fds, NULL, NULL, NULL) != 1)
             continue;
 
-        clientfd = accept(serverfd, &(clientaddr.sa), &clientlen);
+        clientfd = accept(serverfd, &clientaddr.sa, &clientlen);
         if (clientfd < 0) {
             if (errno != EINTR)
                 proxy_log(LOG_ERROR, "Error accepting client connection: %s", errstr);
@@ -123,12 +123,12 @@ static void server_run(char *host, int port) {
         thread = &(net_threads[proxy_pool_get(thread_pool)]);
 
         /* Give work to thread and signal it to go */
-        proxy_mutex_lock(&(thread->lock));
+        proxy_mutex_lock(&thread->lock);
         thread->data.work.clientfd = clientfd;
-        thread->data.work.addr = &(clientaddr.sin);
+        thread->data.work.addr = &clientaddr.sin;
         thread->data.work.proxy = NULL;
-        proxy_cond_signal(&(thread->cv));
-        proxy_mutex_unlock(&(thread->lock));
+        proxy_cond_signal(&thread->cv);
+        proxy_mutex_unlock(&thread->lock);
     }
 
     close(serverfd);
@@ -189,6 +189,7 @@ int main(int argc, char *argv[]) {
     pid_t pid;
     my_bool wrote_pid = FALSE;
 
+    /* Parse command-lne options */
     ret = parse_options(argc, argv);
     if (ret != EX_OK || options.help)
         goto out_free;
@@ -254,13 +255,13 @@ int main(int argc, char *argv[]) {
 
     for (i=0; i<options.client_threads; i++) {
         net_threads[i].id = i;
-        proxy_cond_init(&(net_threads[i].cv));
-        proxy_mutex_init(&(net_threads[i].lock));
+        proxy_cond_init(&net_threads[i].cv);
+        proxy_mutex_init(&net_threads[i].lock);
         net_threads[i].exit = 0;
         net_threads[i].data.work.addr = NULL;
         net_threads[i].data.work.proxy = NULL;
 
-        pthread_create(&(net_threads[i].thread), &attr, proxy_net_new_thread, (void*) &(net_threads[i]));
+        pthread_create(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
     }
 
     /* Initialize backend data */

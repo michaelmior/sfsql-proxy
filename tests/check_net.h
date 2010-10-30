@@ -19,9 +19,13 @@
 
 #define SOCK_NAME  "mysql.sock"
 
+/** Union of socket types to adhere
+ *  to strict aliasing rules. */
 typedef union {
-    struct sockaddr_un sun;
+    /** Generic socket struct. */
     struct sockaddr    sa;
+    /** UNIX domain socket struct. */
+    struct sockaddr_un sun;
 } sun_addr_t;
 
 #endif /* _check_net_h */
