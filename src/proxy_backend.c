@@ -905,6 +905,35 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
 }
 
 /**
+ * Read a packet from a backend connection,
+ * forward to the proxy, and check for errors.
+ *
+ * \param mysql  MYSQL object to read from.
+ * \param proxy  MYSQL object to forward results to.
+ * \param status Status information for the connection.
+ *
+ * \return Negative for failure, positive to continue reading, and 0 to finish.
+ **/
+static inline int read_packet(MYSQL *mysql, MYSQL *proxy, status_t *status) {
+    uchar *pos;
+    ulong pkt_len = 8;
+
+    /* derived from sql/client.c:cli_read_query_result */
+    /* read info and result header packets */
+    if ((pkt_len = backend_read_to_proxy(mysql, proxy, status)) == packet_error)
+        return -1;
+
+    /* If the query doesn't return results, no more to do */
+    pos = (uchar*) mysql->net.read_pos;
+    if (net_field_length(&pos) == 0)
+        return 1;
+    else if (mysql->net.read_pos[0] == 0xFF)
+        return -1;
+
+    return 0;
+}
+
+/**
  * Forward a query to a backend connection
  *
  * \param conn    Connection where the query should be sent.
@@ -919,9 +948,7 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
  **/
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier, status_t *status) {
     my_bool error = FALSE;
-    ulong pkt_len = 8;
-    uchar *pos;
-    int i;
+    int ret;
     MYSQL *mysql;
 
     mysql = conn->mysql;
@@ -940,38 +967,31 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     else
         simple_command(mysql, COM_PROXY_QUERY, (uchar*) query, length, 1);
 
-    /* derived from sql/client.c:cli_read_query_result */
-    /* read info and result header packets */
-    for (i=0; i<2; i++) {
-        if ((pkt_len = backend_read_to_proxy(mysql, proxy, status)) == packet_error) {
-            error = TRUE;
-            goto out;
-        }
-
-        /* If we're sending to multiple backends, wait
-         * until everyone is done before sending results */
-        if (i == 0 && barrier)
-            pthread_barrier_wait(barrier);
-
-        /* If the query doesn't return results, no more to do */
-        pos = (uchar*) mysql->net.read_pos;
-        if (net_field_length(&pos) == 0) {
-            error = FALSE;
-            goto out;
-        } else if (mysql->net.read_pos[0] == 0xFF) {
-            error = TRUE;
-            goto out;
-        }
+    if ((ret = read_packet(mysql, proxy, status)) != 0) {
+        error = ret < 0 ? TRUE : FALSE;
+        goto out;
     }
+
+    /* If we're sending to multiple backends, wait
+     * until everyone is done before sending results */
+    if (barrier)
+        pthread_barrier_wait(barrier);
+
+#define READ_PACKET_ERR \
+    if ((ret = read_packet(mysql, proxy, status)) != 0) { \
+        error = ret < 0 ? TRUE : FALSE; \
+        goto out; \
+    }
+
+    READ_PACKET_ERR
 
     /* Flush the write buffer */
     proxy_net_flush(proxy);
 
     /* read field info */
-    if (backend_read_rows(mysql, proxy, 7, status)) {
-        error = TRUE;
-        goto out;
-    }
+    READ_PACKET_ERR
+
+#undef READ_PACKET_ERR
 
     /* Read result rows
      *
