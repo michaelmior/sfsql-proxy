@@ -40,6 +40,9 @@ void proxy_threading_init() {
     for (i=0; i<size; i++)
         sigaddset(&handle_set, handle_sigs[i]);
 
+    /* Initialize thread-specific data */
+    pthread_key_create(&thread_buf_key, &free);
+
 #ifdef DEBUG
     pthread_mutexattr_init(&__proxy_mutexattr);
     pthread_mutexattr_settype(&__proxy_mutexattr, PTHREAD_MUTEX_ERRORCHECK);
@@ -57,9 +60,34 @@ void proxy_threading_mask() {
  * Free threading data structures.
  **/
 void proxy_threading_end() {
+    /* Delete thread-specific data keys */
+    pthread_key_delete(thread_buf_key);
+
 #ifdef DEBUG
     pthread_mutexattr_destroy(&__proxy_mutexattr);
 #endif
+}
+
+/**
+ * Start a new thread and initialize thread-specific data.
+ *
+ * \param thread        Pointer where a thread identifier will be stored.
+ * \param attr          Attributes to associate with the new thread.
+ * \param start_routine Function to be called to start the thread.
+ * \param arg           Data pointer passed to start_routine.
+ *
+ * \return Zero on success, otherwise an error number.
+ **/
+int proxy_threading_start(pthread_t *thread, const pthread_attr_t *attr, void* (*start_routine)(void*), void *arg) {
+    int ret;
+    char *buf = (char*) malloc(BUFSIZ);
+
+    ret = pthread_create(thread, attr, start_routine, arg);
+
+    if (!ret)
+        pthread_setspecific(thread_buf_key, buf);
+
+    return ret;
 }
 
 /**

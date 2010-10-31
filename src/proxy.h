@@ -41,8 +41,6 @@
 /** Signify that we are currently cloning */
 extern volatile sig_atomic_t cloning;
 
-#define errstr strerror_r(errno, BUF, BUFSIZ)
-
 #include "proxy_logging.h"
 #include "proxy_net.h"
 #include "proxy_backend.h"

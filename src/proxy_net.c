@@ -240,7 +240,6 @@ MYSQL* client_init(Vio *vio) {
  **/
 void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
-    char BUF[BUFSIZ];
 
     proxy_debug("Called client_destroy on thread %d", thread->id);
 

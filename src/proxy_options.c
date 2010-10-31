@@ -25,8 +25,6 @@
 
 #include "proxy.h"
 
-static char BUF[BUFSIZ];
-
 /**
  * Print a simple usage message with command-line arguments.
  **/

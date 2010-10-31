@@ -28,8 +28,6 @@
 #include <unistd.h>
 #include <ltdl.h>
 
-static char BUF[BUFSIZ];
-
 /** Maximum TCP packet length (from sql/net_serv.cc) */
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
 
@@ -313,7 +311,7 @@ void backend_new_threads(int bi) {
         thread->data.backend.query.query = NULL;
 
         /* Start a backend thread */
-        pthread_create(&thread->thread, &attr, proxy_backend_new_thread, (void*) thread);
+        proxy_threading_start(&thread->thread, &attr, proxy_backend_new_thread, (void*) thread);
     }
 }
 

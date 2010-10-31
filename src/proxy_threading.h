@@ -57,9 +57,16 @@ typedef struct {
     status_t *status;
 } proxy_thread_t;
 
+/** Key for retrieving thread-specific buffer */
+pthread_key_t thread_buf_key;
+
+/** Get an error message in a thread-safe way using thread-specific data as a buffer */
+#define errstr strerror_r(errno, pthread_getspecific(thread_buf_key), BUFSIZ)
+
 void proxy_threading_init();
 void proxy_threading_mask();
 void proxy_threading_end();
+int proxy_threading_start(pthread_t *thread, const pthread_attr_t *attr, void* (*start_routine)(void*), void *arg);
 void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);
 void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);
 

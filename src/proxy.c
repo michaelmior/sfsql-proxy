@@ -36,7 +36,6 @@
 volatile sig_atomic_t run = 1;
 volatile sig_atomic_t cloning  = 0;
 pid_t signaller = -1;
-static char BUF[BUFSIZ];
 
 /** Union used to avoid aliasing warnings. */
 union sockaddr_union {
@@ -188,6 +187,7 @@ int main(int argc, char *argv[]) {
     FILE *pid_file;
     pid_t pid;
     my_bool wrote_pid = FALSE;
+    char *buf;
 
     /* Parse command-lne options */
     ret = parse_options(argc, argv);
@@ -224,6 +224,8 @@ int main(int argc, char *argv[]) {
 
     /* Initialization */
     proxy_threading_init();
+    buf = (char*) malloc(BUFSIZ);
+    pthread_setspecific(thread_buf_key, buf);
 
     /* Install signal handler */
     new_action.sa_sigaction = catch_sig;
@@ -261,7 +263,7 @@ int main(int argc, char *argv[]) {
         net_threads[i].data.work.addr = NULL;
         net_threads[i].data.work.proxy = NULL;
 
-        pthread_create(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
+        proxy_threading_start(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
     }
 
     /* Initialize backend data */
