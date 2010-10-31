@@ -188,9 +188,9 @@ int parse_options(int argc, char *argv[]) {
     }
 
     /* Set defaults for unspecified options */
-    options.user = options.user ? options.user : BACKEND_USER;
-    options.pass = options.pass ? options.pass : BACKEND_PASS;
-    options.db   = options.db   ? options.db   : BACKEND_DB;
+    options.user = options.user ?: BACKEND_USER;
+    options.pass = options.pass ?: BACKEND_PASS;
+    options.db   = options.db   ?: BACKEND_DB;
 
     /* If a file was specified, make sure no other host options were used */
     if (options.backend_file) {
@@ -207,10 +207,8 @@ int parse_options(int argc, char *argv[]) {
             return EX_USAGE;
         }
 
-        options.backend.host = options.backend.host ?
-            options.backend.host : BACKEND_HOST;
-        options.backend.port = options.backend.port ?
-            options.backend.port : BACKEND_PORT;
+        options.backend.host = options.backend.host ?: BACKEND_HOST;
+        options.backend.port = options.backend.port ?: BACKEND_PORT;
     }
     
     return EXIT_SUCCESS;

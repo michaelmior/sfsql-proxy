@@ -61,7 +61,13 @@ typedef struct {
 pthread_key_t thread_buf_key;
 
 /** Get an error message in a thread-safe way using thread-specific data as a buffer */
-#define errstr strerror_r(errno, pthread_getspecific(thread_buf_key), BUFSIZ)
+#define errstr \
+    ({ \
+        char *_buf = pthread_getspecific(thread_buf_key); \
+        if (!_buf || strerror_r(errno, _buf, BUFSIZ)) \
+            _buf = ""; \
+        _buf; \
+     })
 
 void proxy_threading_init();
 void proxy_threading_mask();

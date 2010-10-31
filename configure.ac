@@ -27,7 +27,6 @@ AX_CFLAGS_GCC_OPTION(-Wall)
 AX_CFLAGS_GCC_OPTION(-Werror)
 AX_CFLAGS_GCC_OPTION(-Wextra)
 AX_CFLAGS_GCC_OPTION(-Wstrict-aliasing=2)
-AX_CFLAGS_GCC_OPTION(-pedantic)
 AC_PROG_RANLIB
 
 # Checks for libraries.
