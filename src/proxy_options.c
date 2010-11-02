@@ -198,7 +198,7 @@ int parse_options(int argc, char *argv[]) {
             usage();
             return EX_USAGE;
         } else if (access(options.backend_file, R_OK)) {
-            printf("Error accessing backend file %s:%s\n", options.backend_file, strerror(errno));
+            fprintf(stderr, "Error accessing backend file %s:%s\n", options.backend_file, strerror(errno));
             return EX_NOINPUT;
         }
     } else {
