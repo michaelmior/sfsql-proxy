@@ -48,7 +48,8 @@ static void usage() {
             "\t                     \t(cannot be specified with above options)\n\n"
             "\t--num-conns,       -N\tNumber connections per backend\n"
             "\t                   -a\tDisable autocommit (default is enabled)\n"
-            "\t--add-ids,         -i\tTag transactions with unique identifiers\n\n"
+            "\t--add-ids,         -i\tTag transactions with unique identifiers\n"
+            "\t--two-pc,          -2\tUse two-phase commit to ensure consistency across backends\n\n"
 
             "Proxy options:\n"
             "\t--proxy-host,      -b\tBinding address (default is 0.0.0.0)\n"
@@ -86,6 +87,7 @@ int parse_options(int argc, char *argv[]) {
         {"backend-file",    required_argument, 0, 'f'},
         {"num-conns",       required_argument, 0, 'N'},
         {"add-ids",         no_argument,       0, 'i'},
+        {"two-pc",          no_argument,       0, '2'},
         {"proxy-host",      required_argument, 0, 'b'},
         {"proxy-port",      required_argument, 0, 'L'},
         {"timeout",         required_argument, 0, 'n'},
@@ -101,6 +103,7 @@ int parse_options(int argc, char *argv[]) {
 
     options.num_conns       = NUM_CONNS;
     options.add_ids         = FALSE;
+    options.two_pc          = FALSE;
     options.autocommit      = TRUE;
     options.backend.host    = NULL;
     options.backend.port    = 0;
@@ -118,7 +121,7 @@ int parse_options(int argc, char *argv[]) {
     options.backend_threads = BACKEND_THREADS; 
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:iaAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -160,6 +163,9 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'i':
                 options.add_ids = TRUE;
+                break;
+            case '2':
+                options.two_pc = TRUE;
                 break;
             case 'a':
                 options.autocommit = FALSE;

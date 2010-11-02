@@ -52,6 +52,10 @@ typedef struct {
         proxy_backend_data_t backend;
     } data;
 
+    /** Commit info for the transaction associated
+     *  with this thread. */
+    commitdata_t *commit;
+
     /** Status info for the connection associated
      *  with this thread. */
     status_t *status;

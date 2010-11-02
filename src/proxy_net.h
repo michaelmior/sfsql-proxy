@@ -12,6 +12,8 @@
 #ifndef _proxy_net_h
 #define _proxy_net_h
 
+#include <mysqld_error.h>
+
 /** Name of proxy commands */
 #define PROXY_CMD "PROXY"
 
@@ -51,19 +53,6 @@ typedef enum {
     ERROR_OTHER
 } conn_error_t;
 
-/**
- * Status information for a client
- * connection or global statistics.
- **/
-typedef struct {
-    /** Bytes received from clients by proxy. */
-    long bytes_recv;
-    /** Bytes sent by proxy to client. */
-    long bytes_sent;
-    /** Number of queries received by proxy. */
-    long queries;
-} status_t;
-
 /** Total number of connections. */
 long global_connections;
 /** Globally accumulated status. */
@@ -73,7 +62,7 @@ time_t proxy_start_time;
 
 my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
-conn_error_t proxy_net_read_query(MYSQL *mysql, status_t *status);
+conn_error_t proxy_net_read_query(MYSQL *mysql, commitdata_t *commit, status_t *status);
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
 

@@ -22,8 +22,6 @@
 
 #include "proxy.h"
 
-#include <mysqld_error.h>
-
 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
 #define MIN_HANDSHAKE_SIZE 6
 
@@ -32,7 +30,7 @@ extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
 static MYSQL* client_init(Vio *vio);
-void client_do_work(proxy_work_t *work, status_t *status);
+void client_do_work(proxy_work_t *work, commitdata_t *commit, status_t *status);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
 static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
@@ -277,6 +275,7 @@ void net_thread_destroy(void *ptr) {
 
     /* Free any remaining resources */
     mysql_thread_end();
+    free(thread->status);
 }
 
 /**
@@ -287,15 +286,17 @@ void net_thread_destroy(void *ptr) {
  **/
 void* proxy_net_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
+    commitdata_t commit;
 
-    proxy_threading_mask();
-    pthread_cleanup_push(net_thread_destroy, ptr);
-    proxy_mutex_lock(&(thread->lock));
-
+    /* Initialize status information for the connection */
     thread->status = (status_t*) malloc(sizeof(status_t));
     thread->status->bytes_sent = 0;
     thread->status->bytes_recv = 0;
     thread->status->queries = 0;
+
+    proxy_threading_mask();
+    pthread_cleanup_push(net_thread_destroy, ptr);
+    proxy_mutex_lock(&(thread->lock));
 
     while (1) {
         if(thread->exit) {
@@ -316,7 +317,7 @@ void* proxy_net_new_thread(void *ptr) {
 
         /* Handle client requests */
         __sync_fetch_and_add(&global_connections, 1);
-        client_do_work(&thread->data.work, thread->status);
+        client_do_work(&thread->data.work, &commit, thread->status);
         client_destroy(thread);
         thread->data.work.addr = NULL;
 
@@ -334,7 +335,6 @@ void* proxy_net_new_thread(void *ptr) {
 
     proxy_debug("Exiting loop on client thead %d", thread->id);
 
-    free(thread->status);
     pthread_cleanup_pop(1);
     pthread_exit(NULL);
 }
@@ -342,9 +342,12 @@ void* proxy_net_new_thread(void *ptr) {
 /**
  * Service a client request.
  *
- * \param work Information on the work to be done
+ * \param work   Information on the work to be done.
+ * \param commit Information required to commit which is
+ *               passed to the backend.
+ * \param status Status information for the connection.
  **/
-void client_do_work(proxy_work_t *work, status_t *status) {
+void client_do_work(proxy_work_t *work, commitdata_t *commit, status_t *status) {
     int error, optval;
     Vio *vio_tmp;
 
@@ -378,7 +381,7 @@ void client_do_work(proxy_work_t *work, status_t *status) {
 
     /* from sql/sql_connect.cc:handle_one_connection */
     while (!work->proxy->net.error && work->proxy->net.vio != 0) {
-        error = proxy_net_read_query(work->proxy, status);
+        error = proxy_net_read_query(work->proxy, commit, status);
 
         /* One more flush the write buffer to make
          * sure client has everything */
@@ -408,13 +411,16 @@ void client_do_work(proxy_work_t *work, status_t *status) {
  *
  * This code is derived from sql/sql_parse.cc:do_command
  *
- * \param mysql A MySQL object for a client which a query
- *              should be read from.
+ * \param mysql  A MySQL object for a client which a query
+ *               should be read from.
+ * \param commit Information required to commit which is
+ *               passed to the backend.
+ * \param status Status information for the connection.
  *
  * \return Positive to disconnect without error,
  *         negative for errors, 0 to keep going
  **/
-conn_error_t proxy_net_read_query(MYSQL *mysql, status_t *status) {
+conn_error_t proxy_net_read_query(MYSQL *mysql, commitdata_t *commit, status_t *status) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -443,8 +449,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, status_t *status) {
     }
 
     if ((pkt_len = my_net_read(net)) == packet_error) {
-        proxy_log(LOG_ERROR, "Error reading query from client");
-        printf("%s\n", mysql_error(mysql));
+        proxy_log(LOG_ERROR, "Error reading query from client: %s", mysql_error(mysql));
         return ERROR_CLIENT;
     }
 
@@ -470,13 +475,13 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, status_t *status) {
     switch (command) {
         case COM_PROXY_QUERY:
             /* XXX: for now, we do nothing different here */
-            return proxy_backend_query(mysql, packet, pkt_len, status) ? ERROR_BACKEND : ERROR_OK;
+            return proxy_backend_query(mysql, packet, pkt_len, commit, status) ? ERROR_BACKEND : ERROR_OK;
         case COM_QUERY:
             status->queries++;
 
             if (strncasecmp(packet, PROXY_CMD, sizeof(PROXY_CMD)-1)) {
                 /* pass the query to the backend */
-                return proxy_backend_query(mysql, packet, pkt_len, status) ? ERROR_BACKEND : ERROR_OK;
+                return proxy_backend_query(mysql, packet, pkt_len, commit, status) ? ERROR_BACKEND : ERROR_OK;
             } else {
                 /* Execute the proxy command */
                 return net_proxy_cmd(mysql, packet + sizeof(PROXY_CMD)-1, pkt_len, status) ? ERROR_CLIENT : ERROR_OK;

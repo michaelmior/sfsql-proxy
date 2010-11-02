@@ -52,6 +52,7 @@ static pool_t **backend_thread_pool = NULL;
 volatile sig_atomic_t querying = 0;
 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status);
+static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
 static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn);
 static proxy_host_t** backend_read_file(char *filename, int *num)
@@ -61,8 +62,24 @@ static void backend_free(proxy_host_t *backend);
 static void backends_free(proxy_host_t **backends, int num);
 static my_bool backends_alloc(int num_backends);
 static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status);
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier, status_t *status);
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status);
 void backend_new_threads(int bi);
+
+static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status) {
+        NET *net = &backend->net;
+
+        if (!proxy)
+            return FALSE;
+
+        /* Read from the backend and forward to the proxy connection */
+        if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
+            status->bytes_sent += pkt_len;
+            proxy_log(LOG_ERROR, "Couldn't forward backend packet to proxy");
+            return TRUE;
+        }
+
+        return FALSE;
+}
 
 /**
  * Read a MySQL packet from the backend and forward to the client.
@@ -70,8 +87,8 @@ void backend_new_threads(int bi);
  * This code is derived from sql/client.c:cli_safe_read
  *
  * \param backend Backend to read from.
- * \param proxy   Client to write to.
- * \param status    Status information for the connection.
+ * \param proxy   Client to write to or NULL to only read.
+ * \param status  Status information for the connection.
  *
  * \return Length of the packet which was read.
  **/
@@ -101,14 +118,8 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
     if (net->read_pos[0] == 255 && pkt_len <= 3)
         return packet_error;
 
-    if (proxy) {
-        /* Read from the backend and forward to the proxy connection */
-        if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
-            status->bytes_sent += pkt_len;
-            proxy_log(LOG_ERROR, "Couldn't forward backend packet to proxy");
-            return packet_error;
-        }
-    }
+    /* Write the results to the proxy */
+    backend_proxy_write(backend, proxy, pkt_len, status);
 
     return pkt_len;
 }
@@ -356,7 +367,7 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
     }
 
     /* Set autocommit option if specified */
-    mysql_autocommit(mysql, options.autocommit);
+    mysql_autocommit(mysql, options.autocommit && !options.two_pc);
 
     conn->mysql = mysql;
 
@@ -733,7 +744,6 @@ void proxy_backends_update() {
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     proxy_backend_query_t *query = &thread->data.backend.query;
-    int bi = thread->data.backend.bi;
 
     proxy_threading_mask();
     proxy_mutex_lock(&thread->lock);
@@ -756,7 +766,7 @@ void* proxy_backend_new_thread(void *ptr) {
         __sync_fetch_and_add(&querying, 1);
 
         /* We make a copy of the query string since MySQL destroys it */
-        query->result[bi] = backend_query(thread->data.backend.conn, query->proxy, query->query, *(query->length), query->barrier, thread->status);
+        backend_query(thread->data.backend.conn, query->proxy, query->query, *(query->length), thread->data.backend.bi, thread->commit, thread->status);
 
         __sync_fetch_and_sub(&querying, 1);
 
@@ -775,18 +785,21 @@ void* proxy_backend_new_thread(void *ptr) {
  * \param proxy  MySQL object corresponding to the client connection.
  * \param query  A query string received from the client.
  * \param length Length of the query string.
- * \param status    Status information for the connection.
+ * \param commit Data required for synchronization
+ *               and two-phase commit.
+ * \param status Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *status) {
+my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_t *commit, status_t *status) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
-    my_bool error = FALSE, *result;
+    my_bool error = FALSE;
     char *newq = NULL;
     pthread_barrier_t query_barrier;
     proxy_backend_query_t *bquery;
     proxy_thread_t *thread;
+    ulonglong results;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -833,7 +846,6 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *s
 
             /* Set up synchronization */
             pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
-            result = (my_bool*) calloc(backend_num, sizeof(my_bool));
 
             bi = rand() % backend_num;
             for (i=0; i<backend_num; i++) {
@@ -851,8 +863,12 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *s
                 bquery->query = query;
                 bquery->length = &length;
                 bquery->proxy = (i == 0) ? proxy : NULL;
-                bquery->result = result;
-                bquery->barrier = &query_barrier;
+
+                /* Set up commit data */
+                commit->backends = backend_num;
+                commit->results = &results;
+                commit->barrier = &query_barrier;
+                thread->commit = commit;
 
                 proxy_cond_signal(&thread->cv);
                 proxy_mutex_unlock(&thread->lock);
@@ -866,12 +882,11 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *s
 
             /* XXX: should do better at handling failures */
             for (i=0; i<backend_num; i++)
-                if (result[i]) {
+                if (!(results & (i==0 ? 1 : 2 << (i-1)))) {
                     error = TRUE;
                     /* XXX should print a message if failure is not a malformed query */
                     //proxy_log(LOG_ERROR, "Failure for query on backend %d\n", i);
                 }
-            free(result);
 
             break;
         default:
@@ -904,42 +919,15 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
     ci = proxy_pool_get(backend_pools[bi]);
     conn = backend_conns[bi][ci];
 
+    proxy_debug("Sending read-only query %s to backend %d, connection %d\n", query, bi, ci);
+
     /*Send the query */
-    error = backend_query(conn, proxy, query, length, NULL, status);
+    error = backend_query(conn, proxy, query, length, bi, NULL, status);
 
     if (!conn->freed)
         proxy_pool_return(backend_pools[bi], ci);
 
     return error;
-}
-
-/**
- * Read a packet from a backend connection,
- * forward to the proxy, and check for errors.
- *
- * \param mysql  MYSQL object to read from.
- * \param proxy  MYSQL object to forward results to.
- * \param status Status information for the connection.
- *
- * \return Negative for failure, positive to continue reading, and 0 to finish.
- **/
-static inline int read_packet(MYSQL *mysql, MYSQL *proxy, status_t *status) {
-    uchar *pos;
-    ulong pkt_len = 8;
-
-    /* derived from sql/client.c:cli_read_query_result */
-    /* read info and result header packets */
-    if ((pkt_len = backend_read_to_proxy(mysql, proxy, status)) == packet_error)
-        return -1;
-
-    /* If the query doesn't return results, no more to do */
-    pos = (uchar*) mysql->net.read_pos;
-    if (net_field_length(&pos) == 0)
-        return 1;
-    else if (mysql->net.read_pos[0] == 0xFF)
-        return -1;
-
-    return 0;
 }
 
 /**
@@ -949,17 +937,18 @@ static inline int read_packet(MYSQL *mysql, MYSQL *proxy, status_t *status) {
  * \param proxy   MYSQL object to forward results to.
  * \param query   Query string to execute.
  * \param length  Length of the query.
- * \param barrier Optional barrier which blocks query response
- *                until all backends have received the query.
- * \param status    Status information for the connection.
+ * \param bi      Index of the backend executing the query.
+ * \param commit  Data required for synchronization
+ *                and two-phase commit.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, pthread_barrier_t *barrier, status_t *status) {
-    my_bool error = FALSE;
-    int ret;
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status) {
+    my_bool error = FALSE, success;
+    ulong pkt_len = 8;
     MYSQL *mysql;
 
+    /* Check for a valid MySQL object */
     mysql = conn->mysql;
     if (unlikely(!mysql)) {
         proxy_log(LOG_ERROR, "Query with uninitialized MySQL object");
@@ -976,31 +965,71 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     else
         simple_command(mysql, COM_PROXY_QUERY, (uchar*) query, length, 1);
 
-    if ((ret = read_packet(mysql, proxy, status)) != 0) {
-        error = ret < 0 ? TRUE : FALSE;
+    /* Read the result header packet from the backend */
+    pkt_len = backend_read_to_proxy(mysql, NULL, status);
+
+    if (pkt_len == packet_error) {
+        error = TRUE;
+
+        if (commit && commit->barrier)
+            pthread_barrier_wait(commit->barrier);
+
         goto out;
     }
 
+    /* Check the success of the transaction */
+    success = (mysql->net.read_pos[0] != 0xFF) ? TRUE : FALSE;
+
     /* If we're sending to multiple backends, wait
      * until everyone is done before sending results */
-    if (barrier)
-        pthread_barrier_wait(barrier);
-
-#define READ_PACKET_ERR \
-    if ((ret = read_packet(mysql, proxy, status)) != 0) { \
-        error = ret < 0 ? TRUE : FALSE; \
-        goto out; \
+    if (commit) {
+        /* Record error status */
+        if (commit->results && success) {
+            __sync_fetch_and_or(commit->results, bi == 0 ? 1 : 2 << (bi-1));
+        }
+        if (commit->barrier) {
+            pthread_barrier_wait(commit->barrier);
+            commit->barrier = NULL;
+        }
     }
 
-    READ_PACKET_ERR
+    /* Check if all transactions succeeded and commit or rollback accordingly */
+    /* XXX: This currently assumes that queries requiring two-phase commit
+     *      do not return any results, and thus have a single packet which
+     *      has already been consumed at this point. This holds for UPDATE
+     *      INSERT, and DELETE. If this assumption breaks, subsequent
+     *      queries will fail, although the client can then reconnect. */
+    if (commit && options.two_pc) {
+        if (*(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1)) {
+            if (proxy)
+                error = proxy_net_send_ok(proxy, 0, 0, 0);
+
+            proxy_debug("Commiting on backend %d", bi);
+            mysql_real_query(mysql, "COMMIT", 6);
+        } else {
+            if (proxy)
+                error = proxy_net_send_error(proxy,
+                        ER_ERROR_DURING_COMMIT,
+                        "Couldn't commit transaction");
+            proxy_debug("Rolling back on backend %d", bi);
+            mysql_real_query(mysql, "ROLLBACK", 8);
+        }
+
+        return error;
+    }
 
     /* Flush the write buffer */
+    error = backend_proxy_write(mysql, proxy, pkt_len, status);
     proxy_net_flush(proxy);
 
-    /* read field info */
-    READ_PACKET_ERR
+    if (!success || net_field_length(&mysql->net.read_pos) == 0)
+        return error;
 
-#undef READ_PACKET_ERR
+    /* read field info */
+    if (backend_read_rows(mysql, proxy, 7, status)) {
+        error = TRUE;
+        goto out;
+    }
 
     /* Read result rows
      *

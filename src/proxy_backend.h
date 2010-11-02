@@ -45,14 +45,9 @@ typedef struct {
     char *query;
     /** Length of the query string. */
     ulong *length;
-   /** Proxy MySQL object where results
-       should be sent, or NULL to discard. */
+    /** Proxy MySQL object where results
+        should be sent, or NULL to discard. */
     MYSQL *proxy;             
-    /** Barrier for ensuring all queries execute
-        before sending results. */
-    pthread_barrier_t *barrier;
-    /** Success array from various backends. */
-    my_bool *result;
 } proxy_backend_query_t;
 
 /** Data required to process a backend query. */
@@ -63,14 +58,13 @@ typedef struct {
     proxy_backend_conn_t *conn;
     /** Query information. */
     proxy_backend_query_t query;
-}
-proxy_backend_data_t;
+} proxy_backend_data_t;
 
 my_bool proxy_backend_init();
 my_bool proxy_backend_connect();
 my_bool proxy_backends_connect();
 void proxy_backends_update();
-my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, status_t *status);
+my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_t *commit, status_t *status);
 void* proxy_backend_new_thread(void *ptr);
 void proxy_backend_close();
 

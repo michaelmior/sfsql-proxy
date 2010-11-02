@@ -61,8 +61,10 @@ struct {
     int num_conns;
     /** Autocommit option for backends. */
     my_bool autocommit;
-    /** Whether an identifier should be added */
+    /** Whether an identifier should be added. */
     my_bool add_ids;
+    /** Whether or not to use two-phase commit. */
+    my_bool two_pc;
 
     /** Host for proxy to bind to. */
     char *phost;

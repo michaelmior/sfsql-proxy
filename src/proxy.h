@@ -41,6 +41,31 @@
 /** Signify that we are currently cloning */
 extern volatile sig_atomic_t cloning;
 
+/** Data required for two-phase commit. */
+typedef struct {
+    /** Barrier for ensuring all queries execute
+        before sending results. */
+    pthread_barrier_t *barrier;
+    /** Number of active backends when the
+     *  transacation was issued. */
+    int backends;
+    /** Success array from various backends. */
+    ulonglong *results;
+} commitdata_t;
+
+/**
+ * Status information for a client
+ * connection or global statistics.
+ **/
+typedef struct {
+    /** Bytes received from clients by proxy. */
+    long bytes_recv;
+    /** Bytes sent by proxy to client. */
+    long bytes_sent;
+    /** Number of queries received by proxy. */
+    long queries;
+} status_t;
+
 #include "proxy_logging.h"
 #include "proxy_net.h"
 #include "proxy_backend.h"
