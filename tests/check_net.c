@@ -28,8 +28,6 @@
 #include <stdio.h>
 #include <signal.h>
 
-MYSQL* client_init(Vio *vio);
-
 /**
  * Send all data in a file to a socket.
  *
@@ -140,7 +138,7 @@ START_TEST (test_net_handshake) {
             addr.sin_port = 0;
 
             /* Try to handshake */
-            mysql = client_init((Vio*) NULL);
+            mysql = client_init(s);
             proxy_net_handshake(mysql, &addr, 0);
             exit(0);
         default:

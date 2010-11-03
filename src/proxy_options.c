@@ -68,6 +68,34 @@ static void usage() {
 }
 
 /**
+ * Set default values for options in the ::options structure.
+ **/
+void set_option_defaults() {
+    /* Set options to default values */
+    options.help            = FALSE;
+    options.daemonize       = FALSE;
+
+    options.num_conns       = NUM_CONNS;
+    options.add_ids         = FALSE;
+    options.two_pc          = FALSE;
+    options.autocommit      = TRUE;
+    options.backend.host    = NULL;
+    options.backend.port    = 0;
+    options.unix_socket     = FALSE;
+    options.socket_file     = NULL;
+    options.user            = NULL;
+    options.pass            = NULL;
+    options.db              = NULL;
+    options.backend_file    = NULL;
+    options.phost           = NULL;
+    options.pport           = PROXY_PORT;
+    options.timeout         = CLIENT_TIMEOUT;
+    options.mapper          = NULL;
+    options.client_threads  = CLIENT_THREADS;
+    options.backend_threads = BACKEND_THREADS;
+}
+
+/**
  * Parse command-line options
  *
  * \param argc Number of arguments.
@@ -97,28 +125,7 @@ int parse_options(int argc, char *argv[]) {
         {0, 0, 0, 0}
     };
 
-    /* Set options to default values */
-    options.help            = FALSE;
-    options.daemonize       = FALSE;
-
-    options.num_conns       = NUM_CONNS;
-    options.add_ids         = FALSE;
-    options.two_pc          = FALSE;
-    options.autocommit      = TRUE;
-    options.backend.host    = NULL;
-    options.backend.port    = 0;
-    options.unix_socket     = FALSE;
-    options.socket_file     = NULL;
-    options.user            = NULL;
-    options.pass            = NULL;
-    options.db              = NULL;
-    options.backend_file    = NULL;
-    options.phost           = NULL;
-    options.pport           = PROXY_PORT;
-    options.timeout         = CLIENT_TIMEOUT;
-    options.mapper          = NULL;
-    options.client_threads  = CLIENT_THREADS;
-    options.backend_threads = BACKEND_THREADS; 
+    set_option_defaults();
 
     /* Parse command-line options */
     while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {

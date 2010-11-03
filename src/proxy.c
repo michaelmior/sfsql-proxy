@@ -29,12 +29,16 @@
 
 #include "proxy.h"
 
+/** Number of client connections waiting in
+ *  queue to be accepted when client threads
+ *  are all occupied. */
 #define QUEUE_LENGTH  10
 /** File to store PID of proxy process */
 #define PID_FILE      "/var/run/sfsql-proxy.pid"
 
 volatile sig_atomic_t run = 1;
 volatile sig_atomic_t cloning  = 0;
+/** PID of process which signaled to start cloning */
 pid_t signaller = -1;
 
 /** Union used to avoid aliasing warnings. */
@@ -46,6 +50,7 @@ union sockaddr_union {
 };
 
 static void server_run(char *host, int port);
+static inline void client_threads_start();
 
 /**
  * Main server loop which accepts external extensions
@@ -130,6 +135,7 @@ static void server_run(char *host, int port) {
         proxy_mutex_unlock(&thread->lock);
     }
 
+    /* Server is shutting down, close the listening socket */
     close(serverfd);
 }
 
@@ -180,9 +186,38 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
     }
 }
 
-int main(int argc, char *argv[]) {
-    int error, i, ret=EX_OK;
+/**
+ * Start threads to manage client connections.
+ **/
+static inline void client_threads_start() {
     pthread_attr_t attr;
+    int i;
+
+    /* Create a thread pool */
+    thread_pool = proxy_pool_new(options.client_threads);
+
+    /* Set up thread attributes */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    /* Create the new threads */
+    net_threads = (proxy_thread_t*) calloc(options.client_threads, sizeof(proxy_thread_t));
+
+    for (i=0; i<options.client_threads; i++) {
+        /* Initialize thread data */
+        net_threads[i].id = i;
+        proxy_cond_init(&net_threads[i].cv);
+        proxy_mutex_init(&net_threads[i].lock);
+        net_threads[i].exit = 0;
+        net_threads[i].data.work.addr = NULL;
+        net_threads[i].data.work.proxy = NULL;
+
+        proxy_threading_start(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
+    }
+}
+
+int main(int argc, char *argv[]) {
+    int error, ret=EX_OK;
     struct sigaction new_action;
     FILE *pid_file;
     pid_t pid;
@@ -209,6 +244,8 @@ int main(int argc, char *argv[]) {
             goto out_free;
         }
     }
+
+    /* Open the log file */
     proxy_log_open();
 
     /* Write PID file */
@@ -245,26 +282,8 @@ int main(int argc, char *argv[]) {
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
 
-    /* Create a thread pool */
-    thread_pool = proxy_pool_new(options.client_threads);
-
-    /* Set up thread attributes */
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-
-    /* Create the new threads */
-    net_threads = (proxy_thread_t*) calloc(options.client_threads, sizeof(proxy_thread_t));
-
-    for (i=0; i<options.client_threads; i++) {
-        net_threads[i].id = i;
-        proxy_cond_init(&net_threads[i].cv);
-        proxy_mutex_init(&net_threads[i].lock);
-        net_threads[i].exit = 0;
-        net_threads[i].data.work.addr = NULL;
-        net_threads[i].data.work.proxy = NULL;
-
-        proxy_threading_start(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
-    }
+    /* Start threads to handle clients */
+    client_threads_start();
 
     /* Initialize backend data */
     if (proxy_backend_init()) {

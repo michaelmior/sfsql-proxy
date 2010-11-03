@@ -54,17 +54,31 @@ volatile sig_atomic_t querying = 0;
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status);
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
-static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn);
-static proxy_host_t** backend_read_file(char *filename, int *num)
-    __attribute__((malloc));
+
+static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status);
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status);
+
+/* Data structure allocation functions */
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_host_t *backend);
 static void backends_free(proxy_host_t **backends, int num);
+static void backend_conns_free(int bi);
 static my_bool backends_alloc(int num_backends);
-static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status);
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status);
-void backend_new_threads(int bi);
+static void backend_conns_free(int bi);
 
+static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn);
+static void backend_new_threads(int bi);
+static proxy_host_t** backend_read_file(char *filename, int *num) __attribute__((malloc));
+
+
+/**
+ * Write from a backend to a proxy connection.
+ *
+ * \param backend Backend MYSQL object to read from.
+ * \param proxy   Proxy MYSQL object to write to.
+ * \param pkt_len Number of bytes to write.
+ * \param status  Status of connection for updating bytes sent.
+ **/
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status) {
         NET *net = &backend->net;
 
@@ -287,6 +301,7 @@ static my_bool backends_alloc(int num_backends)  {
     return FALSE;
 
 error:
+    /* We failed to start, abort */
     proxy_backend_close();
     return TRUE;
 }
@@ -296,7 +311,7 @@ error:
  *
  * \param bi Index of the backend whose threads should be started.
  **/
-void backend_new_threads(int bi) {
+static void backend_new_threads(int bi) {
     int i;
     proxy_thread_t *thread;
     pthread_attr_t attr;
@@ -382,7 +397,7 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
  *
  *  \return An array of ::proxy_host_t structs representing the read backends.
  **/
-proxy_host_t** backend_read_file(char *filename, int *num) {
+static proxy_host_t** backend_read_file(char *filename, int *num) {
     FILE *f;
     char *buf, *buf2, *pch;
     ulong pos;
@@ -503,13 +518,16 @@ my_bool proxy_backend_connect() {
 my_bool proxy_backends_connect() {
     int num_backends=-1, i, j;
 
+    /* Read the backends from the file */
     backends = backend_read_file(options.backend_file, &num_backends);
     if (!backends)
         return TRUE;
 
+    /* Allocate backend data structures */
     if (backends_alloc(num_backends))
         return TRUE;
 
+    /* Connect to all backends */
     for (i=0; i<num_backends; i++) {
         for (j=0; j<options.num_conns; j++) {
             if (backend_connect(backends[i], backend_conns[i][j]))
@@ -551,40 +569,42 @@ static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
  * \param pools List of pools to initialize.
  **/
 static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools) {
-    int i, j;
+    int bi, ci;
 
-    for (i=0; i<backend_num; i++) {
-        if (!conns[i]) {
-            proxy_log(LOG_INFO, "Connecting to new backend %d\n", i);
-            conns[i] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
+    for (bi=0; bi<backend_num; bi++) {
+        if (!conns[bi]) {
+            proxy_log(LOG_INFO, "Connecting to new backend %d\n", bi);
+            conns[bi] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
 
-            for (j=0; j<options.num_conns; j++) {
-                conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
-                backend_connect(backends[i], conns[i][j]);
+            for (ci=0; ci<options.num_conns; ci++) {
+                conns[bi][ci] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+                backend_connect(backends[bi], conns[bi][ci]);
             }
         }
 
         /* Allocate a new pool if necessary */
-        if (!pools[i]) {
-            pools[i] = proxy_pool_new(options.num_conns);
+        if (!pools[bi]) {
+            pools[bi] = proxy_pool_new(options.num_conns);
         } else {
             /* Unlock pool */
-            proxy_pool_unlock(pools[i]);
+            proxy_pool_unlock(pools[bi]);
         }
 
         /* Start new backend threads */
-        if (!backend_threads[i])
-            backend_new_threads(i);
+        if (!backend_threads[bi])
+            backend_new_threads(bi);
 
-        if (!backend_thread_pool[i]) {
-            backend_thread_pool[i] = proxy_pool_new(options.backend_threads);
-        for (j=0; j<options.backend_threads; j++) {
-            if (!backend_threads[i][j].data.backend.conn->mysql)
-                backend_connect(backends[i], backend_threads[i][j].data.backend.conn);
-        }
+        /* Create a new thread pool for this backend */
+        if (!backend_thread_pool[bi]) {
+            backend_thread_pool[bi] = proxy_pool_new(options.backend_threads);
 
+            /* Open the MySQL connections for each backend thread */
+            for (ci=0; ci<options.backend_threads; ci++) {
+                if (!backend_threads[bi][ci].data.backend.conn->mysql)
+                    backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn);
+            }
         } else {
-            proxy_pool_unlock(backend_thread_pool[i]);
+            proxy_pool_unlock(backend_thread_pool[bi]);
         }
     }
 }
@@ -594,7 +614,7 @@ static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **
  *
  * \param bi Index of the backend to free.
  **/
-static inline void backend_conns_free(int bi) {
+static void backend_conns_free(int bi) {
     int i;
 
     /* Free connections */
@@ -629,7 +649,7 @@ static inline void backend_conns_free(int bi) {
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool backend_resize(int num, my_bool before) {
+static my_bool backend_resize(int num, my_bool before) {
     int i;
     void *ptr;
 
@@ -765,8 +785,10 @@ void* proxy_backend_new_thread(void *ptr) {
 
         __sync_fetch_and_add(&querying, 1);
 
-        /* We make a copy of the query string since MySQL destroys it */
-        backend_query(thread->data.backend.conn, query->proxy, query->query, *(query->length), thread->data.backend.bi, thread->commit, thread->status);
+        /* Send the query to the backend server */
+        backend_query(thread->data.backend.conn, query->proxy,
+                      query->query, *(query->length),
+                      thread->data.backend.bi, thread->commit, thread->status);
 
         __sync_fetch_and_sub(&querying, 1);
 
@@ -806,6 +828,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_
     if (backend_mapper) {
         map = (*backend_mapper)(query, newq);
 
+        /* If the query was modified by the mapper,
+         * switch to the new query string */
         if (newq) {
             free(query);
             query = newq;
@@ -819,9 +843,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_
 
     /* Speed things up with only one backend
      * by avoiding synchronization */
-    if (backend_num == 1) {
+    if (backend_num == 1)
         map = QUERY_MAP_ANY;
-    }
 
     switch (map) {
         case QUERY_MAP_ANY:
@@ -829,12 +852,17 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_
              * We check for an unallocated pool in case
              * backends are in the process of changing */
             bi = rand() % backend_num;
+
+            /* XXX: This guards against the unlikely case that we
+             *      get here while backends are being updated */
             while (!backend_pools[bi]) { bi = rand() % backend_num; }
+
             if (backend_query_idx(bi, proxy, query, length, status)) {
                 error = TRUE;
                 goto out;
             }
             break;
+
         case QUERY_MAP_ALL:
             /* Send a query to the other backends and keep only the first result */
 
@@ -889,6 +917,8 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_
                 }
 
             break;
+
+        /* Some unknown value was returned, give up */
         default:
             error = TRUE;
             goto out;
@@ -906,7 +936,7 @@ out:
  * \param proxy   MYSQL object to forward results to.
  * \param query   Query string to execute.
  * \param length  Length of the query.
- * \param status    Status information for the connection.
+ * \param status  Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
@@ -931,6 +961,28 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
 }
 
 /**
+ * Wait for all backends to finish before continuing and record success.
+ *
+ * \param commit  Data required for synchronization.
+ * \param status  Status information for the connection.
+ * \param success Whether the query succeeded or failed.
+ **/
+static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool success) {
+    /* If we're sending to multiple backends, wait
+     * until everyone is done before sending results */
+    if (commit) {
+        /* Record error status */
+        if (commit->results && success) {
+            __sync_fetch_and_or(commit->results, bi == 0 ? 1 : 2 << (bi-1));
+        }
+        if (commit->barrier) {
+            pthread_barrier_wait(commit->barrier);
+            commit->barrier = NULL;
+        }
+    }
+}
+
+/**
  * Forward a query to a backend connection
  *
  * \param conn    Connection where the query should be sent.
@@ -940,6 +992,7 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
  * \param bi      Index of the backend executing the query.
  * \param commit  Data required for synchronization
  *                and two-phase commit.
+ * \param status  Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
@@ -968,6 +1021,9 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* Read the result header packet from the backend */
     pkt_len = backend_read_to_proxy(mysql, NULL, status);
 
+    /* Error reading from the backend, wait on the barrier
+     * so everyone else will be able to continue, then
+     * return with error */
     if (pkt_len == packet_error) {
         error = TRUE;
 
@@ -980,18 +1036,8 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* Check the success of the transaction */
     success = (mysql->net.read_pos[0] != 0xFF) ? TRUE : FALSE;
 
-    /* If we're sending to multiple backends, wait
-     * until everyone is done before sending results */
-    if (commit) {
-        /* Record error status */
-        if (commit->results && success) {
-            __sync_fetch_and_or(commit->results, bi == 0 ? 1 : 2 << (bi-1));
-        }
-        if (commit->barrier) {
-            pthread_barrier_wait(commit->barrier);
-            commit->barrier = NULL;
-        }
-    }
+    /* Wait for other backends to finish */
+    backend_query_wait(commit, bi, success);
 
     /* Check if all transactions succeeded and commit or rollback accordingly */
     /* XXX: This currently assumes that queries requiring two-phase commit
@@ -1022,6 +1068,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     error = backend_proxy_write(mysql, proxy, pkt_len, status);
     proxy_net_flush(proxy);
 
+    /* If query has zero results, then we can stop here */
     if (!success || net_field_length(&mysql->net.read_pos) == 0)
         return error;
 

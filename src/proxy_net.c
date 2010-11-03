@@ -29,11 +29,20 @@
 extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
-static MYSQL* client_init(Vio *vio);
+/* Definitions of functions to deal with client connections */
 void client_do_work(proxy_work_t *work, commitdata_t *commit, status_t *status);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
+static inline MYSQL* client_init(int clientfd);
 static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
+
+static void proxy_net_send_eof(MYSQL *mysql, status_t *status);
+static uchar *net_store_data(uchar *to, const uchar *from, size_t length);
+
+/* Definitions for PROXY STATUS functions */
+static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t *status);
+static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status);
+static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 
 /**
@@ -202,13 +211,32 @@ my_bool check_user(
 /**
  * Initialize client data structures.
  *
- * \param vio Virtual I/O structure corresponding to client connection.
+ * \param clientfd Socket descriptor of client connection.
  *
  * \return A MYSQL structure ready to communicate with the client, or NULL on error.
  **/
-MYSQL* client_init(Vio *vio) {
+MYSQL* client_init(int clientfd) {
+    Vio *vio_tmp;
+    int optval;
     MYSQL *mysql;
     NET *net;
+
+    /* derived from sql/mysqld.cc:handle_connections_sockets */
+    vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
+    vio_fastsend(vio_tmp);
+
+    /* Enable TCP keepalive which equivalent to
+     * to vio_keepalive(vio_tmp, TRUE) plus setting
+     *   tcp_keepalive_probes = 4
+     *   tcp_keepalive_time   = 60
+     *   tcp_keepalive_intvl  = 60 */
+    optval = 1;
+    setsockopt(vio_tmp->sd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
+    optval = 4;
+    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPCNT, &optval, sizeof(optval));
+    optval = 60;
+    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPIDLE, &optval, sizeof(optval));
+    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPINTVL, &optval, sizeof(optval));
 
     /* Initialize a MySQL object */
     mysql = mysql_init(NULL);
@@ -224,7 +252,7 @@ MYSQL* client_init(Vio *vio) {
     /* Initialize the client network structure */
     net = &(mysql->net);
     net->max_packet += ID_SIZE;
-    my_net_init(net, vio);
+    my_net_init(net, vio_tmp);
     my_net_set_write_timeout(net, NET_WRITE_TIMEOUT);
     my_net_set_read_timeout(net, NET_READ_TIMEOUT);
 
@@ -348,30 +376,12 @@ void* proxy_net_new_thread(void *ptr) {
  * \param status Status information for the connection.
  **/
 void client_do_work(proxy_work_t *work, commitdata_t *commit, status_t *status) {
-    int error, optval;
-    Vio *vio_tmp;
+    int error;
 
     if (unlikely(!work))
         return;
 
-    /* derived from sql/mysqld.cc:handle_connections_sockets */
-    vio_tmp = vio_new(work->clientfd, VIO_TYPE_TCPIP, 0);
-    vio_fastsend(vio_tmp);
-
-    /* Enable TCP keepalive which equivalent to
-     * to vio_keepalive(vio_tmp, TRUE) plus setting
-     *   tcp_keepalive_probes = 4
-     *   tcp_keepalive_time   = 60
-     *   tcp_keepalive_intvl  = 60 */
-    optval = 1;
-    setsockopt(vio_tmp->sd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(optval));
-    optval = 4;
-    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPCNT, &optval, sizeof(optval));
-    optval = 60;
-    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPIDLE, &optval, sizeof(optval));
-    setsockopt(vio_tmp->sd, SOL_TCP, TCP_KEEPINTVL, &optval, sizeof(optval));
-
-    work->proxy = client_init(vio_tmp);
+    work->proxy = client_init(work->clientfd);
     if (work->proxy == NULL)
         return;
 
@@ -634,7 +644,7 @@ static uchar *net_store_data(uchar *to, const uchar *from, size_t length) {
  * \param org_name  Column identifer before AS clause.
  * \param status    Status information for the connection.
  **/
-static inline void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t *status) {
+static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t *status) {
     uchar buff[BUFSIZ], *pos;
 
     /* These values are the same for SHOW STATUS */
@@ -685,7 +695,7 @@ static inline void send_status_field(MYSQL *mysql, char *name, char *org_name, s
  * \param value  Value of the variable to send.
  * \param status Status information for the connection.
  **/
-static inline void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status) {
+static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status) {
     uchar *pos;
     char val[LONG_LEN];
     int len;
