@@ -41,6 +41,17 @@ void __wrap_proxy_threading_start(
         __attribute__((unused)) void* (*start_routine)(void*),
         __attribute__((unused)) void *arg) {}
 
+/* Dummy network functions */
+my_bool __wrap_proxy_net_send_ok(
+        __attribute__((unused)) MYSQL *mysql,
+        __attribute__((unused)) uint warnings,
+        __attribute__((unused)) ulong affected_rows,
+        __attribute__((unused)) ulonglong last_insert_id) { return FALSE; }
+my_bool __wrap_proxy_net_send_error(
+        __attribute__((unused))MYSQL *mysql,
+        __attribute__((unused))int sql_errno,
+        __attribute__((unused))const char *err) { return FALSE; }
+
 volatile sig_atomic_t cloning = 0;
 
 /* Error when trying to read backend with no filename */

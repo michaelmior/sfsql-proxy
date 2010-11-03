@@ -29,7 +29,9 @@ check_backend_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,proxy_threading_cancel \
 	-Wl,--wrap,proxy_threading_cleanup \
 	-Wl,--wrap,proxy_threading_mask \
-	-Wl,--wrap,proxy_threading_start
+	-Wl,--wrap,proxy_threading_start \
+	-Wl,--wrap,proxy_net_send_ok \
+	-Wl,--wrap,proxy_net_send_error
 
 check_map_SOURCES = check_map.c log_stub.c
 check_map_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@ $(LIBLTDL)
