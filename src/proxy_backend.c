@@ -55,7 +55,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, stat
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
 
-static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status);
+static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, status_t *status);
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status);
 
 /* Data structure allocation functions */
@@ -270,6 +270,10 @@ static my_bool backends_alloc(int num_backends)  {
         }
     }
 
+    /* Check if we skip threading and pool setup */
+    if (!options.backend_file)
+        return FALSE;
+
     /* Initialize pools for locking backend access */
     backend_pools = (pool_t**) calloc(backend_num, sizeof(proxy_host_t**));
     if (!backend_pools)
@@ -277,10 +281,6 @@ static my_bool backends_alloc(int num_backends)  {
 
     for (i=0; i<num_backends; i++)
         backend_pools[i] = proxy_pool_new(backend_num);
-
-    /* Check if we skip threading setup */
-    if (!options.backend_file)
-        return FALSE;
 
     /* Create a thread pool */
     if (!backend_thread_pool) {
@@ -805,6 +805,8 @@ void* proxy_backend_new_thread(void *ptr) {
  * Send a query to the backend and return the results to the client.
  *
  * \param proxy  MySQL object corresponding to the client connection.
+ * \param ci     Index of a connection to use in the case of a
+ *               single backend.
  * \param query  A query string received from the client.
  * \param length Length of the query string.
  * \param commit Data required for synchronization
@@ -813,7 +815,7 @@ void* proxy_backend_new_thread(void *ptr) {
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_t *commit, status_t *status) {
+my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, commitdata_t *commit, status_t *status) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE;
@@ -838,7 +840,7 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_
     }
 
     /* Spin until query can proceed */
-    while (!backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
+    while (backend_pools && !backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
     while (cloning) { usleep(1000); }           /* Wait until cloning is done */
 
     /* Speed things up with only one backend
@@ -855,9 +857,9 @@ my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_
 
             /* XXX: This guards against the unlikely case that we
              *      get here while backends are being updated */
-            while (!backend_pools[bi]) { bi = rand() % backend_num; }
+            while (backend_pools && !backend_pools[bi]) { bi = rand() % backend_num; }
 
-            if (backend_query_idx(bi, proxy, query, length, status)) {
+            if (backend_query_idx(bi, ci, proxy, query, length, status)) {
                 error = TRUE;
                 goto out;
             }
@@ -932,21 +934,22 @@ out:
 /**
  * Forward a query to a specific backend
  *
- * \param bi      Index of the backend to send the query to.
- * \param proxy   MYSQL object to forward results to.
- * \param query   Query string to execute.
- * \param length  Length of the query.
- * \param status  Status information for the connection.
+ * \param bi     Index of the backend to send the query to.
+ * \param ci     Index of a connection to use, or negative
+ *               to use any connection.
+ * \param proxy  MYSQL object to forward results to.
+ * \param query  Query string to execute.
+ * \param length Length of the query.
+ * \param status Status information for the connection.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query, ulong length, status_t *status) {
-    int ci;
+static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, status_t *status) {
     proxy_backend_conn_t *conn;
     my_bool error;
 
     /* Get a backend to use */
-    ci = proxy_pool_get(backend_pools[bi]);
+    ci = backend_pools ? proxy_pool_get(backend_pools[bi]) : ci;
     conn = backend_conns[bi][ci];
 
     proxy_debug("Sending read-only query %s to backend %d, connection %d\n", query, bi, ci);
@@ -954,7 +957,7 @@ static inline my_bool backend_query_idx(int bi, MYSQL *proxy, const char *query,
     /*Send the query */
     error = backend_query(conn, proxy, query, length, bi, NULL, status);
 
-    if (!conn->freed)
+    if (!conn->freed && backend_pools)
         proxy_pool_return(backend_pools[bi], ci);
 
     return error;

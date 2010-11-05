@@ -75,7 +75,7 @@ void set_option_defaults() {
     options.help            = FALSE;
     options.daemonize       = FALSE;
 
-    options.num_conns       = NUM_CONNS;
+    options.num_conns       = -1;
     options.add_ids         = FALSE;
     options.two_pc          = FALSE;
     options.autocommit      = TRUE;
@@ -92,7 +92,7 @@ void set_option_defaults() {
     options.timeout         = CLIENT_TIMEOUT;
     options.mapper          = NULL;
     options.client_threads  = CLIENT_THREADS;
-    options.backend_threads = BACKEND_THREADS;
+    options.backend_threads = -1;
 }
 
 /**
@@ -214,7 +214,15 @@ int parse_options(int argc, char *argv[]) {
             fprintf(stderr, "Error accessing backend file %s:%s\n", options.backend_file, strerror(errno));
             return EX_NOINPUT;
         }
+
+        options.backend_threads = BACKEND_THREADS;
+        options.num_conns = NUM_CONNS;
     } else {
+        if (options.backend_threads > 0 || options.num_conns > 0) {
+            fprintf(stderr, "Can't specify backend threads or connections with only one backend\n");
+            return EX_USAGE;
+        }
+
         if ((options.backend.host || options.backend.port) && options.unix_socket) {
             usage();
             return EX_USAGE;

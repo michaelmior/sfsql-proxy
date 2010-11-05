@@ -64,7 +64,7 @@ my_bool proxy_backend_init();
 my_bool proxy_backend_connect();
 my_bool proxy_backends_connect();
 void proxy_backends_update();
-my_bool proxy_backend_query(MYSQL *proxy, char *query, ulong length, commitdata_t *commit, status_t *status);
+my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, commitdata_t *commit, status_t *status);
 void* proxy_backend_new_thread(void *ptr);
 void proxy_backend_close();
 
