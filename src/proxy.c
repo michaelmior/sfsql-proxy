@@ -212,7 +212,7 @@ static inline void client_threads_start() {
         net_threads[i].data.work.addr = NULL;
         net_threads[i].data.work.proxy = NULL;
 
-        proxy_threading_start(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
+        pthread_create(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
     }
 }
 

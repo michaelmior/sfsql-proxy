@@ -51,9 +51,11 @@ void proxy_threading_init() {
 
 /*
  * Block signals so they are handled by the main thread
+ * and initialize thread-specific data.
  */
 void proxy_threading_mask() {
     pthread_sigmask(SIG_BLOCK, &handle_set, NULL);
+    pthread_setspecific(thread_buf_key, malloc(BUFSIZ));
 }
 
 /**
@@ -66,28 +68,6 @@ void proxy_threading_end() {
 #ifdef DEBUG
     pthread_mutexattr_destroy(&__proxy_mutexattr);
 #endif
-}
-
-/**
- * Start a new thread and initialize thread-specific data.
- *
- * \param thread        Pointer where a thread identifier will be stored.
- * \param attr          Attributes to associate with the new thread.
- * \param start_routine Function to be called to start the thread.
- * \param arg           Data pointer passed to start_routine.
- *
- * \return Zero on success, otherwise an error number.
- **/
-int proxy_threading_start(pthread_t *thread, const pthread_attr_t *attr, void* (*start_routine)(void*), void *arg) {
-    int ret;
-    char *buf = (char*) malloc(BUFSIZ);
-
-    ret = pthread_create(thread, attr, start_routine, arg);
-
-    if (!ret)
-        pthread_setspecific(thread_buf_key, buf);
-
-    return ret;
 }
 
 /**

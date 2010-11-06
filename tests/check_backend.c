@@ -35,11 +35,6 @@ void __wrap_proxy_threading_cleanup(
     __attribute__((unused)) int num,
     __attribute__((unused)) pool_t *pool) {}
 void __wrap_proxy_threading_mask() {}
-void __wrap_proxy_threading_start(
-        __attribute__((unused)) pthread_t *thread,
-        __attribute__((unused)) const pthread_attr_t *attr,
-        __attribute__((unused)) void* (*start_routine)(void*),
-        __attribute__((unused)) void *arg) {}
 
 /* Dummy network functions */
 my_bool __wrap_proxy_net_send_ok(

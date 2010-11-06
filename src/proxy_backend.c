@@ -337,7 +337,7 @@ static void backend_new_threads(int bi) {
         thread->data.backend.query.query = NULL;
 
         /* Start a backend thread */
-        proxy_threading_start(&thread->thread, &attr, proxy_backend_new_thread, (void*) thread);
+        pthread_create(&thread->thread, &attr, proxy_backend_new_thread, (void*) thread);
     }
 }
 
