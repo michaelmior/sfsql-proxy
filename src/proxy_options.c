@@ -236,6 +236,7 @@ int parse_options(int argc, char *argv[]) {
 
         options.backend.host = options.backend.host ?: BACKEND_HOST;
         options.backend.port = options.backend.port ?: BACKEND_PORT;
+        options.num_conns = NUM_CONNS;
     }
     
     return EXIT_SUCCESS;

@@ -149,6 +149,7 @@ START_TEST (test_options_defaults) {
     fail_unless(strcmp(options.pass, BACKEND_PASS) == 0);
     fail_unless(strcmp(options.db, BACKEND_DB) == 0);
     fail_unless(options.backend_file == NULL);
+    fail_unless(options.num_conns = NUM_CONNS);
     fail_unless(options.phost == NULL);
     fail_unless(options.pport == PROXY_PORT);
     fail_unless(options.timeout == CLIENT_TIMEOUT);
