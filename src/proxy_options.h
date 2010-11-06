@@ -44,6 +44,8 @@ struct {
 
     /** Backend address info. */
     proxy_host_t backend;
+    /** Port used to bypass secondary proxy server. */
+    int bypass_port;
     /** Whether or not to use UNIX sockets*/
     my_bool unix_socket;
     /** UNIX socket filename */

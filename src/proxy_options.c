@@ -39,6 +39,7 @@ static void usage() {
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
             "\t--backend-port,    -P\tPort of the backend host (default: 3306)\n"
+            "\t--bypass-port,     -y\tPort used to bypass secondary proxy for read-only queries\n"
             "\t--socket,          -s\tUse a UNIX socket for the backend connection\n\n"
 
             "\t--backend-db,      -D\tName of database on the backend (default: test)\n"
@@ -81,6 +82,7 @@ void set_option_defaults() {
     options.autocommit      = TRUE;
     options.backend.host    = NULL;
     options.backend.port    = 0;
+    options.bypass_port     = -1;
     options.unix_socket     = FALSE;
     options.socket_file     = NULL;
     options.user            = NULL;
@@ -108,6 +110,7 @@ int parse_options(int argc, char *argv[]) {
         {"daemonize",       no_argument,       0, 'd'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
+        {"bypass-port",     required_argument, 0, 'y'},
         {"socket",          optional_argument, 0, 's'},
         {"backend-db",      required_argument, 0, 'D'},
         {"backend-user",    required_argument, 0, 'u'},
@@ -128,7 +131,7 @@ int parse_options(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dh:P:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dh:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -142,6 +145,9 @@ int parse_options(int argc, char *argv[]) {
                 break;
             case 'P':
                 options.backend.port = atoi(optarg);
+                break;
+            case 'y':
+                options.bypass_port = atoi(optarg);
                 break;
             case 's':
                 options.unix_socket = TRUE;

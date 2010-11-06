@@ -66,7 +66,7 @@ static void backend_conns_free(int bi);
 static my_bool backends_alloc(int num_backends);
 static void backend_conns_free(int bi);
 
-static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn);
+static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn, my_bool bypass);
 static void backend_new_threads(int bi);
 static proxy_host_t** backend_read_file(char *filename, int *num) __attribute__((malloc));
 
@@ -346,12 +346,15 @@ static void backend_new_threads(int bi) {
  *
  * \param backend Address information of the backend.
  * \param conn    Connection whre MySQL object should be stored.
+ * \param bypass  TRUE to use the bypass port if specified,
+ *                FALSE otherwise.
  *
  * \return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn) {
+static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn, my_bool bypass) {
     MYSQL *mysql, *ret;
     my_bool reconnect = TRUE;
+    int port = bypass && (options.bypass_port > 0) ? options.bypass_port : backend->port;
 
     mysql = conn->mysql = NULL;
     mysql = mysql_init(NULL);
@@ -370,9 +373,9 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
         ret = mysql_real_connect(mysql, NULL, options.user, options.pass, options.db,
                 0, options.socket_file, 0);
     } else {
-        proxy_log(LOG_INFO, "Connecting to %s:%d", backend->host, backend->port);
+        proxy_log(LOG_INFO, "Connecting to %s:%d", backend->host, port);
         ret = mysql_real_connect(mysql, backend->host,
-                options.user, options.pass, options.db, backend->port, NULL, 0);
+                options.user, options.pass, options.db, port, NULL, 0);
     }
 
     if (!ret) {
@@ -503,7 +506,7 @@ my_bool proxy_backend_connect() {
 
     /* Connect to all backends */
     for (i=0; i<options.num_conns; i++) {
-        if (backend_connect(backends[0], backend_conns[0][i]))
+        if (backend_connect(backends[0], backend_conns[0][i], TRUE))
             return TRUE;
     }
 
@@ -530,12 +533,12 @@ my_bool proxy_backends_connect() {
     /* Connect to all backends */
     for (i=0; i<num_backends; i++) {
         for (j=0; j<options.num_conns; j++) {
-            if (backend_connect(backends[i], backend_conns[i][j]))
+            if (backend_connect(backends[i], backend_conns[i][j], TRUE))
                 return TRUE;
         }
 
         for (j=0; j<options.backend_threads; j++) {
-            if (backend_connect(backends[i], backend_threads[i][j].data.backend.conn))
+            if (backend_connect(backends[i], backend_threads[i][j].data.backend.conn, FALSE))
                 return TRUE;
         }
     }
@@ -578,7 +581,7 @@ static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **
 
             for (ci=0; ci<options.num_conns; ci++) {
                 conns[bi][ci] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
-                backend_connect(backends[bi], conns[bi][ci]);
+                backend_connect(backends[bi], conns[bi][ci], TRUE);
             }
         }
 
@@ -601,7 +604,7 @@ static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **
             /* Open the MySQL connections for each backend thread */
             for (ci=0; ci<options.backend_threads; ci++) {
                 if (!backend_threads[bi][ci].data.backend.conn->mysql)
-                    backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn);
+                    backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn, FALSE);
             }
         } else {
             proxy_pool_unlock(backend_thread_pool[bi]);

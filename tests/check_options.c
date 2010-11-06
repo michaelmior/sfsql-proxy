@@ -26,6 +26,7 @@
 
 #define TEST_HOST            "127.0.0.2"
 #define TEST_PORT            "3307"
+#define TEST_BYPASS_PORT     "3306"
 #define TEST_SOCKET          "/tmp/dummy.sock"
 #define TEST_DB              "db"
 #define TEST_USER            "test"
@@ -61,6 +62,7 @@ START_TEST (test_options_short) {
         "-d",
         "-h" TEST_HOST,
         "-P" TEST_PORT,
+        "-y" TEST_BYPASS_PORT,
         "-n" TEST_CLIENT_TIMEOUT,
         "-D" TEST_DB,
         "-u" TEST_USER,
@@ -78,6 +80,7 @@ START_TEST (test_options_short) {
     fail_unless(options.daemonize);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
+    fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
     fail_unless(strcmp(options.db, TEST_DB) == 0);
     fail_unless(strcmp(options.user, TEST_USER) == 0);
     fail_unless(strcmp(options.pass, TEST_PASS) == 0);
@@ -97,6 +100,7 @@ START_TEST (test_options_long) {
         "--daemonize",
         "--backend-host="    TEST_HOST,
         "--backend-port="    TEST_PORT,
+        "--bypass-port="     TEST_BYPASS_PORT,
         "--backend-db="      TEST_DB,
         "--backend-user="    TEST_USER,
         "--backend-pass="    TEST_PASS,
@@ -113,6 +117,7 @@ START_TEST (test_options_long) {
     fail_unless(options.daemonize);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
+    fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
     fail_unless(strcmp(options.db, TEST_DB) == 0);
     fail_unless(strcmp(options.user, TEST_USER) == 0);
     fail_unless(strcmp(options.pass, TEST_PASS) == 0);
@@ -136,6 +141,7 @@ START_TEST (test_options_defaults) {
     fail_unless(!options.two_pc);
     fail_unless(options.autocommit);
     fail_unless(strcmp(options.backend.host, BACKEND_HOST) == 0);
+    fail_unless(options.bypass_port < 0);
     fail_unless(!options.unix_socket);
     fail_unless(options.socket_file == NULL);
     fail_unless(options.backend.port == BACKEND_PORT);
