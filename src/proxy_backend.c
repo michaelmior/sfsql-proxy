@@ -826,7 +826,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
     pthread_barrier_t query_barrier;
     proxy_backend_query_t *bquery;
     proxy_thread_t *thread;
-    ulonglong results;
+    ulonglong results=0;
 
     /* Get the query map and modified query
      * if a mapper was specified */
@@ -1004,8 +1004,11 @@ static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool succ
  **/
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status) {
     my_bool error = FALSE, success;
-    ulong pkt_len = 8;
+    ulong pkt_len = 8, field_count;
     MYSQL *mysql;
+    my_ulonglong affected_rows=0;
+    my_ulonglong insert_id=0;
+    uint server_status=0, warnings=0;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1026,6 +1029,16 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* Read the result header packet from the backend */
     pkt_len = backend_read_to_proxy(mysql, NULL, status);
+
+    /* If we're doing two-phase commit, save data from executing the statement */
+    if (proxy && commit && options.two_pc) {
+        uchar *pos = (uchar*) mysql->net.read_pos;
+        field_count = net_field_length_ll(&pos);
+        affected_rows = net_field_length_ll(&pos);
+        insert_id = net_field_length_ll(&pos);
+        server_status = uint2korr(pos); pos += 2;
+        warnings = uint2korr(pos); pos += 2;
+    }
 
     /* Error reading from the backend, wait on the barrier
      * so everyone else will be able to continue, then
@@ -1054,7 +1067,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     if (commit && options.two_pc) {
         if (*(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1)) {
             if (proxy)
-                error = proxy_net_send_ok(proxy, 0, 0, 0);
+                error = proxy_net_send_ok(proxy, warnings, affected_rows, insert_id);
 
             proxy_debug("Commiting on backend %d", bi);
             mysql_real_query(mysql, "COMMIT", 6);
@@ -1063,6 +1076,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
                 error = proxy_net_send_error(proxy,
                         ER_ERROR_DURING_COMMIT,
                         "Couldn't commit transaction");
+
             proxy_debug("Rolling back on backend %d", bi);
             mysql_real_query(mysql, "ROLLBACK", 8);
         }
