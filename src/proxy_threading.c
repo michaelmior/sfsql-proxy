@@ -75,9 +75,9 @@ void proxy_threading_end() {
  * for work, and they will exit upon seeing no work available.
  * We then return any locked threads to the pool.
  *
- * \param threads Array of threads to cancel.
- * \param num     Number of threads in the array.
- * \param pool    Pool for locking thread access.
+ * @param threads Array of threads to cancel.
+ * @param num     Number of threads in the array.
+ * @param pool    Pool for locking thread access.
  **/
 void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool) {
     int i;
@@ -104,9 +104,9 @@ void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool) {
 /**
  *  Join and clean up thread data structures.
  *
- *  \param threads Array of threads to clean up.
- *  \param num     Number of threads in the array.
- *  \param pool    Pool for locking thread access.
+ *  @param threads Array of threads to clean up.
+ *  @param num     Number of threads in the array.
+ *  @param pool    Pool for locking thread access.
  **/
 void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool) {
     int i;

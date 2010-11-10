@@ -65,7 +65,7 @@ AC_DEFUN([DX_FEATURE_ps],   ON)
 # DX_ENV_APPEND(VARIABLE, VALUE)
 # ------------------------------
 # Append VARIABLE="VALUE" to DX_ENV for invoking doxygen.
-AC_DEFUN([DX_ENV_APPEND], [AC_SUBST([DX_ENV], ["$DX_ENV $1='$2'"])])
+AC_DEFUN([DX_ENV_APPEND], [AC_SUBST([DX_ENV], ["$DX_ENV $1=\\\"$2\\\"\n"])])
 
 # DX_DIRNAME_EXPR
 # ---------------

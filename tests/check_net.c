@@ -111,7 +111,7 @@ int compare_to_file(char *filename, int sd) {
     return 0;
 }
 
-/* Proxy executes handshake correctly */
+/** @test Proxy executes handshake correctly */
 START_TEST (test_net_handshake) {
     sun_addr_t server_addr;
     struct sockaddr_in addr;

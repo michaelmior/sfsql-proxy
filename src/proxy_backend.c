@@ -70,14 +70,15 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
 static void backend_new_threads(int bi);
 static proxy_host_t** backend_read_file(char *filename, int *num) __attribute__((malloc));
 
-
 /**
  * Write from a backend to a proxy connection.
  *
- * \param backend Backend MYSQL object to read from.
- * \param proxy   Proxy MYSQL object to write to.
- * \param pkt_len Number of bytes to write.
- * \param status  Status of connection for updating bytes sent.
+ * @param backend        Backend MYSQL object to read from.
+ * @param proxy          Proxy MYSQL object to write to.
+ * @param pkt_len        Number of bytes to write.
+ * @param[in,out] status Status of connection for updating bytes sent.
+ *
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status) {
         NET *net = &backend->net;
@@ -100,11 +101,14 @@ static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict 
  *
  * This code is derived from sql/client.c:cli_safe_read
  *
- * \param backend Backend to read from.
- * \param proxy   Client to write to or NULL to only read.
- * \param status  Status information for the connection.
+ * @callergraph
  *
- * \return Length of the packet which was read.
+ * @param backend        Backend to read from.
+ * @param proxy          Client to write to or NULL to only read.
+ * @param[in,out] status Status information for the connection.
+ *
+ * @return Length of the packet which was read, or packet_error
+ *         on error.
  **/
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status) {
     NET *net = &backend->net;
@@ -144,12 +148,12 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
  *
  * This code is derived from sql/client.c:cli_read_rows
  *
- * \param backend Backend where results are being read from.
- * \param proxy   Client where results are written to.
- * \param fields  Number of fields in the result set.
- * \param status    Status information for the connection.
+ * @param backend        Backend where results are being read from.
+ * @param proxy          Client where results are written to.
+ * @param fields         Number of fields in the result set.
+ * @param[in,out] status Status information for the connection.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status) {
     uchar *cp;
@@ -188,7 +192,7 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, stat
 /**
  *  Set up backend data structures.
  *
- *  \return TRUE on error, FALSE otherwise.
+ *  @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_init() {
     char buf[BUFSIZ], *err;
@@ -232,8 +236,9 @@ my_bool proxy_backend_init() {
 /**
  * Allocated data structures for storing backend info.
  *
- * \param num_backends Number of backends to allocate.
- * \param threading    TRUE to perform threading setup, FALSE otherwise.
+ * @param num_backends Number of backends to allocate.
+ *
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backends_alloc(int num_backends)  {
     int i, j;
@@ -242,6 +247,7 @@ static my_bool backends_alloc(int num_backends)  {
     
     /* Allocate memory for backends and connections */
     if (num_backends > 0) {
+        /* Allocate host information array */
         if (!backends) {
             backends = (proxy_host_t**) calloc(backend_num, sizeof(proxy_host_t*));
             if (!backends)
@@ -249,10 +255,12 @@ static my_bool backends_alloc(int num_backends)  {
         }
 
         if (!backend_conns) {
+            /* Allocate read-only connections */
             backend_conns = (proxy_backend_conn_t***) calloc(backend_num, sizeof(proxy_backend_conn_t**));
             if (!backend_conns)
                 goto error;
 
+            /* Allocate R/W connections for threads */
             for (i=0; i<backend_num; i++) {
                 backend_conns[i] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
                 if (!backend_conns[i])
@@ -309,7 +317,7 @@ error:
 /**
  * Start new threads for a particular backend.
  *
- * \param bi Index of the backend whose threads should be started.
+ * @param bi Index of the backend whose threads should be started.
  **/
 static void backend_new_threads(int bi) {
     int i;
@@ -344,12 +352,12 @@ static void backend_new_threads(int bi) {
 /**
  * Connect to a backend server with the given address.
  *
- * \param backend Address information of the backend.
- * \param conn    Connection whre MySQL object should be stored.
- * \param bypass  TRUE to use the bypass port if specified,
+ * @param backend Address information of the backend.
+ * @param conn    Connection whre MySQL object should be stored.
+ * @param bypass  TRUE to use the bypass port if specified,
  *                FALSE otherwise.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn, my_bool bypass) {
     MYSQL *mysql, *ret;
@@ -395,10 +403,12 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
 /**
  *  Read a list of backends from file.
  *
- *  \param filename Filename to read from.
- *  \param num      A pointer where the number of found backends will be stored.
+ *  @param filename Filename to read from.
+ *  @param[out] num A pointer where the number of
+ *                  found backends will be stored.
  *
- *  \return An array of ::proxy_host_t structs representing the read backends.
+ *  @return An array of ::proxy_host_t structs
+ *          representing the read backends.
  **/
 static proxy_host_t** backend_read_file(char *filename, int *num) {
     FILE *f;
@@ -492,7 +502,7 @@ static proxy_host_t** backend_read_file(char *filename, int *num) {
 /**
  * Open a number of connections to a single backend.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_connect() {
     int i;
@@ -516,7 +526,7 @@ my_bool proxy_backend_connect() {
 /**
  * Connect to all backends in a specified file.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backends_connect() {
     int num_backends=-1, i, j;
@@ -549,8 +559,8 @@ my_bool proxy_backends_connect() {
 /**
  * Update data structures with new backend data after update.
  *
- * \param new_num      New number of backends.
- * \param new_backends New backends to use.
+ * @param new_num      New number of backends.
+ * @param new_backends New backends to use.
  **/
 static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
     int oldnum;
@@ -568,8 +578,8 @@ static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
 /**
  * Connect to new backends after an update.
  *
- * \param conns List of connections to open.
- * \param pools List of pools to initialize.
+ * @param conns List of connections to open.
+ * @param pools List of pools to initialize.
  **/
 static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools) {
     int bi, ci;
@@ -615,7 +625,7 @@ static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **
 /**
  * Free a backend and asociated connections.
  *
- * \param bi Index of the backend to free.
+ * @param bi Index of the backend to free.
  **/
 static void backend_conns_free(int bi) {
     int i;
@@ -647,10 +657,10 @@ static void backend_conns_free(int bi) {
 /**
  * Reize the backend pool and connection data structures on update.
  *
- * \param num    Number of backends to allocate in new structure.
- * \param before TRUE if allocation is before reshuffling, FALSE otherwise.
+ * @param num    Number of backends to allocate in new structure.
+ * @param before TRUE if allocation is before reshuffling, FALSE otherwise.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_resize(int num, my_bool before) {
     int i;
@@ -760,9 +770,9 @@ void proxy_backends_update() {
 /**
  * Start a new backend thread.
  *
- * \param ptr Pointer to a thread object.
+ * @param ptr Pointer to a thread object.
  *
- * \return NULL.
+ * @return NULL.
  **/
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
@@ -807,16 +817,16 @@ void* proxy_backend_new_thread(void *ptr) {
 /**
  * Send a query to the backend and return the results to the client.
  *
- * \param proxy  MySQL object corresponding to the client connection.
- * \param ci     Index of a connection to use in the case of a
- *               single backend.
- * \param query  A query string received from the client.
- * \param length Length of the query string.
- * \param commit Data required for synchronization
- *               and two-phase commit.
- * \param status Status information for the connection.
+ * @param proxy          MySQL object corresponding to the client connection.
+ * @param ci             Index of a connection to use in the case of a
+ *                       single backend.
+ * @param query          A query string received from the client.
+ * @param length         Length of the query string.
+ * @param commit         Data required for synchronization and
+ *                       two-phase commit.
+ * @param[in,out] status Status information for the connection.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, commitdata_t *commit, status_t *status) {
     int bi = -1, i, ti;
@@ -937,15 +947,15 @@ out:
 /**
  * Forward a query to a specific backend
  *
- * \param bi     Index of the backend to send the query to.
- * \param ci     Index of a connection to use, or negative
- *               to use any connection.
- * \param proxy  MYSQL object to forward results to.
- * \param query  Query string to execute.
- * \param length Length of the query.
- * \param status Status information for the connection.
+ * @param bi             Index of the backend to send the query to.
+ * @param ci             Index of a connection to use, or negative
+ *                       to use any connection.
+ * @param proxy          MYSQL object to forward results to.
+ * @param query          Query string to execute.
+ * @param length         Length of the query.
+ * @param[in,out] status Status information for the connection.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, status_t *status) {
     proxy_backend_conn_t *conn;
@@ -969,9 +979,9 @@ static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char
 /**
  * Wait for all backends to finish before continuing and record success.
  *
- * \param commit  Data required for synchronization.
- * \param status  Status information for the connection.
- * \param success Whether the query succeeded or failed.
+ * @param commit  Data required for synchronization.
+ * @param bi      Index of the backend being waited on.
+ * @param success Whether the query succeeded or failed.
  **/
 static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool success) {
     /* If we're sending to multiple backends, wait
@@ -991,16 +1001,16 @@ static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool succ
 /**
  * Forward a query to a backend connection
  *
- * \param conn    Connection where the query should be sent.
- * \param proxy   MYSQL object to forward results to.
- * \param query   Query string to execute.
- * \param length  Length of the query.
- * \param bi      Index of the backend executing the query.
- * \param commit  Data required for synchronization
- *                and two-phase commit.
- * \param status  Status information for the connection.
+ * @param conn           Connection where the query should be sent.
+ * @param proxy          MYSQL object to forward results to.
+ * @param query          Query string to execute.
+ * @param length         Length of the query.
+ * @param bi             Index of the backend executing the query.
+ * @param commit         Data required for synchronization
+ *                       and two-phase commit.
+ * @param[in,out] status Status information for the connection.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status) {
     my_bool error = FALSE, success;
@@ -1122,7 +1132,7 @@ out:
 /**
  * Free resources associated with a connection.
  *
- * \param conn Connection to free.
+ * @param conn Connection to free.
  **/
 static void conn_free(proxy_backend_conn_t *conn) {
     if (!conn)
@@ -1137,7 +1147,7 @@ static void conn_free(proxy_backend_conn_t *conn) {
 /**
  * Free resources associated with a backend.
  *
- * \param backend Backend to free.
+ * @param backend Backend to free.
  **/
 static void backend_free(proxy_host_t *backend) {
     if (!backend)
@@ -1150,8 +1160,8 @@ static void backend_free(proxy_host_t *backend) {
 /**
  * Free an array of backends.
  *
- * \param backends Array of backends to free.
- * \param num      Number of backends in the array.
+ * @param backends Array of backends to free.
+ * @param num      Number of backends in the array.
  **/
 static void backends_free(proxy_host_t **backends, int num) {
     int i;

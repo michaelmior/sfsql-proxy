@@ -32,8 +32,6 @@ log_level_t log_level;
 
 /**
  * Open the log file.
- * 
- * \param level Maximum level of logged messages.
  **/
 void proxy_log_open() {
     /* Save the log level */
@@ -53,8 +51,8 @@ void proxy_log_open() {
 
 /**
  *
- * \param level Log level.
- * \param fmt   Format string.
+ * @param level Log level.
+ * @param fmt   Format string.
  **/
 void proxy_log(log_level_t level, const char *fmt, ...) {
     va_list arg;

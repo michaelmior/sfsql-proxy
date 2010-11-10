@@ -51,11 +51,11 @@ static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_
  * This code is derived from sql/sql_connect.cc:check_connection
  * XXX: not currently using thread ID
  *
- * \param mysql MySQL object corresponding to the client connection.
- * \param clientaddr Address of the newly connected client.
- * \param thread_id Identifier of the thread handling the connection.
+ * @param mysql MySQL object corresponding to the client connection.
+ * @param clientaddr Address of the newly connected client.
+ * @param thread_id Identifier of the thread handling the connection.
  *
- * \return TRUE on error, FALSE otherwise
+ * @return TRUE on error, FALSE otherwise
  **/
 my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
     NET *net;
@@ -188,14 +188,14 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attr
 /**
  * Validate the user credentials. This currently accepts any credentials as valid.
  *
- * \param user       Username to check.
- * \param user_len   Length of the username.
- * \param passwd     Password to check.
- * \param passwd_len Length of the password.
- * \param db         Database to check.
- * \param db_len     Length of the database.
+ * @param user       Username to check.
+ * @param user_len   Length of the username.
+ * @param passwd     Password to check.
+ * @param passwd_len Length of the password.
+ * @param db         Database to check.
+ * @param db_len     Length of the database.
  *
- * \return TRUE if the client is authorized, FALSE otherwise.
+ * @return TRUE if the client is authorized, FALSE otherwise.
  **/
 my_bool check_user(
         __attribute__((unused)) char *user,
@@ -211,9 +211,9 @@ my_bool check_user(
 /**
  * Initialize client data structures.
  *
- * \param clientfd Socket descriptor of client connection.
+ * @param clientfd Socket descriptor of client connection.
  *
- * \return A MYSQL structure ready to communicate with the client, or NULL on error.
+ * @return A MYSQL structure ready to communicate with the client, or NULL on error.
  **/
 MYSQL* client_init(int clientfd) {
     Vio *vio_tmp;
@@ -262,7 +262,7 @@ MYSQL* client_init(int clientfd) {
 /**
  * Destroy all data structures associated with a thread.
  *
- * \param thread Thread to destroy.
+ * @param thread Thread to destroy.
  **/
 void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
@@ -294,7 +294,7 @@ void client_destroy(proxy_thread_t *thread) {
  *
  * thread->status = (status_t*) malloc(sizeof(status_t));
  *
- * \param ptr A pointer to a #proxy_thread_t struct
+ * @param ptr A pointer to a #proxy_thread_t struct
  *            corresponding to the thread to be destroyed.
  **/
 void net_thread_destroy(void *ptr) {
@@ -309,8 +309,10 @@ void net_thread_destroy(void *ptr) {
 /**
  * Create a new thread to service client requests
  *
- * \param ptr A pointer to a #proxy_thread_t struct which
+ * @param ptr A pointer to a #proxy_thread_t struct which
  *            contains information on available work
+ *
+ * @return NULL.
  **/
 void* proxy_net_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
@@ -370,12 +372,12 @@ void* proxy_net_new_thread(void *ptr) {
 /**
  * Service a client request.
  *
- * \param work      Information on the work to be done.
- * \param thread_id Identifier of the client thread issuing
- *                  the request.
- * \param commit    Information required to commit which is
- *                  passed to the backend.
- * \param status    Status information for the connection.
+ * @param work              Information on the work to be done.
+ * @param thread_id         Identifier of the client thread issuing
+ *                          the request.
+ * @param commit            Information required to commit which is
+ *                          passed to the backend.
+ * @param[in,out] status    Status information for the connection.
  **/
 void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status) {
     int error;
@@ -419,20 +421,23 @@ void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, sta
 }
 
 /**
- * Read a query from a client connection.
+ * Read a query from a client connection and take
+ * appropriate action.
  *
  * This code is derived from sql/sql_parse.cc:do_command
  *
- * \param mysql     A MySQL object for a client which a query
- *                  should be read from.
- * \param thread_id Identifier of the client thread issuing
- *                  the query.
- * \param commit    Information required to commit which is
- *                  passed to the backend.
- * \param status    Status information for the connection.
+ * @callgraph
  *
- * \return Positive to disconnect without error,
- *         negative for errors, 0 to keep going
+ * @param mysql          A MySQL object for a client which
+ *                       a query should be read from.
+ * @param thread_id      Identifier of the client thread
+ *                       issuing the query.
+ * @param commit         Information required to commit 
+ *                       which is passed to the backend.
+ * @param[in,out] status Status information for the connection.
+ *
+ * @return Positive to disconnect without error, negative
+ *         for errors, 0 to keep going.
  **/
 conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status) {
     NET *net = &(mysql->net);
@@ -441,6 +446,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
     enum enum_server_command command;
     struct pollfd polls[1];
 
+    /* Ensure we have a valid MySQL object */
     if (unlikely(!mysql)) {
         proxy_log(LOG_ERROR, "Invalid MySQL object for reading query");
         return ERROR_OTHER;
@@ -545,12 +551,12 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
  *
  * This code is derived from sql/protocol.cc:net_send_ok.
  *
- * \param mysql          MySQL object the ok should be sent to.
- * \param warnings       Number of warnings produced by the previous command.
- * \param affected_rows  Number of rows affected by the previous command.
- * \param last_insert_id ID of the last row to be inserted by the previous command.
+ * @param mysql          MySQL object the ok should be sent to.
+ * @param warnings       Number of warnings produced by the previous command.
+ * @param affected_rows  Number of rows affected by the previous command.
+ * @param last_insert_id ID of the last row to be inserted by the previous command.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id) {
     NET *net = &(mysql->net);
@@ -585,9 +591,11 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
 /**
  * Send an an error message to a connected client.
  *
- * \param mysql     MYSQL object where the error should be sent.
- * \param sql_errno MySQL error code.
- * \param err       Error message string.
+ * @param mysql     MYSQL object where the error should be sent.
+ * @param sql_errno MySQL error code.
+ * @param err       Error message string.
+ *
+ * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
     /* derived from libmysql/lib_sql.cc:net_send_error_packet */
@@ -614,8 +622,8 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
 /**
  * Send an EOF packet to connected client.
  *
- * \param mysql  MYSQL object where the EOF packet should be sent.
- * \param status Status information for the connection.
+ * @param mysql          MYSQL object where the EOF packet should be sent.
+ * @param[in,out] status Status information for the connection.
  **/
 static void proxy_net_send_eof(MYSQL *mysql, status_t *status) {
     uchar buff[BUFSIZ], *pos;
@@ -643,10 +651,10 @@ static uchar *net_store_data(uchar *to, const uchar *from, size_t length) {
  *
  * This function is only called twice and exists for convenience.
  *
- * \param mysql     MYSQL object where the field packet should be sent.
- * \param name      Column identifer after AS clause.
- * \param org_name  Column identifer before AS clause.
- * \param status    Status information for the connection.
+ * @param mysql          MYSQL object where the field packet should be sent.
+ * @param name           Column identifer after AS clause.
+ * @param org_name       Column identifer before AS clause.
+ * @param[in,out] status Status information for the connection.
  **/
 static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t *status) {
     uchar buff[BUFSIZ], *pos;
@@ -693,11 +701,11 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
 /**
  * Send one row of output from a PROXY STATUS command.
  *
- * \param mysql  MYSQL object where the row packet should be sent.
- * \param buff   A buffer which can be used to store data.
- * \param name   Name of the variable to send.
- * \param value  Value of the variable to send.
- * \param status Status information for the connection.
+ * @param mysql          MYSQL object where the row packet should be sent.
+ * @param buff           A buffer which can be used to store data.
+ * @param name           Name of the variable to send.
+ * @param value          Value of the variable to send.
+ * @param[in,out] status Status information for the connection.
  **/
 static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status) {
     uchar *pos;
@@ -715,12 +723,12 @@ static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t 
 /**
  * Respond to a PROXY STATUS command.
  *
- * \param mysql     MYSQL object where status should be sent.
- * \param query     Query string from client.
- * \param query_len Length of query string.
- * \param status    Status information for the connection.
+ * @param mysql          MYSQL object where status should be sent.
+ * @param query          Query string from client.
+ * @param query_len      Length of query string.
+ * @param[in,out] status Status information for the connection.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool net_status(MYSQL *mysql, char *query,
         __attribute__((unused)) ulong query_len,
@@ -791,12 +799,12 @@ static my_bool net_status(MYSQL *mysql, char *query,
 /**
  * Respond to a PROXY command received from a client.
  *
- * \param mysql     Client MYSQL object.
- * \param query     Query string from client.
- * \param query_len Length of query string.
- * \param status    Status information for the connection.
+ * @param mysql          Client MYSQL object.
+ * @param query          Query string from client.
+ * @param query_len      Length of query string.
+ * @param[in,out] status Status information for the connection.
  *
- * \return TRUE on error, FALSE otherwise.
+ * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) {
     char *last_tok = strrchr(query, ' ')+1;

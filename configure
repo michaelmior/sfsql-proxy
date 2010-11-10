@@ -17403,13 +17403,13 @@ DX_DOCDIR=doc
 
 
 # Environment variables used inside doxygen.cfg:
-DX_ENV="$DX_ENV SRCDIR='$srcdir'"
+DX_ENV="$DX_ENV SRCDIR=\\\"$srcdir\\\"\n"
 
-DX_ENV="$DX_ENV PROJECT='$DX_PROJECT'"
+DX_ENV="$DX_ENV PROJECT=\\\"$DX_PROJECT\\\"\n"
 
-DX_ENV="$DX_ENV DOCDIR='$DX_DOCDIR'"
+DX_ENV="$DX_ENV DOCDIR=\\\"$DX_DOCDIR\\\"\n"
 
-DX_ENV="$DX_ENV VERSION='$PACKAGE_VERSION'"
+DX_ENV="$DX_ENV VERSION=\\\"$PACKAGE_VERSION\\\"\n"
 
 
 # Doxygen itself:
@@ -17678,7 +17678,7 @@ else
   DX_COND_doc_FALSE=
 fi
 
-    DX_ENV="$DX_ENV PERL_PATH='$DX_PERL'"
+    DX_ENV="$DX_ENV PERL_PATH=\\\"$DX_PERL\\\"\n"
 
     :
 else
@@ -17860,9 +17860,9 @@ else
   DX_COND_dot_FALSE=
 fi
 
-    DX_ENV="$DX_ENV HAVE_DOT='YES'"
+    DX_ENV="$DX_ENV HAVE_DOT=\\\"YES\\\"\n"
 
-             DX_ENV="$DX_ENV DOT_PATH='`expr ".$DX_DOT" : '\(\.\)[^/]*$' \| "x$DX_DOT" : 'x\(.*\)/[^/]*$'`'"
+             DX_ENV="$DX_ENV DOT_PATH=\\\"`expr ".$DX_DOT" : '\(\.\)[^/]*$' \| "x$DX_DOT" : 'x\(.*\)/[^/]*$'`\\\"\n"
 
     :
 else
@@ -17874,7 +17874,7 @@ else
   DX_COND_dot_FALSE=
 fi
 
-    DX_ENV="$DX_ENV HAVE_DOT='NO'"
+    DX_ENV="$DX_ENV HAVE_DOT=\\\"NO\\\"\n"
 
     :
 fi
@@ -17935,7 +17935,7 @@ else
   DX_COND_man_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_MAN='YES'"
+    DX_ENV="$DX_ENV GENERATE_MAN=\\\"YES\\\"\n"
 
     :
 else
@@ -17947,7 +17947,7 @@ else
   DX_COND_man_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_MAN='NO'"
+    DX_ENV="$DX_ENV GENERATE_MAN=\\\"NO\\\"\n"
 
     :
 fi
@@ -18008,7 +18008,7 @@ else
   DX_COND_rtf_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_RTF='YES'"
+    DX_ENV="$DX_ENV GENERATE_RTF=\\\"YES\\\"\n"
 
     :
 else
@@ -18020,7 +18020,7 @@ else
   DX_COND_rtf_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_RTF='NO'"
+    DX_ENV="$DX_ENV GENERATE_RTF=\\\"NO\\\"\n"
 
     :
 fi
@@ -18081,7 +18081,7 @@ else
   DX_COND_xml_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_XML='YES'"
+    DX_ENV="$DX_ENV GENERATE_XML=\\\"YES\\\"\n"
 
     :
 else
@@ -18093,7 +18093,7 @@ else
   DX_COND_xml_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_XML='NO'"
+    DX_ENV="$DX_ENV GENERATE_XML=\\\"NO\\\"\n"
 
     :
 fi
@@ -18263,11 +18263,11 @@ else
   DX_COND_chm_FALSE=
 fi
 
-    DX_ENV="$DX_ENV HHC_PATH='$DX_HHC'"
+    DX_ENV="$DX_ENV HHC_PATH=\\\"$DX_HHC\\\"\n"
 
-             DX_ENV="$DX_ENV GENERATE_HTML='YES'"
+             DX_ENV="$DX_ENV GENERATE_HTML=\\\"YES\\\"\n"
 
-             DX_ENV="$DX_ENV GENERATE_HTMLHELP='YES'"
+             DX_ENV="$DX_ENV GENERATE_HTMLHELP=\\\"YES\\\"\n"
 
     :
 else
@@ -18279,7 +18279,7 @@ else
   DX_COND_chm_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_HTMLHELP='NO'"
+    DX_ENV="$DX_ENV GENERATE_HTMLHELP=\\\"NO\\\"\n"
 
     :
 fi
@@ -18340,7 +18340,7 @@ else
   DX_COND_chi_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_CHI='YES'"
+    DX_ENV="$DX_ENV GENERATE_CHI=\\\"YES\\\"\n"
 
     :
 else
@@ -18352,7 +18352,7 @@ else
   DX_COND_chi_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_CHI='NO'"
+    DX_ENV="$DX_ENV GENERATE_CHI=\\\"NO\\\"\n"
 
     :
 fi
@@ -18421,7 +18421,7 @@ else
   DX_COND_html_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_HTML='YES'"
+    DX_ENV="$DX_ENV GENERATE_HTML=\\\"YES\\\"\n"
 
     :
 else
@@ -18433,7 +18433,7 @@ else
   DX_COND_html_FALSE=
 fi
 
-    test "$DX_FLAG_chm" = 1 || DX_ENV="$DX_ENV GENERATE_HTML='NO'"
+    test "$DX_FLAG_chm" = 1 || DX_ENV="$DX_ENV GENERATE_HTML=\\\"NO\\\"\n"
 
     :
 fi
@@ -19359,7 +19359,7 @@ else
   DX_COND_latex_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_LATEX='YES'"
+    DX_ENV="$DX_ENV GENERATE_LATEX=\\\"YES\\\"\n"
 
 else
      if false; then
@@ -19370,7 +19370,7 @@ else
   DX_COND_latex_FALSE=
 fi
 
-    DX_ENV="$DX_ENV GENERATE_LATEX='NO'"
+    DX_ENV="$DX_ENV GENERATE_LATEX=\\\"NO\\\"\n"
 
 fi
 
@@ -19383,7 +19383,7 @@ case "$DOXYGEN_PAPER_SIZE" in
 
 ;; #(
 a4wide|a4|letter|legal|executive)
-    DX_ENV="$DX_ENV PAPER_SIZE='$DOXYGEN_PAPER_SIZE'"
+    DX_ENV="$DX_ENV PAPER_SIZE=\\\"$DOXYGEN_PAPER_SIZE\\\"\n"
 
 ;; #(
 *)

@@ -100,8 +100,8 @@ void set_option_defaults() {
 /**
  * Parse command-line options
  *
- * \param argc Number of arguments.
- * \param argv Argument list.
+ * @param argc Number of arguments.
+ * @param argv Argument list.
  **/
 int parse_options(int argc, char *argv[]) {
     int c, opt=0;

@@ -55,7 +55,7 @@ void teardown() {
     lt_dlexit();
 }
 
-/* Read queries should be mapped to any backend with ROWA mapper */
+/** @test Read queries should be mapped to any backend with ROWA mapper */
 START_TEST (test_rowa_read) {
     proxy_query_map_t map;
     char *newq = NULL;
@@ -73,7 +73,7 @@ START_TEST (test_rowa_read) {
     fail_unless(map == QUERY_MAP_ANY);
 } END_TEST
 
-/* Non-read queries should be mapped to all backends with ROWA mapper */
+/** @test Non-read queries should be mapped to all backends with ROWA mapper */
 START_TEST (test_rowa_other) {
     char *newq = NULL;
     proxy_query_map_t map = (*func)("INSERT INTO test VALUES(1);", newq);

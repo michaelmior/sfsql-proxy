@@ -39,7 +39,7 @@
 #define TEST_CLIENT_TIMEOUT  "600"
 #define TEST_BACKEND_THREADS "5"
 
-/* Confirm that testing options are not the same as defaults */
+/** @test Confirm that testing options are not the same as defaults */
 START_TEST (test_options_test) {
     fail_unless(strcmp(TEST_HOST, BACKEND_HOST));
     fail_unless(atoi(TEST_PORT) != BACKEND_PORT);
@@ -56,7 +56,7 @@ START_TEST (test_options_test) {
     fail_unless(atoi(TEST_BACKEND_THREADS) != BACKEND_THREADS);
 } END_TEST
 
-/* Short option parsing */
+/** @test Short option parsing */
 START_TEST (test_options_short) {
     char *argv[] = { "./sfsql-proxy",
         "-d",
@@ -94,7 +94,7 @@ START_TEST (test_options_short) {
     fail_unless(options.client_threads == atoi(TEST_CLIENT_THREADS));
 } END_TEST
 
-/* Long option parsing */
+/** @test Long option parsing */
 START_TEST (test_options_long) {
     char *argv[] = { "./sfsql-proxy",
         "--daemonize",
@@ -130,7 +130,7 @@ START_TEST (test_options_long) {
     fail_unless(options.client_threads == atoi(TEST_CLIENT_THREADS));
 } END_TEST
 
-/* Assignment of default options */
+/** @test Assignment of default options */
 START_TEST (test_options_defaults) {
     /* Specify no arguments */
     fail_unless(parse_options(0, NULL) == EXIT_SUCCESS);
@@ -157,7 +157,7 @@ START_TEST (test_options_defaults) {
     fail_unless(options.client_threads == CLIENT_THREADS);
 } END_TEST
 
-/* Specification of invalid file */
+/** @test Specification of invalid file */
 START_TEST (test_options_bad_file) {
     char *argv[] = { "./sfsql-proxy", "-fNOTHING.txt" };
 
@@ -167,7 +167,7 @@ START_TEST (test_options_bad_file) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_NOINPUT);
 } END_TEST
 
-/* Specification of both backend and filename */
+/** @test Specification of both backend and filename */
 START_TEST (test_options_backend_and_file) {
     char *argv[] = { "./sfsql-proxy", "-fbackend/backends.txt", "-h" BACKEND_HOST };
 
@@ -178,7 +178,7 @@ START_TEST (test_options_backend_and_file) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
-/* Specification of both file and socket */
+/** @test Specification of both file and socket */
 START_TEST (test_options_file_and_socket) {
     char *argv[] = { "./sfsql-proxy", "-fbackend/backends.txt", "-s" };
 
@@ -189,7 +189,7 @@ START_TEST (test_options_file_and_socket) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
-/* Specification of both backend and socket */
+/** @test Specification of both backend and socket */
 START_TEST (test_options_backend_and_socket) {
     char *argv[] = { "./sfsql-proxy", "-h" BACKEND_HOST, "-s" };
 
@@ -200,7 +200,7 @@ START_TEST (test_options_backend_and_socket) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
-/* Default socket path assigned if none specified */
+/** @test Default socket path assigned if none specified */
 START_TEST (test_options_socket_default) {
     char *argv[] = { "./sfsql-proxy", "-s" };
 
@@ -209,7 +209,7 @@ START_TEST (test_options_socket_default) {
     fail_unless(strcmp(options.socket_file, MYSQL_UNIX_ADDR) == 0);
 } END_TEST
 
-/* Options which should not be specfied with no backend file */
+/** @test Options which should not be specfied with no backend file */
 START_TEST (test_options_no_file) {
     char *argv1[] = { "./sfsql-proxy",
         "-N" TEST_NUM_CONNS };
@@ -227,7 +227,7 @@ START_TEST (test_options_no_file) {
     fail_unless(parse_options(sizeof(argv2)/sizeof(*argv2), argv2) == EX_USAGE);
 } END_TEST;
 
-/* Short options only valid with file specified */
+/** @test Short options only valid with file specified */
 START_TEST (test_options_file_short) {
     char *argv[] = { "./sfsql-proxy",
         "-fbackend/backends.txt",
@@ -240,7 +240,7 @@ START_TEST (test_options_file_short) {
     fail_unless(options.backend_threads = atoi(TEST_BACKEND_THREADS));
 } END_TEST
 
-/* Long options only valid with file specified */
+/** @test Long options only valid with file specified */
 START_TEST (test_options_file_long) {
     char *argv[] = { "./sfsql-proxy",
         "-fbackend/backends.txt",
@@ -253,7 +253,7 @@ START_TEST (test_options_file_long) {
     fail_unless(options.backend_threads = atoi(TEST_BACKEND_THREADS));
 } END_TEST
 
-/* Default parameters only valid when file specified */
+/** @test Default parameters only valid when file specified */
 START_TEST (test_options_file_default) {
     char *argv[] = { "./sfsql-proxy", "-fbackend/backends.txt" };
 

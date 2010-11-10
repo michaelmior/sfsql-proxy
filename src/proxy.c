@@ -20,6 +20,17 @@
  *
  */
 
+/**
+ * \mainpage
+ *
+ * This documentation is intended for future developers to gain
+ * a quick understanding of the code. Attempts have been to
+ * document all functions and data structures.
+ *
+ * This software and associated documentation is currently maintained
+ * by <a href="http://www.cs.toronto.edu/~mmior">Michael Mior</a>.
+ **/
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -55,8 +66,8 @@ static inline void client_threads_start();
 /**
  * Main server loop which accepts external extensions
  *
- * \param host Host which the listening socket should be bound to.
- * \param port The port number for listening to incoming connections.
+ * @param host Host which the listening socket should be bound to.
+ * @param port The port number for listening to incoming connections.
  **/
 static void server_run(char *host, int port) {
     int serverfd, clientfd;

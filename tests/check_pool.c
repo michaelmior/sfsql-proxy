@@ -36,7 +36,7 @@ void teardown() {
     proxy_pool_destroy(pool);
 }
 
-/* New pool is correctly allocated */
+/** @test New pool is correctly allocated */
 START_TEST (test_pool_new) {
     fail_unless(pool != NULL);
     fail_unless(pool->__alloc >= 1);
@@ -44,12 +44,12 @@ START_TEST (test_pool_new) {
     fail_unless(pool->avail[0] == TRUE);
 } END_TEST
 
-/* Passing NULL when destroying pool does nothing */
+/** @test Passing NULL when destroying pool does nothing */
 START_TEST (test_pool_destroy_null) {
     proxy_pool_destroy(NULL);
 } END_TEST
 
-/* Trying to create an empty pool returns NULL */
+/** @test Trying to create an empty pool returns NULL */
 START_TEST (test_pool_new_empty) {
     pool_t *pool;
 
@@ -57,7 +57,7 @@ START_TEST (test_pool_new_empty) {
     fail_unless(pool == NULL);
 } END_TEST
 
-/* Pool can be successfully grown */
+/** @test Pool can be successfully grown */
 START_TEST (test_pool_grow) {
     int i;
 
@@ -70,7 +70,7 @@ START_TEST (test_pool_grow) {
         fail_unless(pool->avail[i] == TRUE);
 } END_TEST
 
-/* Pool can be successfully shrunk */
+/** @test Pool can be successfully shrunk */
 START_TEST (test_pool_shrink) {
     pool_t *pool;
 
@@ -83,7 +83,7 @@ START_TEST (test_pool_shrink) {
     proxy_pool_destroy(pool);
 } END_TEST
 
-/* Objects can be removed from the pool */
+/** @test Objects can be removed from the pool */
 START_TEST (test_pool_remove) {
     pool_t *pool;
 
@@ -95,7 +95,7 @@ START_TEST (test_pool_remove) {
     proxy_pool_destroy(pool);
 } END_TEST
 
-/* Objects can be fetched from the pool */
+/** @test Objects can be fetched from the pool */
 START_TEST (test_pool_get) {
     int i;
 
@@ -105,7 +105,7 @@ START_TEST (test_pool_get) {
     fail_unless(pool->avail[0] == FALSE);
 } END_TEST
 
-/* List of locked objects can be fetched */
+/** @test List of locked objects can be fetched */
 START_TEST (test_pool_get_locked) {
     int i;
 
@@ -115,7 +115,7 @@ START_TEST (test_pool_get_locked) {
     fail_unless(i == 0);
 } END_TEST
 
-/* Correct checking of free objects in pool */
+/** @test Correct checking of free objects in pool */
 START_TEST(test_pool_is_free) {
     int i;
 
@@ -131,7 +131,7 @@ START_TEST(test_pool_is_free) {
     proxy_pool_unlock(pool);
 } END_TEST
 
-/* Objects can be returned to the pool */
+/** @test Objects can be returned to the pool */
 START_TEST (test_pool_return) {
     int i;
 

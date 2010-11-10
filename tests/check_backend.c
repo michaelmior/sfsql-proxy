@@ -49,7 +49,7 @@ my_bool __wrap_proxy_net_send_error(
 
 volatile sig_atomic_t cloning = 0;
 
-/* Error when trying to read backend with no filename */
+/** @test Error when trying to read backend with no filename */
 START_TEST (test_backend_read_no_filename) {
     int num;
 
@@ -57,7 +57,7 @@ START_TEST (test_backend_read_no_filename) {
     fail_unless(num < 0);
 } END_TEST
 
-/* Error for reading empty backend file */
+/** @test Error for reading empty backend file */
 START_TEST (test_backend_read_not_exists) {
     int num;
 
@@ -65,7 +65,7 @@ START_TEST (test_backend_read_not_exists) {
     fail_unless(num < 0);
 } END_TEST
 
-/* NULL produced when reading empty f ile */
+/** @test NULL produced when reading empty f ile */
 START_TEST (test_backend_read_empty_file) {
     int num;
     proxy_host_t **backends;
@@ -76,7 +76,7 @@ START_TEST (test_backend_read_empty_file) {
     fail_unless(num == 0);
 } END_TEST
 
-/* Correct parsing of backend file */
+/** @test Correct parsing of backend file */
 START_TEST (test_backend_read_file) {
     int num;
     proxy_host_t **backends;
@@ -97,7 +97,7 @@ START_TEST (test_backend_read_file) {
     free(backends);
 } END_TEST
 
-/* Correct parsing of backend file with a missing port number*/
+/** @test Correct parsing of backend file with a missing port number*/
 START_TEST (test_backend_read_file_noport) {
     int num;
     proxy_host_t **backends;

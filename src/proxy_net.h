@@ -69,7 +69,7 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
 /**
  * Flush the write buffer of the proxy MySQL object
  *
- * /param proxy MySQL object for proxy to flush.
+ * @param proxy MySQL object for proxy to flush.
  *
  * /return TRUE on error, FALSE otherwise.
  **/
