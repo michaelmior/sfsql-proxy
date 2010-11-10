@@ -4,7 +4,7 @@ TESTS = check_options check_pool check_net check_backend check_map
 check_PROGRAMS = check_options check_pool check_net check_backend check_map
 
 AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir)/src
-AM_LDFLAGS = -Wl,--wrap,proxy_log
+AM_LDFLAGS = -Wl,--wrap,_proxy_log
 
 SRC_DIR = $(abs_top_srcdir)/src
 

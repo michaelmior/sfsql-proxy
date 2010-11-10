@@ -50,11 +50,12 @@ void proxy_log_open() {
 }
 
 /**
+ * Log a message to the previously specified log file.
  *
  * @param level Log level.
  * @param fmt   Format string.
  **/
-void proxy_log(log_level_t level, const char *fmt, ...) {
+void _proxy_log(log_level_t level, const char *fmt, ...) {
     va_list arg;
 
     /* Check if the message should be logged */
@@ -65,8 +66,6 @@ void proxy_log(log_level_t level, const char *fmt, ...) {
     va_start(arg, fmt);
     vfprintf(log_file, fmt, arg);
     va_end(arg);
-
-    fwrite("\n", 1, 1, log_file);
 
 #ifdef DEBUG
     fflush(log_file);

@@ -22,6 +22,6 @@
 
 #include "../src/proxy_logging.h"
 
-void __wrap_proxy_log(
+void __wrap__proxy_log(
     __attribute__((unused)) log_level_t level,
     __attribute__((unused)) const char *fmt, ...) {}
