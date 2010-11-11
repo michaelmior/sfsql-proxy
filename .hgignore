@@ -31,9 +31,8 @@ autom4te.cache/.*
 ^(.*/)?aclocal\.m4$
 ^(.*/)?stamp-h1$
 ^(.*/)?ltmain.sh$
-^(.*/)?config[\.-]h(\.in)?$
+^(.*/)?config[\.-]h$
 ^(.*/)?Makefile$
-^(.*/)?Makefile.in$
 ^(.*/)?libtool$
 ^install-sh$
 ^compile$
