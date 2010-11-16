@@ -723,6 +723,16 @@ static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t 
     status->bytes_sent += pos-buff;
 }
 
+static inline void net_result_header(NET *net, uchar *buff, int nfields, status_t *status) {
+    uchar *pos;
+
+    pos = buff;
+    pos = net_store_length(pos, nfields);
+    pos = net_store_length(pos, 0);
+    my_net_write(net, buff, (size_t) (pos - buff));
+    status->bytes_sent += pos-buff;
+}
+
 /**
  * Respond to a PROXY STATUS command.
  *
@@ -755,11 +765,7 @@ static my_bool net_status(MYSQL *mysql, char *query,
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Status type must be GLOBAL or SESSION");
 
     /* Send result header packet specifying two fields */
-    pos = buff;
-    pos[0] = 2; pos++;
-    pos[0] = 0; pos++;
-    my_net_write(net, buff, (size_t) (pos - buff));
-    status->bytes_sent += pos-buff;
+    net_result_header(net, buff, 2, status);
 
     /* Send list of fields */
     send_status_field(mysql, "Variable_name", "VARIABLE_NAME", status);
@@ -837,7 +843,7 @@ static my_bool net_show_clones(MYSQL *mysql,
         __attribute__((unused)) char *query,
         __attribute__((unused)) ulong query_len,
         status_t *status) {
-    uchar buff[BUFSIZ], *pos;
+    uchar buff[BUFSIZ];
     NET *net = &mysql->net;
     sf_result *tickets, *clones;
     sf_ticket_list *ticket;
@@ -855,11 +861,7 @@ static my_bool net_show_clones(MYSQL *mysql,
         return proxy_net_send_ok(mysql, 0, 0, 0);
 
     /* Send result header packet specifying two fields */
-    pos = buff;
-    pos[0] = 2; pos++;
-    pos[0] = 0; pos++;
-    my_net_write(net, buff, (size_t) (pos - buff));
-    status->bytes_sent += pos-buff;
+    net_result_header(net, buff, 2, status);
 
     /* Send list of fields */
     send_status_field(mysql, "Ticket", "TICKET", status);
