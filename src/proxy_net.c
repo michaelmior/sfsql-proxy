@@ -22,6 +22,8 @@
 
 #include "proxy.h"
 
+#include <sf.h>
+
 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
 #define MIN_HANDSHAKE_SIZE 6
 
@@ -697,6 +699,7 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
 #define GLOBAL  "GLOBAL"
 #define SESSION "SESSION"
 #define STATUS  "STATUS"
+#define CLONES  "CLONES"
 
 /**
  * Send one row of output from a PROXY STATUS command.
@@ -797,6 +800,102 @@ static my_bool net_status(MYSQL *mysql, char *query,
 }
 
 /**
+ * Respond to a PROXY CLONE[S] command.
+ *
+ * @param mysql          MYSQL object where status should be sent.
+ * @param query          Query string from client.
+ * @param query_len      Length of query string.
+ * @param[in,out] status Status information for the connection.
+ *
+ * @return TRUE on error, FALSE otherwise.
+ **/
+static my_bool net_clone(MYSQL *mysql, char *query,
+        __attribute__((unused)) ulong query_len,
+        __attribute__((unused)) status_t *status) {
+    char *err = alloca(BUFSIZ), *tok, *t=NULL;
+    int nclones, ret;
+    my_bool error;
+
+    /* Get the number of clones to create */
+    tok = strtok_r(query, " ", &t);
+    nclones = tok ? atoi(tok) : 1;
+
+    /* Perform the clone and return the result */
+    ret = proxy_do_clone(nclones, &err, BUFSIZ);
+
+    if (ret < 0)
+        error = proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, err);
+    else if (ret == 0)
+        error = proxy_net_send_ok(mysql, 0, 0, 0);
+    else
+        return TRUE;
+
+    return error;
+}
+
+static my_bool net_show_clones(MYSQL *mysql,
+        __attribute__((unused)) char *query,
+        __attribute__((unused)) ulong query_len,
+        status_t *status) {
+    uchar buff[BUFSIZ], *pos;
+    NET *net = &mysql->net;
+    sf_result *tickets, *clones;
+    sf_ticket_list *ticket;
+    sf_clone_info *clone;
+    int nclones = 0;
+
+    /* Get a list of active tickets */
+    tickets = LIST_TICKETS();
+    if (!tickets)
+        return proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, "Could not get list of tickets");
+    printf("Got tickets\n");
+    /* Check if we have no tickets */
+    ticket = tickets->outstanding_tickets;
+    if (!ticket)
+        return proxy_net_send_ok(mysql, 0, 0, 0);
+
+    /* Send result header packet specifying two fields */
+    pos = buff;
+    pos[0] = 2; pos++;
+    pos[0] = 0; pos++;
+    my_net_write(net, buff, (size_t) (pos - buff));
+    status->bytes_sent += pos-buff;
+
+    /* Send list of fields */
+    send_status_field(mysql, "Ticket", "TICKET", status);
+    send_status_field(mysql, "VMID", "VMID", status);
+    proxy_net_send_eof(mysql, status);
+    printf("Sent fields\n");
+
+    printf("Got some tickets\n");
+    /* Read the clones from each ticket and
+     * send the list to the client */
+    do {
+        clones = READ_TICKET_INFO(ticket->ticket);
+        clone = clones->clone_list;
+        if (!clone)
+            continue;
+
+        do {
+            add_row(mysql, buff, ticket->ticket, clone->vmid, status);
+            nclones++;
+        } while ((clone = clone->next));
+    } while((ticket = ticket->next));
+
+    printf("Got %d clones\n", nclones);
+
+    /* If for some reason we got here, but no clones exist,
+     * then return an OK so the client knows we haven nothing */
+    if (nclones == 0)
+        add_row(mysql, buff, "", 0, status);
+
+    proxy_net_send_eof(mysql, status);
+    proxy_net_flush(mysql);
+
+    return FALSE;
+}
+
+/**
  * Respond to a PROXY command received from a client.
  *
  * @param mysql          Client MYSQL object.
@@ -807,10 +906,18 @@ static my_bool net_status(MYSQL *mysql, char *query,
  * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) {
-    char *last_tok = strrchr(query, ' ')+1;
+    char *tok, *last_tok, *t=NULL;
 
     status->bytes_recv += query_len;
 
+    tok = strtok_r(query, " ", &t);
+    if (strncasecmp(tok, CLONES, sizeof(CLONES)-1) == 0) {
+        return net_show_clones(mysql, t, query_len-sizeof(CLONES)-1, status);
+    } else if (strncasecmp(tok, CLONES, sizeof(CLONES)-2) == 0) {
+        return net_clone(mysql, t, query_len-sizeof(CLONES)-2, status);
+    }
+
+    last_tok = strrchr(query, ' ')+1;
     if (strncasecmp(last_tok, STATUS, sizeof(STATUS)-1) == 0)
         return net_status(mysql, query, query_len, status);
 

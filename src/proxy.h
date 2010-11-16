@@ -71,6 +71,7 @@ typedef struct {
 #include "proxy_backend.h"
 #include "proxy_pool.h"
 #include "proxy_threading.h"
+#include "proxy_clone.h"
 #include "proxy_options.h"
 
 /** Threads for dealing with connected clients. */

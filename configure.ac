@@ -41,7 +41,8 @@ AC_CHECK_HEADERS([\
     arpa/inet.h \
     netdb.h \
     netinet/in.h \
-    sys/socket.h ])
+    sys/socket.h \
+    sf.h ])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
@@ -53,6 +54,7 @@ AC_C_RESTRICT
 
 # Checks for library functions.
 AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])
+AC_CHECK_FUNCS([CLONE_MASTER])
 AC_FUNC_FORK
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_VPRINTF
