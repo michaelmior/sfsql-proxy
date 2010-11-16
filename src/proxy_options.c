@@ -34,7 +34,8 @@ static void usage() {
 
             "Options:\n"
             "\t--help,             -?\tShow this message\n"
-            "\t--daemonize,        -d\tDaemonize\n\n"
+            "\t--daemonize,        -d\tDaemonize\n"
+            "\t--cloneable,        -c\tProxy should execute cloning when signalled\n\n"
 
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
@@ -108,6 +109,7 @@ int parse_options(int argc, char *argv[]) {
     static struct option long_options[] = {
         {"help",            no_argument,       0, '?'},
         {"daemonize",       no_argument,       0, 'd'},
+        {"cloneable",       no_argument,       0, 'c'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
         {"bypass-port",     required_argument, 0, 'y'},
@@ -131,7 +133,7 @@ int parse_options(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dh:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dch:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -139,6 +141,9 @@ int parse_options(int argc, char *argv[]) {
                 return EXIT_SUCCESS;
             case 'd':
                 options.daemonize = TRUE;
+                break;
+            case 'c':
+                options.cloneable = TRUE;
                 break;
             case 'h':
                 options.backend.host = optarg;

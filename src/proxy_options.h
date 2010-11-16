@@ -41,6 +41,8 @@ struct {
     my_bool help;
     /** TRUE if we need to daemonize */
     my_bool daemonize;
+    /** TRUE if this proxy is cloneable. */
+    my_bool cloneable;
 
     /** Backend address info. */
     proxy_host_t backend;

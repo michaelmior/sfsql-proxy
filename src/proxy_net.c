@@ -23,6 +23,7 @@
 #include "proxy.h"
 
 #include <sf.h>
+#include <netdb.h>
 
 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
 #define MIN_HANDSHAKE_SIZE 6
@@ -46,6 +47,8 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
 static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status);
 static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status);
+
+struct hostent *coordinator = NULL;
 
 /**
  * Perform client authentication.
@@ -696,10 +699,11 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
 }
 
 /* String defines for PROXY commands */
-#define GLOBAL  "GLOBAL"
-#define SESSION "SESSION"
-#define STATUS  "STATUS"
-#define CLONES  "CLONES"
+#define GLOBAL      "GLOBAL"
+#define SESSION     "SESSION"
+#define STATUS      "STATUS"
+#define CLONES      "CLONES"
+#define COORDINATOR "COORDINATOR"
 
 /**
  * Send one row of output from a PROXY STATUS command.
@@ -822,6 +826,10 @@ static my_bool net_clone(MYSQL *mysql, char *query,
     int nclones, ret;
     my_bool error;
 
+    /* Check if we think we can clone */
+    if (!options.cloneable)
+        proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
+
     /* Get the number of clones to create */
     tok = strtok_r(query, " ", &t);
     nclones = tok ? atoi(tok) : 1;
@@ -897,6 +905,49 @@ static my_bool net_show_clones(MYSQL *mysql,
     return FALSE;
 }
 
+static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
+    struct hostent *host;
+    uchar buff[BUFSIZ], *pos;
+    char *tok = strtok_r(NULL, " ", &t);
+
+    /* Check if a coordinator is valid */
+    if (!options.cloneable)
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Coordinator cannot be set if proxy is not cloneable");
+
+    if (tok) {
+        /* Check for a valid host and set the coordinator */
+        host = gethostbyname(tok);
+
+        if (!host) {
+            return proxy_net_send_error(mysql, ER_BAD_HOST_ERROR, "Invalid coordinator host");
+        } else {
+            coordinator = host;
+            return proxy_net_send_ok(mysql, 0, 0, 0);
+        }
+    } else {
+        /* Return nothing if no coordinator is set */
+        if (!coordinator)
+            return proxy_net_send_ok(mysql, 0, 0, 0);
+
+        /* Send the header */
+        net_result_header(&mysql->net, buff, 1, status);
+        send_status_field(mysql, "Coordinator", "COORDINATOR", status);
+        proxy_net_send_eof(mysql, status);
+
+        /* Send the coordinator name */
+        pos = buff;
+        pos = net_store_data(pos, (uchar*) coordinator->h_name, strlen(coordinator->h_name));
+
+        my_net_write(&mysql->net, buff, (size_t) (pos - buff));
+        status->bytes_sent += pos-buff;
+
+        proxy_net_send_eof(mysql, status);
+        proxy_net_flush(mysql);
+
+        return FALSE;
+    }
+}
+
 /**
  * Respond to a PROXY command received from a client.
  *
@@ -917,6 +968,8 @@ static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_
         return net_show_clones(mysql, t, query_len-sizeof(CLONES)-1, status);
     } else if (strncasecmp(tok, CLONES, sizeof(CLONES)-2) == 0) {
         return net_clone(mysql, t, query_len-sizeof(CLONES)-2, status);
+    } else if (strncasecmp(tok, COORDINATOR, sizeof(COORDINATOR)-1) == 0) {
+        return net_proxy_coordinator(mysql, t, status);
     }
 
     last_tok = strrchr(query, ' ')+1;
