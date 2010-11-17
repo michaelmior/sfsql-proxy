@@ -241,13 +241,16 @@ int parse_options(int argc, char *argv[]) {
             return EX_USAGE;
         }
 
-        if ((options.backend.host || options.backend.port) && options.unix_socket) {
+        if ((options.backend.host || options.backend.port || options.coordinator) && options.unix_socket) {
             usage();
             return EX_USAGE;
         }
 
         options.backend.host = options.backend.host ?: BACKEND_HOST;
         options.backend.port = options.backend.port ?: BACKEND_PORT;
+
+        if (options.coordinator)
+            options.backend_threads = BACKEND_THREADS;
         options.num_conns = NUM_CONNS;
     }
     
