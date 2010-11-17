@@ -858,6 +858,10 @@ static my_bool net_show_clones(MYSQL *mysql,
     sf_clone_info *clone;
     int nclones = 0;
 
+    /* Check if we can clone */
+    if (!options.cloneable)
+        proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
+
     /* Get a list of active tickets */
     tickets = LIST_TICKETS();
     if (!tickets)
@@ -912,7 +916,7 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
 
     /* Check if a coordinator is valid */
     if (!options.cloneable)
-        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Coordinator cannot be set if proxy is not cloneable");
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Coordinator cannot be used if proxy is not cloneable");
 
     if (tok) {
         /* Check for a valid host and set the coordinator */
@@ -972,9 +976,6 @@ static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_
         return net_proxy_coordinator(mysql, t, status);
     }
 
-    last_tok = strrchr(query, ' ')+1;
-    if (strncasecmp(last_tok, STATUS, sizeof(STATUS)-1) == 0)
-        return net_status(mysql, query, query_len, status);
-
+    /* No valid command was found */
     return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Unrecognized proxy command");
 }
