@@ -48,9 +48,6 @@ static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t 
 static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 
-struct hostent *coordinator = NULL;
-struct hostent *master = NULL;
-
 /**
  * Perform client authentication.
  *
@@ -908,23 +905,62 @@ static my_bool net_show_clones(MYSQL *mysql,
     return FALSE;
 }
 
+/**
+ * Respond to a PROXY COORDINATOR command.
+ *
+ * @param mysql  MYSQL object where results should be sent.
+ * @param t      Pointer to the next token in the string.
+ * @param status Status information for the connection.
+ **/
 static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
-    struct hostent *host;
-    uchar buff[BUFSIZ], *pos;
-    char *tok = strtok_r(NULL, " ", &t);
+    my_bool error = FALSE;
+    MYSQL *old_coordinator, *new_coordinator = NULL;
+    uchar buff1[BUFSIZ], buff2[BUFSIZ], *pos;
+    char *tok = strtok_r(NULL, " ", &t), *t2 = NULL, *host;
+    int port;
+    size_t size;
 
     /* Check if a coordinator is valid */
     if (!options.cloneable)
         return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Coordinator cannot be used if proxy is not cloneable");
 
     if (tok) {
-        /* Check for a valid host and set the coordinator */
-        host = gethostbyname(tok);
+        /* Extract the host and port information */
+        host = strtok_r(tok, ":", &t2);
+        tok = strtok_r(NULL, ":", &t2);
+        if (tok) {
+            port = strtol(tok, NULL, 10);
+            if (errno || port <= 0)
+                return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid coordinator port number");
+        } else {
+            port = options.backend.port;
+        }
 
-        if (!host) {
+        /* Check for a valid host and connect to the coordinator */
+        new_coordinator = mysql_init(NULL);
+        if (new_coordinator) {
+            /* Reconnect on error */
+            my_bool reconnect = 1;
+            mysql_options(new_coordinator, MYSQL_OPT_RECONNECT, &reconnect);
+
+            if (!mysql_real_connect(new_coordinator, host, options.user, options.pass, NULL, port, NULL, 0)) {
+                error = proxy_net_send_error(mysql, mysql_errno(new_coordinator), mysql_error(new_coordinator));
+                mysql_close(new_coordinator);
+                return error;
+            }
+        }
+
+        if (!new_coordinator) {
+            proxy_log(LOG_ERROR, "Error setting coordinator to %s", tok);
+
             return proxy_net_send_error(mysql, ER_BAD_HOST_ERROR, "Invalid coordinator host");
         } else {
-            coordinator = host;
+            proxy_log(LOG_INFO, "Coordinator successfully changed to %s", tok);
+
+            /* Swap to the new coordinator */
+            old_coordinator = (MYSQL*) coordinator;
+            coordinator = new_coordinator;
+            mysql_close(new_coordinator);
             return proxy_net_send_ok(mysql, 0, 0, 0);
         }
     } else {
@@ -933,16 +969,22 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
             return proxy_net_send_ok(mysql, 0, 0, 0);
 
         /* Send the header */
-        net_result_header(&mysql->net, buff, 1, status);
+        net_result_header(&mysql->net, buff1, 1, status);
         send_status_field(mysql, "Coordinator", "COORDINATOR", status);
         proxy_net_send_eof(mysql, status);
 
         /* Send the coordinator name */
-        pos = buff;
-        pos = net_store_data(pos, (uchar*) coordinator->h_name, strlen(coordinator->h_name));
+        pos = buff1;
+        size = snprintf((char*) buff2, BUFSIZ, "%s:%d", coordinator->host, coordinator->port);
 
-        my_net_write(&mysql->net, buff, (size_t) (pos - buff));
-        status->bytes_sent += pos-buff;
+        /* Check that the name has been successfully stored and send */
+        if (size <= 0)
+            pos = net_store_data(pos, (uchar*) "", 0);
+        else
+            pos = net_store_data(pos, (uchar*) buff2, size);
+
+        my_net_write(&mysql->net, buff1, (size_t) (pos - buff1));
+        status->bytes_sent += pos-buff1;
 
         proxy_net_send_eof(mysql, status);
         proxy_net_flush(mysql);

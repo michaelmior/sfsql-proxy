@@ -52,6 +52,9 @@ static pool_t **backend_thread_pool = NULL;
 /** Signify that a backend is currently querying */
 volatile sig_atomic_t querying = 0;
 
+volatile MYSQL *coordinator = NULL;
+MYSQL *master = NULL;
+
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status);
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
@@ -524,8 +527,13 @@ my_bool proxy_backend_connect() {
     /* Start connections in backend threads if we are the
      * coordinator, because more backends will be coming */
     if (options.coordinator) {
-        /* Save the master host information for later */
-        master = gethostbyname(options.backend.host);
+        /* Open a MySQL connection to the master host */
+        my_bool reconnect = TRUE;
+        master = mysql_init(NULL);
+        mysql_options(master, MYSQL_OPT_RECONNECT, &reconnect);
+        mysql_real_connect(master, options.backend.host, options.user,
+                options.pass, NULL, options.backend.port, NULL, 0);
+
         if (!master) {
             proxy_log(LOG_ERROR, "Unable to resolve master host: %s", hstrerror(h_errno));
             return TRUE;
@@ -1240,4 +1248,10 @@ void proxy_backend_close() {
         free(backend_threads);
         free(backend_thread_pool);
     }
+
+    /* Close any open administrative connections */
+    if (master)
+        mysql_close(master);
+    if (coordinator)
+        mysql_close((MYSQL*) coordinator);
 }
