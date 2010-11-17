@@ -24,20 +24,17 @@
 
 #include "proxy_map.h"
 
-#define SELECT   "SELECT"
-#define SHOW     "SHOW"
-#define DESCRIBE "DESCRIBE"
-#define EXPLAIN  "EXPLAIN"
+#define strprefix(str, cmp, len) (((sizeof(cmp) - 1) > len) ? 0 : (strncasecmp(str, cmp, len) == 0))
 
-proxy_query_map_t proxy_map_query(char *query, char *new_query) {
+proxy_query_map_t proxy_map_query(char *query, unsigned long *query_len, char *new_query) {
     new_query = NULL;
 
     /* Anything which starts with the keywords above
      * goes to any backend, otherwise, go everywhere */
-    if (strncasecmp(query, SELECT, sizeof(SELECT)-1) == 0
-        || strncasecmp(query, SHOW, sizeof(SHOW)-1) == 0
-        || strncasecmp(query, DESCRIBE, sizeof(DESCRIBE)-1) == 0
-        || strncasecmp(query, EXPLAIN, sizeof(EXPLAIN)-1) == 0)
+    if (strprefix(query, "SELECT", *query_len)
+        || strprefix(query, "SHOW", *query_len)
+        || strprefix(query, "DESCRIBE", *query_len)
+        || strprefix(query, "EXPLAIN", *query_len))
         return QUERY_MAP_ANY;
     else
         return QUERY_MAP_ALL;

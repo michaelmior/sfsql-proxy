@@ -698,12 +698,8 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
     proxy_net_flush(mysql);
 }
 
-/* String defines for PROXY commands */
-#define GLOBAL      "GLOBAL"
-#define SESSION     "SESSION"
-#define STATUS      "STATUS"
-#define CLONES      "CLONES"
-#define COORDINATOR "COORDINATOR"
+/** Check if cmp is a prefix of str */
+#define strprefix(str, cmp, len) (((sizeof(cmp) - 1) > len) ? 0 : (strncasecmp(str, cmp, len) == 0))
 
 /**
  * Send one row of output from a PROXY STATUS command.
@@ -747,9 +743,7 @@ static inline void net_result_header(NET *net, uchar *buff, int nfields, status_
  *
  * @return TRUE on error, FALSE otherwise.
  **/
-static my_bool net_status(MYSQL *mysql, char *query,
-        __attribute__((unused)) ulong query_len,
-        status_t *status) {
+static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *status) {
     uchar buff[BUFSIZ], *pos;
     NET *net = &mysql->net;
     char *last_tok = strrchr(query, ' ')+1;
@@ -760,9 +754,9 @@ static my_bool net_status(MYSQL *mysql, char *query,
 
     /* Get status request type */
     pch = strtok_r(query, " ", &t);
-    global = (pch == last_tok) || (strncasecmp(pch, GLOBAL, sizeof(GLOBAL)-1) == 0) ? TRUE : FALSE;
+    global = (pch == last_tok) || strprefix(pch, "GLOBAL", query_len);
     if (!global)
-        session = (strncasecmp(pch, SESSION, sizeof(SESSION)-1) == 0) ? TRUE : FALSE;
+        session = strprefix(pch, "SESSION", query_len);
 
     /* Invalid status request */
     if (!(global || session) && pch != last_tok)
@@ -968,12 +962,20 @@ static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_
     status->bytes_recv += query_len;
 
     tok = strtok_r(query, " ", &t);
-    if (strncasecmp(tok, CLONES, sizeof(CLONES)-1) == 0) {
-        return net_show_clones(mysql, t, query_len-sizeof(CLONES)-1, status);
-    } else if (strncasecmp(tok, CLONES, sizeof(CLONES)-2) == 0) {
-        return net_clone(mysql, t, query_len-sizeof(CLONES)-2, status);
-    } else if (strncasecmp(tok, COORDINATOR, sizeof(COORDINATOR)-1) == 0) {
-        return net_proxy_coordinator(mysql, t, status);
+
+    if (tok) {
+        /* Parse the command and take appropriate action */
+        if (strprefix(tok, "CLONES", query_len)) {
+            return net_show_clones(mysql, t, query_len-sizeof("CLONES")-1, status);
+        } else if (strprefix(tok, "CLONE", query_len)) {
+            return net_clone(mysql, t, query_len-sizeof("CLONE")-1, status);
+        } else if (strprefix(tok, "COORDINATOR", query_len)) {
+            return net_proxy_coordinator(mysql, t, status);
+        }
+
+        last_tok = strrchr(query, ' ')+1;
+        if (strprefix(last_tok, "STATUS", query_len))
+            return net_status(mysql, query, query_len, status);
     }
 
     /* No valid command was found */

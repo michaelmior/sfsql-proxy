@@ -841,7 +841,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
     /* Get the query map and modified query
      * if a mapper was specified */
     if (backend_mapper) {
-        map = (*backend_mapper)(query, newq);
+        map = (*backend_mapper)(query, &length, newq);
 
         /* If the query was modified by the mapper,
          * switch to the new query string */
