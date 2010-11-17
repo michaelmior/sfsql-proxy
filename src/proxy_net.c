@@ -699,7 +699,7 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
 }
 
 /** Check if cmp is a prefix of str */
-#define strprefix(str, cmp, len) (((sizeof(cmp) - 1) > len) ? 0 : (strncasecmp(str, cmp, len) == 0))
+#define strprefix(str, cmp, len) (((sizeof(cmp) - 1) > len) ? 0 : (strncasecmp(str, cmp, sizeof(cmp)-1) == 0))
 
 /**
  * Send one row of output from a PROXY STATUS command.

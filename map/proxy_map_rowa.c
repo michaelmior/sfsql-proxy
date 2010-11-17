@@ -24,10 +24,11 @@
 
 #include "proxy_map.h"
 
-#define strprefix(str, cmp, len) (((sizeof(cmp) - 1) > len) ? 0 : (strncasecmp(str, cmp, len) == 0))
+#define strprefix(str, cmp, len) (((sizeof(cmp) - 1) > len) ? 0 : (strncasecmp(str, cmp, sizeof(cmp)-1) == 0))
 
-proxy_query_map_t proxy_map_query(char *query, unsigned long *query_len, char *new_query) {
-    new_query = NULL;
+proxy_query_map_t proxy_map_query(char *query, unsigned long *query_len, char **new_query) {
+    if (new_query)
+        *new_query = NULL;
 
     /* Anything which starts with the keywords above
      * goes to any backend, otherwise, go everywhere */
