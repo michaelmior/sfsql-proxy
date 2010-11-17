@@ -27,6 +27,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <ltdl.h>
+#include <netdb.h>
 
 /** Maximum TCP packet length (from sql/net_serv.cc) */
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
@@ -279,7 +280,7 @@ static my_bool backends_alloc(int num_backends)  {
     }
 
     /* Check if we skip threading and pool setup */
-    if (!options.backend_file)
+    if (!options.backend_file && !options.coordinator)
         return FALSE;
 
     /* Initialize pools for locking backend access */
@@ -518,6 +519,22 @@ my_bool proxy_backend_connect() {
     for (i=0; i<options.num_conns; i++) {
         if (backend_connect(backends[0], backend_conns[0][i], TRUE))
             return TRUE;
+    }
+
+    /* Start connections in backend threads if we are the
+     * coordinator, because more backends will be coming */
+    if (options.coordinator) {
+        /* Save the master host information for later */
+        master = gethostbyname(options.backend.host);
+        if (!master) {
+            proxy_log(LOG_ERROR, "Unable to resolve master host: %s", hstrerror(h_errno));
+            return TRUE;
+        }
+
+        for (i=0; i<options.backend_threads; i++) {
+            if (backend_connect(backends[0], backend_threads[0][i].data.backend.conn, FALSE))
+                return TRUE;
+        }
     }
 
     return FALSE;

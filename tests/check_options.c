@@ -60,6 +60,7 @@ START_TEST (test_options_test) {
 START_TEST (test_options_short) {
     char *argv[] = { "./sfsql-proxy",
         "-d",
+        "-C",
         "-c",
         "-h" TEST_HOST,
         "-P" TEST_PORT,
@@ -79,6 +80,7 @@ START_TEST (test_options_short) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.daemonize);
+    fail_unless(options.coordinator);
     fail_unless(options.cloneable);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
@@ -100,6 +102,7 @@ START_TEST (test_options_short) {
 START_TEST (test_options_long) {
     char *argv[] = { "./sfsql-proxy",
         "--daemonize",
+        "--coordinator",
         "--cloneable",
         "--backend-host="    TEST_HOST,
         "--backend-port="    TEST_PORT,
@@ -118,6 +121,7 @@ START_TEST (test_options_long) {
     fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.daemonize);
+    fail_unless(options.coordinator);
     fail_unless(options.cloneable);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
@@ -141,6 +145,7 @@ START_TEST (test_options_defaults) {
 
     /* Check that all options have their correct values */
     fail_unless(!options.daemonize);
+    fail_unless(!options.coordinator);
     fail_unless(!options.cloneable);
     fail_unless(!options.add_ids);
     fail_unless(!options.two_pc);

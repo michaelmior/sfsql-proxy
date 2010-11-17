@@ -41,6 +41,8 @@ struct {
     my_bool help;
     /** TRUE if we need to daemonize */
     my_bool daemonize;
+    /** TRUE if this proxy acts as coordinator. */
+    my_bool coordinator;
     /** TRUE if this proxy is cloneable. */
     my_bool cloneable;
 

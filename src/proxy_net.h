@@ -33,6 +33,8 @@
 ulong transaction_id;
 /** Host which coordinates transactions between clones */
 extern struct hostent *coordinator;
+/** Master hosts which handles cloning */
+extern struct hostent *master;
 
 /** Command to send for queries which must be tracked */
 /* XXX: This will break if COM_END is equal to the size

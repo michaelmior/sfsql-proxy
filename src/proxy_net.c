@@ -49,6 +49,7 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
 static my_bool net_proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 
 struct hostent *coordinator = NULL;
+struct hostent *master = NULL;
 
 /**
  * Perform client authentication.

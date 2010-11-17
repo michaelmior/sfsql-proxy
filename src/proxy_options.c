@@ -35,6 +35,7 @@ static void usage() {
             "Options:\n"
             "\t--help,             -?\tShow this message\n"
             "\t--daemonize,        -d\tDaemonize\n"
+            "\t--coordinator,      -C\tProxy should act as coordinator\n"
             "\t--cloneable,        -c\tProxy should execute cloning when signalled\n\n"
 
             "Backend options:\n"
@@ -76,6 +77,8 @@ void set_option_defaults() {
     /* Set options to default values */
     options.help            = FALSE;
     options.daemonize       = FALSE;
+    options.coordinator     = FALSE;
+    options.cloneable       = FALSE;
 
     options.num_conns       = -1;
     options.add_ids         = FALSE;
@@ -109,6 +112,7 @@ int parse_options(int argc, char *argv[]) {
     static struct option long_options[] = {
         {"help",            no_argument,       0, '?'},
         {"daemonize",       no_argument,       0, 'd'},
+        {"coordinator",     no_argument,       0, 'C'},
         {"cloneable",       no_argument,       0, 'c'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
@@ -133,7 +137,7 @@ int parse_options(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dch:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dCch:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 options.help = TRUE;
@@ -141,6 +145,9 @@ int parse_options(int argc, char *argv[]) {
                 return EXIT_SUCCESS;
             case 'd':
                 options.daemonize = TRUE;
+                break;
+            case 'C':
+                options.coordinator = TRUE;
                 break;
             case 'c':
                 options.cloneable = TRUE;
