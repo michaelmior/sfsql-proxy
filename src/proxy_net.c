@@ -818,16 +818,20 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) {
     char *err = alloca(BUFSIZ), *tok, *t=NULL;
-    int nclones, ret;
+    int nclones = 1, ret;
     my_bool error;
 
     /* Check if we think we can clone */
     if (!options.cloneable)
-        proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
 
     /* Get the number of clones to create */
     tok = strtok_r(query, " ", &t);
-    nclones = tok ? atoi(tok) : 1;
+    if (tok) {
+        nclones = strtol(tok, NULL, 10);
+        if (errno || nclones <= 0)
+            return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid number of clones");
+    }
 
     /* Perform the clone and return the result */
     ret = proxy_do_clone(nclones, &err, BUFSIZ);
