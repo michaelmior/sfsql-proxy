@@ -27,6 +27,6 @@ typedef enum QUERY_MAP {
 } proxy_query_map_t;
 
 /** Function pointer for query mapping. */
-typedef proxy_query_map_t (*proxy_map_query_t) (char*, unsigned long*, char*);
+typedef proxy_query_map_t (*proxy_map_query_t) (char*, unsigned long*, char**);
 
 #endif /* _proxy_map_h */

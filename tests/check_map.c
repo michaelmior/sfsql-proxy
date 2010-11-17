@@ -55,28 +55,28 @@ void teardown() {
     lt_dlexit();
 }
 
+#define map_with_len(query) ({ unsigned long _len = sizeof(query)-1; (*func)(query, &_len, NULL); })
+
 /** @test Read queries should be mapped to any backend with ROWA mapper */
 START_TEST (test_rowa_read) {
     proxy_query_map_t map;
-    char *newq = NULL;
 
-    map = (*func)("SELECT 1;", newq);
+    map = map_with_len("SELECT 1;");
     fail_unless(map == QUERY_MAP_ANY);
 
-    map = (*func)("SHOW TABLES;", newq);
+    map = map_with_len("SHOW TABLES;");
     fail_unless(map == QUERY_MAP_ANY);
 
-    map = (*func)("DESCRIBE TABLE `test`;", newq);
+    map = map_with_len("DESCRIBE TABLE `test`;");
     fail_unless(map == QUERY_MAP_ANY);
 
-    map = (*func)("EXPLAIN SELECT 1;", newq);
+    map = map_with_len("EXPLAIN SELECT 1;");
     fail_unless(map == QUERY_MAP_ANY);
 } END_TEST
 
 /** @test Non-read queries should be mapped to all backends with ROWA mapper */
 START_TEST (test_rowa_other) {
-    char *newq = NULL;
-    proxy_query_map_t map = (*func)("INSERT INTO test VALUES(1);", newq);
+    proxy_query_map_t map = map_with_len("INSERT INTO test VALUES(1);");
 
     fail_unless(map == QUERY_MAP_ALL);
 } END_TEST
