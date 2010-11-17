@@ -71,3 +71,7 @@ void __wrap_proxy_threading_mask() {}
 void __wrap_randominit(struct rand_struct *rand_st, __attribute__((unused)) ulong seed1, __attribute__((unused)) ulong seed2) {
     __real_randominit(rand_st, 0, 0);
 }
+
+void __wrap_proxy_do_clone(__attribute__((unused)) int nclones, __attribute__((unused)) char *err, __attribute__((unused)) int errlen) {}
+void __wrap_list_tickets(void) {}
+void __wrap_read_ticket_info(__attribute__((unused)) char *ticket) {}

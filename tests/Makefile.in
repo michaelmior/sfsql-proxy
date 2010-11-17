@@ -264,7 +264,10 @@ check_net_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,proxy_backend_query \
 	-Wl,--wrap,proxy_pool_return \
     -Wl,--wrap,randominit \
-	-Wl,--wrap,proxy_threading_mask
+	-Wl,--wrap,proxy_threading_mask \
+	-Wl,--wrap,proxy_do_clone \
+	-Wl,--wrap,list_tickets \
+	-Wl,--wrap,read_ticket_info
 
 check_net_DEPENDENCIES = $(SRC_DIR)/proxy_net.c $(SRC_DIR)/proxy_net.h
 check_backend_SOURCES = check_backend.c $(SRC_DIR)/proxy_pool.c log_stub.c
