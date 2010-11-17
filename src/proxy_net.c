@@ -862,7 +862,7 @@ static my_bool net_show_clones(MYSQL *mysql,
     tickets = LIST_TICKETS();
     if (!tickets)
         return proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, "Could not get list of tickets");
-    printf("Got tickets\n");
+
     /* Check if we have no tickets */
     ticket = tickets->outstanding_tickets;
     if (!ticket)
@@ -875,9 +875,7 @@ static my_bool net_show_clones(MYSQL *mysql,
     send_status_field(mysql, "Ticket", "TICKET", status);
     send_status_field(mysql, "VMID", "VMID", status);
     proxy_net_send_eof(mysql, status);
-    printf("Sent fields\n");
 
-    printf("Got some tickets\n");
     /* Read the clones from each ticket and
      * send the list to the client */
     do {
@@ -891,8 +889,6 @@ static my_bool net_show_clones(MYSQL *mysql,
             nclones++;
         } while ((clone = clone->next));
     } while((ticket = ticket->next));
-
-    printf("Got %d clones\n", nclones);
 
     /* If for some reason we got here, but no clones exist,
      * then return an OK so the client knows we haven nothing */
