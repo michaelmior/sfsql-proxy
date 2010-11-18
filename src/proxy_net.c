@@ -951,12 +951,13 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
 
             return proxy_net_send_error(mysql, ER_BAD_HOST_ERROR, "Invalid coordinator host");
         } else {
-            proxy_log(LOG_INFO, "Coordinator successfully changed to %s", tok);
+            proxy_log(LOG_INFO, "Coordinator successfully changed to %s:%d", host, port);
 
             /* Swap to the new coordinator */
             old_coordinator = (MYSQL*) coordinator;
             coordinator = new_coordinator;
-            mysql_close(new_coordinator);
+            if (old_coordinator)
+                mysql_close(old_coordinator);
             return proxy_net_send_ok(mysql, 0, 0, 0);
         }
     } else {
