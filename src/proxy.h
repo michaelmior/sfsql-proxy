@@ -73,6 +73,7 @@ typedef struct {
 #include "proxy_threading.h"
 #include "proxy_clone.h"
 #include "proxy_monitor.h"
+#include "proxy_cmd.h"
 #include "proxy_options.h"
 
 /** Threads for dealing with connected clients. */

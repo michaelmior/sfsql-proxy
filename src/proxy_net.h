@@ -69,6 +69,7 @@ void* proxy_net_new_thread(void *ptr);
 conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status);
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
+void proxy_net_send_eof(MYSQL *mysql, status_t *status);
 
 /**
  * Flush the write buffer of the proxy MySQL object
