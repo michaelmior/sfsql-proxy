@@ -47,7 +47,7 @@
 /** File to store PID of proxy process */
 #define PID_FILE      "/var/run/sfsql-proxy.pid"
 
-volatile sig_atomic_t run = 1;
+volatile sig_atomic_t run = 0;
 volatile sig_atomic_t cloning  = 0;
 /** PID of process which signaled to start cloning */
 pid_t signaller = -1;
@@ -120,6 +120,7 @@ static void server_run(char *host, int port) {
     /* Server event loop */
     proxy_start_time = time(NULL);
     clientlen = sizeof(clientaddr);
+    run = 1;
     while(run) {
         FD_ZERO(&fds);
         FD_SET(serverfd, &fds);
@@ -318,6 +319,10 @@ int main(int argc, char *argv[]) {
     global_status.bytes_recv = 0;
     global_status.bytes_sent = 0;
     global_status.queries = 0;
+
+    /* Prepare monitoring */
+    if (options.coordinator)
+        proxy_monitor_init();
 
     /* Start proxying */
     proxy_log(LOG_INFO, "Starting proxy on %s:%d",

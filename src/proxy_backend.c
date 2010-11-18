@@ -27,7 +27,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <ltdl.h>
-#include <netdb.h>
 
 /** Maximum TCP packet length (from sql/net_serv.cc) */
 #define MAX_PACKET_LENGTH (256L*256L*256L-1)
@@ -527,18 +526,6 @@ my_bool proxy_backend_connect() {
     /* Start connections in backend threads if we are the
      * coordinator, because more backends will be coming */
     if (options.coordinator) {
-        /* Open a MySQL connection to the master host */
-        my_bool reconnect = TRUE;
-        master = mysql_init(NULL);
-        mysql_options(master, MYSQL_OPT_RECONNECT, &reconnect);
-        mysql_real_connect(master, options.backend.host, options.user,
-                options.pass, NULL, options.backend.port, NULL, 0);
-
-        if (!master) {
-            proxy_log(LOG_ERROR, "Unable to resolve master host: %s", hstrerror(h_errno));
-            return TRUE;
-        }
-
         for (i=0; i<options.backend_threads; i++) {
             if (backend_connect(backends[0], backend_threads[0][i].data.backend.conn, FALSE))
                 return TRUE;
