@@ -48,6 +48,9 @@ static proxy_thread_t **backend_threads = NULL;
 /** Pool for locking access to backend threads */
 static pool_t **backend_thread_pool = NULL;
 
+/** Mutex for protecting addition of new backends */
+static pthread_mutex_t add_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /** Signify that a backend is currently querying */
 volatile sig_atomic_t querying = 0;
 
@@ -72,6 +75,11 @@ static void backend_conns_free(int bi);
 static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn, my_bool bypass);
 static void backend_new_threads(int bi);
 static proxy_host_t** backend_read_file(char *filename, int *num) __attribute__((malloc));
+
+/* Backend update utility functions */
+static my_bool backend_resize(int num, my_bool before);
+static void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools);
+static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, int bi);
 
 /**
  * Write from a backend to a proxy connection.
@@ -588,49 +596,61 @@ static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
 }
 
 /**
- * Connect to new backends after an update.
+ * Connect to all new backends after an update.
  *
  * @param conns List of connections to open.
  * @param pools List of pools to initialize.
  **/
 static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools) {
-    int bi, ci;
+    int bi;
 
-    for (bi=0; bi<backend_num; bi++) {
-        if (!conns[bi]) {
-            proxy_log(LOG_INFO, "Connecting to new backend %d\n", bi);
-            conns[bi] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
+    for (bi=0; bi<backend_num; bi++)
+        backend_new_connect(conns, pools, bi);
+}
 
-            for (ci=0; ci<options.num_conns; ci++) {
-                conns[bi][ci] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
-                backend_connect(backends[bi], conns[bi][ci], TRUE);
-            }
+/**
+ * Connect to a new backend after an update.
+ *
+ * @param conns List of connections to open.
+ * @param pools List of pools to initialize.
+ * @param bi    Index of backend to connect to.
+ **/
+static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, int bi) {
+    int ci;
+
+    if (!conns[bi]) {
+        proxy_log(LOG_INFO, "Connecting to new backend %d\n", bi);
+        conns[bi] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
+
+        for (ci=0; ci<options.num_conns; ci++) {
+            conns[bi][ci] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+            backend_connect(backends[bi], conns[bi][ci], TRUE);
         }
+    }
 
-        /* Allocate a new pool if necessary */
-        if (!pools[bi]) {
-            pools[bi] = proxy_pool_new(options.num_conns);
-        } else {
-            /* Unlock pool */
-            proxy_pool_unlock(pools[bi]);
+    /* Allocate a new pool if necessary */
+    if (!pools[bi]) {
+        pools[bi] = proxy_pool_new(options.num_conns);
+    } else {
+        /* Unlock pool */
+        proxy_pool_unlock(pools[bi]);
+    }
+
+    /* Start new backend threads */
+    if (!backend_threads[bi])
+        backend_new_threads(bi);
+
+    /* Create a new thread pool for this backend */
+    if (!backend_thread_pool[bi]) {
+        backend_thread_pool[bi] = proxy_pool_new(options.backend_threads);
+
+        /* Open the MySQL connections for each backend thread */
+        for (ci=0; ci<options.backend_threads; ci++) {
+            if (!backend_threads[bi][ci].data.backend.conn->mysql)
+                backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn, FALSE);
         }
-
-        /* Start new backend threads */
-        if (!backend_threads[bi])
-            backend_new_threads(bi);
-
-        /* Create a new thread pool for this backend */
-        if (!backend_thread_pool[bi]) {
-            backend_thread_pool[bi] = proxy_pool_new(options.backend_threads);
-
-            /* Open the MySQL connections for each backend thread */
-            for (ci=0; ci<options.backend_threads; ci++) {
-                if (!backend_threads[bi][ci].data.backend.conn->mysql)
-                    backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn, FALSE);
-            }
-        } else {
-            proxy_pool_unlock(backend_thread_pool[bi]);
-        }
+    } else {
+        proxy_pool_unlock(backend_thread_pool[bi]);
     }
 }
 
@@ -664,6 +684,35 @@ static void backend_conns_free(int bi) {
 
     proxy_threading_cancel(backend_threads[bi], options.backend_threads, backend_thread_pool[bi]);
     proxy_threading_cleanup(backend_threads[bi], options.backend_threads, backend_thread_pool[bi]);
+}
+
+/**
+ * Add and connect to a new backend host.
+ *
+ * @param host Backend host to connect to.
+ * @param port Backend port to connect to.
+ * @return TRUE on success, FALSE on error.
+ **/
+my_bool proxy_backend_add(char *host, int port) {
+    pthread_mutex_lock(&add_mutex);
+
+    /* Allocate space for the new backend */
+    if (backend_resize(backend_num+1, TRUE) ||
+        backend_resize(backend_num+1, FALSE))
+        return TRUE;
+
+    /* Add then new host information */
+    backends[backend_num] = (proxy_host_t*) malloc(sizeof(proxy_host_t*));
+    backends[backend_num]->host = strdup(host);
+    backends[backend_num]->port = port;
+
+    /* Connect to the new backend */
+    backend_new_connect(backend_conns, backend_pools, backend_num);
+
+    backend_num++;
+    pthread_mutex_unlock(&add_mutex);
+
+    return FALSE;
 }
 
 /**

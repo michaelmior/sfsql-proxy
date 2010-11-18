@@ -294,6 +294,29 @@ static my_bool net_show_clones(MYSQL *mysql,
 }
 
 /**
+ * Extract a hostname and port number from a string
+ * of the format host[:port].
+ *
+ * @param str       String to parse.
+ * @param[out] host Parsed hostname.
+ * @param[out] port Parsed port number, or
+ *                  default if none specified.
+ **/
+static void parse_host(char *str, char **host, int *port) {
+    char *t = NULL;
+
+    *host = strtok_r(str, ":", &t);
+    str = strtok_r(NULL, ":", &t);
+    if (str) {
+        *port = strtol(str, NULL, 10);
+        if (errno || *port <= 0)
+            *port = -1;
+    } else {
+        *port = options.backend.port;
+    }
+}
+
+/**
  * Respond to a PROXY COORDINATOR command.
  *
  * @param mysql  MYSQL object where results should be sent.
@@ -304,7 +327,7 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
     my_bool error = FALSE;
     MYSQL *old_coordinator, *new_coordinator = NULL;
     uchar buff1[BUFSIZ], buff2[BUFSIZ], *pos;
-    char *tok = strtok_r(NULL, " ", &t), *t2 = NULL, *host;
+    char *tok = strtok_r(NULL, " ", &t), *host;
     int port;
     size_t size;
 
@@ -314,15 +337,9 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
 
     if (tok) {
         /* Extract the host and port information */
-        host = strtok_r(tok, ":", &t2);
-        tok = strtok_r(NULL, ":", &t2);
-        if (tok) {
-            port = strtol(tok, NULL, 10);
-            if (errno || port <= 0)
-                return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid coordinator port number");
-        } else {
-            port = options.backend.port;
-        }
+        parse_host(tok, &host, &port);
+        if (port < 0)
+            return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid coordinator port number");
 
         /* Check for a valid host and connect to the coordinator */
         new_coordinator = mysql_init(NULL);
@@ -382,6 +399,29 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
     }
 }
 
+static my_bool net_add_clone(MYSQL *mysql, char *t,
+        __attribute__((unused)) ulong query_len,
+        __attribute__((unused)) status_t *status) {
+    char *host;
+    int port;
+
+    /* Ensure that we are the coordinator */
+    if (!options.coordinator)
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as coordinator");
+
+    /* Extract and validate host information */
+    parse_host(t, &host, &port);
+
+    if (port < 0)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone port number");
+
+    /* Attempt to add the new host and report success/failure */
+    if (proxy_backend_add(host, port))
+        return proxy_net_send_error(mysql, ER_BAD_HOST_ERROR, "Error adding new host");
+    else
+        return proxy_net_send_ok(mysql, 0, 0, 0);
+}
+
 /**
  * Respond to a PROXY command received from a client.
  *
@@ -407,6 +447,8 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
             return net_clone(mysql, t, query_len-sizeof("CLONE")-1, status);
         } else if (strprefix(tok, "COORDINATOR", query_len)) {
             return net_proxy_coordinator(mysql, t, status);
+        } if (strprefix(tok, "ADD", query_len)) {
+            return net_add_clone(mysql, t, query_len-sizeof("ADD")-1, status);
         }
 
         last_tok = strrchr(query, ' ')+1;
