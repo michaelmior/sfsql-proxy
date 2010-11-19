@@ -198,13 +198,11 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
  *
  * @param mysql          MYSQL object where status should be sent.
  * @param query          Query string from client.
- * @param query_len      Length of query string.
  * @param[in,out] status Status information for the connection.
  *
  * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool net_clone(MYSQL *mysql, char *query,
-        __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) {
     char *buff = alloca(BUFSIZ), *tok, *t=NULL, host[HOST_NAME_MAX+1];
     int nclones = 1, ret;
@@ -412,8 +410,14 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
     }
 }
 
+/**
+ * Respond to a PROXY ADD command received from a client.
+ *
+ * @param mysql   MYSQL object where results should be sent.
+ * @param t       Pointer to the next token in the query string.
+ * @param[in,out] status Status information for the connection.
+ **/
 static my_bool net_add_clone(MYSQL *mysql, char *t,
-        __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) {
     char *host;
     int port;
@@ -436,10 +440,11 @@ static my_bool net_add_clone(MYSQL *mysql, char *t,
 }
 
 /**
- * Respond to a PROXY command received from a client.
+ * Respond to a PROXY SUCCESS or FAILURE command
+ * received from a client.
  *
  * @param mysql   MYSQL object where results should be sent.
- * @param t       Pointer to the next token in the string.
+ * @param t       Pointer to the next token in the query string.
  * @param success TRUE if the transaction succeeded, FALSE if it failed.
  * @param[in,out] status Status information for the connection.
  *
@@ -480,7 +485,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
  * received from a client.
  *
  * @param mysql   MYSQL object where results should be sent.
- * @param t       Pointer to the next token in the string.
+ * @param t       Pointer to the next token in the query string.
  * @param success TRUE to commit, FALSE to rollback.
  * @param[in,out] status Status information for the connection.
  *
@@ -533,11 +538,11 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
         if (strprefix(tok, "CLONES", query_len)) {
             return net_show_clones(mysql, t, query_len-sizeof("CLONES")-1, status);
         } else if (strprefix(tok, "CLONE", query_len)) {
-            return net_clone(mysql, t, query_len-sizeof("CLONE")-1, status);
+            return net_clone(mysql, t, status);
         } else if (strprefix(tok, "COORDINATOR", query_len)) {
             return net_proxy_coordinator(mysql, t, status);
         } else if (strprefix(tok, "ADD", query_len)) {
-            return net_add_clone(mysql, t, query_len-sizeof("ADD")-1, status);
+            return net_add_clone(mysql, t, status);
         } else if (strprefix(tok, "SUCCESS", query_len)) {
             return net_trans_result(mysql, t, TRUE, status);
         } else if (strprefix(tok, "FAILURE", query_len)) {
