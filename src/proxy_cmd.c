@@ -438,6 +438,46 @@ static my_bool net_add_clone(MYSQL *mysql, char *t,
 /**
  * Respond to a PROXY command received from a client.
  *
+ * @param mysql   MYSQL object where results should be sent.
+ * @param t       Pointer to the next token in the string.
+ * @param success TRUE if the transaction succeeded, FALSE if it failed.
+ * @param[in,out] status Status information for the connection.
+ *
+ * @return TRUE on error, FALSE otherwise.
+ **/
+static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
+        __attribute__((unused)) status_t *status) {
+    char *tok;
+    int clone_id;
+    ulong transaction_id;
+
+    /* Ensure that we are the coordinator */
+    if (!options.coordinator)
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as coordinator");
+
+    /* Get the clone ID */
+    tok = strtok_r(NULL, " ", &t);
+    if (tok)
+        clone_id = strtol(tok, NULL, 10);
+    if (!tok || errno || clone_id <= 0)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone ID");
+
+    /* Get the transaction ID */
+    tok = strtok_r(NULL, " ", &t);
+    if (tok)
+        transaction_id = strtol(tok, NULL, 10);
+    if (!tok || errno || transaction_id <= 0)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
+
+    /* XXX need to actually do something with these values */
+    proxy_log(LOG_INFO, "Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
+
+    return proxy_net_send_ok(mysql, 0, 0, 0);
+}
+
+/**
+ * Respond to a PROXY command received from a client.
+ *
  * @param mysql          Client MYSQL object.
  * @param query          Query string from client.
  * @param query_len      Length of query string.
@@ -460,8 +500,12 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
             return net_clone(mysql, t, query_len-sizeof("CLONE")-1, status);
         } else if (strprefix(tok, "COORDINATOR", query_len)) {
             return net_proxy_coordinator(mysql, t, status);
-        } if (strprefix(tok, "ADD", query_len)) {
+        } else if (strprefix(tok, "ADD", query_len)) {
             return net_add_clone(mysql, t, query_len-sizeof("ADD")-1, status);
+        } else if (strprefix(tok, "SUCCESS", query_len)) {
+            return net_trans_result(mysql, t, TRUE, status);
+        } else if (strprefix(tok, "FAILURE", query_len)) {
+            return net_trans_result(mysql, t, FALSE, status);
         }
 
         last_tok = strrchr(query, ' ')+1;
