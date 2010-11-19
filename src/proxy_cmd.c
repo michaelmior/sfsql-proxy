@@ -476,6 +476,42 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 }
 
 /**
+ * Respond to a PROXY COMMIT or ROLLBACK command
+ * received from a client.
+ *
+ * @param mysql   MYSQL object where results should be sent.
+ * @param t       Pointer to the next token in the string.
+ * @param success TRUE to commit, FALSE to rollback.
+ * @param[in,out] status Status information for the connection.
+ *
+ * @return TRUE on error, FALSE otherwise.
+ **/
+my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
+        __attribute__((unused)) status_t *status) {
+    char *tok;
+    ulong transaction_id;
+
+    /* Ensure that we are the coordinator */
+    if (!options.coordinator)
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as coordinator");
+
+    /* Get the transaction ID */
+    tok = strtok_r(NULL, " ", &t);
+    if (tok)
+        transaction_id = strtol(tok, NULL, 10);
+    if (!tok || errno || transaction_id <= 0)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
+
+    /* XXX need to actually perform the commit or rollback */
+    if (success)
+        proxy_log(LOG_INFO, "Committing transaction %lu", transaction_id);
+    else
+        proxy_log(LOG_INFO, "Rolling back transaction %lu", transaction_id);
+
+    return proxy_net_send_ok(mysql, 0, 0, 0);
+}
+
+/**
  * Respond to a PROXY command received from a client.
  *
  * @param mysql          Client MYSQL object.
@@ -506,6 +542,10 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
             return net_trans_result(mysql, t, TRUE, status);
         } else if (strprefix(tok, "FAILURE", query_len)) {
             return net_trans_result(mysql, t, FALSE, status);
+        } else if (strprefix(tok, "COMMIT", query_len)) {
+            return net_commit(mysql, t, TRUE, status);
+        } else if (strprefix(tok, "ROLLBACK", query_len)) {
+            return net_commit(mysql, t, FALSE, status);
         }
 
         last_tok = strrchr(query, ' ')+1;
