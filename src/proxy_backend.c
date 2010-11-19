@@ -49,7 +49,7 @@ static proxy_thread_t **backend_threads = NULL;
 static pool_t **backend_thread_pool = NULL;
 
 /** Mutex for protecting addition of new backends */
-static pthread_mutex_t add_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t add_mutex;
 
 /** Signify that a backend is currently querying */
 volatile sig_atomic_t querying = 0;
@@ -292,6 +292,9 @@ static my_bool backends_alloc(int num_backends)  {
     /* Check if we skip threading and pool setup */
     if (!options.backend_file && !options.coordinator)
         return FALSE;
+
+    /* Initialize mutex for locking adding */
+    proxy_mutex_init(&add_mutex);
 
     /* Initialize pools for locking backend access */
     backend_pools = (pool_t**) calloc(backend_num, sizeof(proxy_host_t**));
@@ -857,14 +860,14 @@ void* proxy_backend_new_thread(void *ptr) {
             break;
         }
 
-        __sync_fetch_and_add(&querying, 1);
+        (void) __sync_fetch_and_add(&querying, 1);
 
         /* Send the query to the backend server */
         backend_query(thread->data.backend.conn, query->proxy,
                       query->query, *(query->length),
                       thread->data.backend.bi, thread->commit, thread->status);
 
-        __sync_fetch_and_sub(&querying, 1);
+        (void) __sync_fetch_and_sub(&querying, 1);
 
         /* Signify thread availability */
         query->query = NULL;
@@ -944,7 +947,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
 
             /* Add an identifier to the query if necessary */
             if (options.add_ids) {
-                __sync_fetch_and_add(&transaction_id, 1);
+                (void) __sync_fetch_and_add(&transaction_id, 1);
                 length += sprintf(query + length, "-- %lu", transaction_id);
             }
 
@@ -1049,9 +1052,9 @@ static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool succ
      * until everyone is done before sending results */
     if (commit) {
         /* Record error status */
-        if (commit->results && success) {
-            __sync_fetch_and_or(commit->results, bi == 0 ? 1 : 2 << (bi-1));
-        }
+        if (commit->results && success)
+            (void) __sync_fetch_and_or(commit->results, bi == 0 ? 1 : 2 << (bi-1));
+
         if (commit->barrier) {
             pthread_barrier_wait(commit->barrier);
             commit->barrier = NULL;
@@ -1290,4 +1293,7 @@ void proxy_backend_close() {
         mysql_close(master);
     if (coordinator)
         mysql_close((MYSQL*) coordinator);
+
+    /* Destroy add mutex */
+    proxy_mutex_destroy(&add_mutex);
 }

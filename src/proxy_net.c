@@ -340,15 +340,15 @@ void* proxy_net_new_thread(void *ptr) {
         }
 
         /* Handle client requests */
-        __sync_fetch_and_add(&global_connections, 1);
+        (void) __sync_fetch_and_add(&global_connections, 1);
         client_do_work(&thread->data.work, thread->id, &commit, thread->status);
         client_destroy(thread);
         thread->data.work.addr = NULL;
 
         /* Update global statistics */
-        __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_sent);
-        __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_recv);
-        __sync_fetch_and_add(&global_status.queries, thread->status->queries);
+        (void) __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_sent);
+        (void) __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_recv);
+        (void) __sync_fetch_and_add(&global_status.queries, thread->status->queries);
         thread->status->bytes_sent = 0;
         thread->status->bytes_recv = 0;
         thread->status->queries = 0;
@@ -595,7 +595,7 @@ my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err) {
     /* derived from libmysql/lib_sql.cc:net_send_error_packet */
     NET *net = &(mysql->net);
     uint length;
-    uchar buff[2+1+SQLSTATE_LENGTH+MYSQL_ERRMSG_SIZE], *pos;
+    uchar *buff = alloca(2+1+SQLSTATE_LENGTH+MYSQL_ERRMSG_SIZE), *pos;
 
     if (unlikely(!net->vio))
         return FALSE;
