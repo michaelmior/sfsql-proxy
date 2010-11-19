@@ -206,7 +206,7 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
 static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) {
-    char *err = alloca(BUFSIZ), *tok, *t=NULL;
+    char *buff = alloca(BUFSIZ), *tok, *t=NULL, host[HOST_NAME_MAX+1];
     int nclones = 1, ret;
     my_bool error;
 
@@ -223,14 +223,27 @@ static my_bool net_clone(MYSQL *mysql, char *query,
     }
 
     /* Perform the clone and return the result */
-    ret = proxy_do_clone(nclones, &err, BUFSIZ);
+    ret = proxy_do_clone(nclones, &buff, BUFSIZ);
 
-    if (ret < 0)
-        error = proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, err);
-    else if (ret == 0)
+    if (ret < 0) {
+        /* Cloning failed */
+        error = proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, buff);
+    } else if (ret == 0) {
+        /* This is the master, and cloning succeeded */
         error = proxy_net_send_ok(mysql, 0, 0, 0);
-    else
+    } else {
+        /* This a clone, notify the coordinator */
+        if (gethostname(host, HOST_NAME_MAX+1))
+            return TRUE;
+
+        snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", host, options.pport);
+        mysql_query((MYSQL*) coordinator, buff);
+
+        if (mysql_errno((MYSQL*) coordinator))
+            proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d", ret);
+
         return TRUE;
+    }
 
     return error;
 }

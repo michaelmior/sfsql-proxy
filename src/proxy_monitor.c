@@ -87,7 +87,7 @@ my_bool monitor_master_connect() {
             return TRUE;
         }
 
-        if (gethostname(host, BUFSIZ)) {
+        if (gethostname(host, HOST_NAME_MAX+1)) {
             proxy_log(LOG_ERROR, "Error getting host name to set coordinator");
             return TRUE;
         }
