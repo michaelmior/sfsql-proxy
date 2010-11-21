@@ -32,9 +32,10 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 TESTS = check_options$(EXEEXT) check_pool$(EXEEXT) check_net$(EXEEXT) \
-	check_backend$(EXEEXT) check_map$(EXEEXT)
+	check_backend$(EXEEXT) check_map$(EXEEXT) check_trans$(EXEEXT)
 check_PROGRAMS = check_options$(EXEEXT) check_pool$(EXEEXT) \
-	check_net$(EXEEXT) check_backend$(EXEEXT) check_map$(EXEEXT)
+	check_net$(EXEEXT) check_backend$(EXEEXT) check_map$(EXEEXT) \
+	check_trans$(EXEEXT)
 subdir = tests
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -69,6 +70,8 @@ am_check_options_OBJECTS = check_options.$(OBJEXT) log_stub.$(OBJEXT)
 check_options_OBJECTS = $(am_check_options_OBJECTS)
 am_check_pool_OBJECTS = check_pool.$(OBJEXT) log_stub.$(OBJEXT)
 check_pool_OBJECTS = $(am_check_pool_OBJECTS)
+am_check_trans_OBJECTS = check_trans.$(OBJEXT) log_stub.$(OBJEXT)
+check_trans_OBJECTS = $(am_check_trans_OBJECTS)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/libltdl/config/depcomp
 am__depfiles_maybe = depfiles
@@ -83,10 +86,10 @@ LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) \
 	$(LDFLAGS) -o $@
 SOURCES = $(check_backend_SOURCES) $(check_map_SOURCES) \
 	$(check_net_SOURCES) $(check_options_SOURCES) \
-	$(check_pool_SOURCES)
+	$(check_pool_SOURCES) $(check_trans_SOURCES)
 DIST_SOURCES = $(check_backend_SOURCES) $(check_map_SOURCES) \
 	$(check_net_SOURCES) $(check_options_SOURCES) \
-	$(check_pool_SOURCES)
+	$(check_pool_SOURCES) $(check_trans_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -267,7 +270,8 @@ check_net_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,proxy_threading_mask \
 	-Wl,--wrap,proxy_do_clone \
 	-Wl,--wrap,list_tickets \
-	-Wl,--wrap,read_ticket_info
+	-Wl,--wrap,read_ticket_info \
+	-Wl,--wrap,proxy_cmd
 
 check_net_DEPENDENCIES = $(SRC_DIR)/proxy_net.c $(SRC_DIR)/proxy_net.h
 check_backend_SOURCES = check_backend.c $(SRC_DIR)/proxy_pool.c log_stub.c
@@ -286,6 +290,9 @@ check_map_DEPENDENCIES = $(top_srcdir)/map/proxy_map.h $(top_srcdir)/map/proxy_m
 check_options_SOURCES = check_options.c log_stub.c
 check_options_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
 check_options_DEPENDENCIES = $(SRC_DIR)/proxy_options.c $(SRC_DIR)/proxy_options.h
+check_trans_SOURCES = check_trans.c log_stub.c
+check_trans_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
+check_trans_DEPENDENCIES = $(SRC_DIR)/proxy_trans.c $(SRC_DIR)/proxy_trans.h
 EXTRA_DIST = net backend
 all: all-am
 
@@ -342,6 +349,9 @@ check_options$(EXEEXT): $(check_options_OBJECTS) $(check_options_DEPENDENCIES)
 check_pool$(EXEEXT): $(check_pool_OBJECTS) $(check_pool_DEPENDENCIES) 
 	@rm -f check_pool$(EXEEXT)
 	$(LINK) $(check_pool_OBJECTS) $(check_pool_LDADD) $(LIBS)
+check_trans$(EXEEXT): $(check_trans_OBJECTS) $(check_trans_DEPENDENCIES) 
+	@rm -f check_trans$(EXEEXT)
+	$(LINK) $(check_trans_OBJECTS) $(check_trans_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -354,6 +364,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/check_net.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/check_options.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/check_pool.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/check_trans.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/log_stub.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/net_stubs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/proxy_pool.Po@am__quote@

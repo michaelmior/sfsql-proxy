@@ -1,7 +1,7 @@
 ## Process this file automake to produce Makefile.in
 
-TESTS = check_options check_pool check_net check_backend check_map
-check_PROGRAMS = check_options check_pool check_net check_backend check_map
+TESTS = check_options check_pool check_net check_backend check_map check_trans
+check_PROGRAMS = check_options check_pool check_net check_backend check_map check_trans
 
 AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir)/src
 AM_LDFLAGS = -Wl,--wrap,_proxy_log
@@ -43,5 +43,9 @@ check_map_DEPENDENCIES = $(top_srcdir)/map/proxy_map.h $(top_srcdir)/map/proxy_m
 check_options_SOURCES = check_options.c log_stub.c
 check_options_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
 check_options_DEPENDENCIES = $(SRC_DIR)/proxy_options.c $(SRC_DIR)/proxy_options.h
+
+check_trans_SOURCES = check_trans.c log_stub.c
+check_trans_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
+check_trans_DEPENDENCIES = $(SRC_DIR)/proxy_trans.c $(SRC_DIR)/proxy_trans.h
 
 EXTRA_DIST = net backend

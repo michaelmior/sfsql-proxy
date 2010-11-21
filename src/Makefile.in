@@ -63,7 +63,9 @@ am_sfsql_proxy_OBJECTS = sfsql_proxy-proxy.$(OBJEXT) \
 	sfsql_proxy-proxy_clone.$(OBJEXT) \
 	sfsql_proxy-proxy_monitor.$(OBJEXT) \
 	sfsql_proxy-proxy_cmd.$(OBJEXT) \
-	sfsql_proxy-sql_string.$(OBJEXT)
+	sfsql_proxy-proxy_trans.$(OBJEXT) \
+	sfsql_proxy-sql_string.$(OBJEXT) \
+	sfsql_proxy-hashtable.$(OBJEXT)
 sfsql_proxy_OBJECTS = $(am_sfsql_proxy_OBJECTS)
 am__DEPENDENCIES_1 =
 sfsql_proxy_LINK = $(LIBTOOL) --tag=CC $(AM_LIBTOOLFLAGS) \
@@ -259,7 +261,9 @@ sfsql_proxy_SOURCES = \
 	proxy_clone.c \
 	proxy_monitor.c \
 	proxy_cmd.c \
-	sql_string.c 
+	proxy_trans.c \
+	sql_string.c \
+	hashtable/hashtable.c
 
 sfsql_proxy_CFLAGS = $(MYSQL_CFLAGS) $(PTHREAD_CFLAGS) $(LTDLINCL) -DPKG_LIB_DIR="\"$(pkglibdir)\""
 sfsql_proxy_LDADD = $(MYSQL_LIBS) $(PTHREAD_LIBS) $(LIBLTDL) -lsf
@@ -274,7 +278,10 @@ noinst_HEADERS = \
 	proxy_threading.h \
 	proxy_clone.h \
 	proxy_monitor.h \
-	proxy_cmd.h
+	proxy_cmd.h \
+	proxy_trans.h \
+	hashtable/hashtable.h \
+	hashtable/hashtable_private.h
 
 all: all-am
 
@@ -347,6 +354,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-hashtable.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy_backend.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy_clone.Po@am__quote@
@@ -357,6 +365,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy_options.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy_pool.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy_threading.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-proxy_trans.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sfsql_proxy-sql_string.Po@am__quote@
 
 .c.o:
@@ -520,6 +529,20 @@ sfsql_proxy-proxy_cmd.obj: proxy_cmd.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -c -o sfsql_proxy-proxy_cmd.obj `if test -f 'proxy_cmd.c'; then $(CYGPATH_W) 'proxy_cmd.c'; else $(CYGPATH_W) '$(srcdir)/proxy_cmd.c'; fi`
 
+sfsql_proxy-proxy_trans.o: proxy_trans.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -MT sfsql_proxy-proxy_trans.o -MD -MP -MF $(DEPDIR)/sfsql_proxy-proxy_trans.Tpo -c -o sfsql_proxy-proxy_trans.o `test -f 'proxy_trans.c' || echo '$(srcdir)/'`proxy_trans.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/sfsql_proxy-proxy_trans.Tpo $(DEPDIR)/sfsql_proxy-proxy_trans.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy_trans.c' object='sfsql_proxy-proxy_trans.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -c -o sfsql_proxy-proxy_trans.o `test -f 'proxy_trans.c' || echo '$(srcdir)/'`proxy_trans.c
+
+sfsql_proxy-proxy_trans.obj: proxy_trans.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -MT sfsql_proxy-proxy_trans.obj -MD -MP -MF $(DEPDIR)/sfsql_proxy-proxy_trans.Tpo -c -o sfsql_proxy-proxy_trans.obj `if test -f 'proxy_trans.c'; then $(CYGPATH_W) 'proxy_trans.c'; else $(CYGPATH_W) '$(srcdir)/proxy_trans.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/sfsql_proxy-proxy_trans.Tpo $(DEPDIR)/sfsql_proxy-proxy_trans.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='proxy_trans.c' object='sfsql_proxy-proxy_trans.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -c -o sfsql_proxy-proxy_trans.obj `if test -f 'proxy_trans.c'; then $(CYGPATH_W) 'proxy_trans.c'; else $(CYGPATH_W) '$(srcdir)/proxy_trans.c'; fi`
+
 sfsql_proxy-sql_string.o: sql_string.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -MT sfsql_proxy-sql_string.o -MD -MP -MF $(DEPDIR)/sfsql_proxy-sql_string.Tpo -c -o sfsql_proxy-sql_string.o `test -f 'sql_string.c' || echo '$(srcdir)/'`sql_string.c
 @am__fastdepCC_TRUE@	mv -f $(DEPDIR)/sfsql_proxy-sql_string.Tpo $(DEPDIR)/sfsql_proxy-sql_string.Po
@@ -533,6 +556,20 @@ sfsql_proxy-sql_string.obj: sql_string.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='sql_string.c' object='sfsql_proxy-sql_string.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -c -o sfsql_proxy-sql_string.obj `if test -f 'sql_string.c'; then $(CYGPATH_W) 'sql_string.c'; else $(CYGPATH_W) '$(srcdir)/sql_string.c'; fi`
+
+sfsql_proxy-hashtable.o: hashtable/hashtable.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -MT sfsql_proxy-hashtable.o -MD -MP -MF $(DEPDIR)/sfsql_proxy-hashtable.Tpo -c -o sfsql_proxy-hashtable.o `test -f 'hashtable/hashtable.c' || echo '$(srcdir)/'`hashtable/hashtable.c
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/sfsql_proxy-hashtable.Tpo $(DEPDIR)/sfsql_proxy-hashtable.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hashtable/hashtable.c' object='sfsql_proxy-hashtable.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -c -o sfsql_proxy-hashtable.o `test -f 'hashtable/hashtable.c' || echo '$(srcdir)/'`hashtable/hashtable.c
+
+sfsql_proxy-hashtable.obj: hashtable/hashtable.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -MT sfsql_proxy-hashtable.obj -MD -MP -MF $(DEPDIR)/sfsql_proxy-hashtable.Tpo -c -o sfsql_proxy-hashtable.obj `if test -f 'hashtable/hashtable.c'; then $(CYGPATH_W) 'hashtable/hashtable.c'; else $(CYGPATH_W) '$(srcdir)/hashtable/hashtable.c'; fi`
+@am__fastdepCC_TRUE@	mv -f $(DEPDIR)/sfsql_proxy-hashtable.Tpo $(DEPDIR)/sfsql_proxy-hashtable.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='hashtable/hashtable.c' object='sfsql_proxy-hashtable.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(sfsql_proxy_CFLAGS) $(CFLAGS) -c -o sfsql_proxy-hashtable.obj `if test -f 'hashtable/hashtable.c'; then $(CYGPATH_W) 'hashtable/hashtable.c'; else $(CYGPATH_W) '$(srcdir)/hashtable/hashtable.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

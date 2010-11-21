@@ -324,6 +324,9 @@ int main(int argc, char *argv[]) {
     if (options.coordinator)
         proxy_monitor_init();
 
+    /* Set up transaction hashtable */
+    proxy_trans_init();
+
     /* Start proxying */
     proxy_log(LOG_INFO, "Starting proxy on %s:%d",
         options.phost ?: "0.0.0.0", options.pport);
@@ -338,6 +341,7 @@ out:
     proxy_threading_cleanup(net_threads, options.client_threads, thread_pool);
 
     proxy_backend_close();
+    proxy_trans_end();
     mysql_library_end();
     proxy_threading_end();
 

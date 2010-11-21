@@ -11,7 +11,9 @@ sfsql_proxy_SOURCES = \
 	proxy_clone.c \
 	proxy_monitor.c \
 	proxy_cmd.c \
-	sql_string.c 
+	proxy_trans.c \
+	sql_string.c \
+	hashtable/hashtable.c
 sfsql_proxy_CFLAGS = $(MYSQL_CFLAGS) $(PTHREAD_CFLAGS) $(LTDLINCL) -DPKG_LIB_DIR="\"$(pkglibdir)\""
 sfsql_proxy_LDADD = $(MYSQL_LIBS) $(PTHREAD_LIBS) $(LIBLTDL) -lsf
 sfsql_proxy_DEPENDENCIES = $(LTDLDEPS)
@@ -26,4 +28,7 @@ noinst_HEADERS = \
 	proxy_threading.h \
 	proxy_clone.h \
 	proxy_monitor.h \
-	proxy_cmd.h
+	proxy_cmd.h \
+	proxy_trans.h \
+	hashtable/hashtable.h \
+	hashtable/hashtable_private.h
