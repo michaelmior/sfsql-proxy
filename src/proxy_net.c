@@ -32,6 +32,8 @@
 extern CHARSET_INFO *default_charset_info;
 CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 
+ulong transaction_id = 1;
+
 /* Definitions of functions to deal with client connections */
 void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status);
 void client_destroy(proxy_thread_t *thread);

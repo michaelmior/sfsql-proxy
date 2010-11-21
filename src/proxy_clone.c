@@ -24,6 +24,8 @@
 
 #include <sf.h>
 
+volatile sig_atomic_t server_id = 0;
+
 /**
  * Execute a cloning operation.
  *
@@ -75,10 +77,12 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             snprintf(*err, errlen, "Cloning produced zero clones");
             vmid = -1;
         } else {
-            if (vmid == 0)
+            if (vmid == 0) {
                 proxy_log(LOG_INFO, "%d clones successfully created", result->rc.number_clones);
-            else
+            } else {
+                server_id = vmid;
                 proxy_log(LOG_INFO, "I am clone %d", vmid);
+            }
         }
     }
 

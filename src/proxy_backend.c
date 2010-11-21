@@ -1063,6 +1063,54 @@ static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool succ
 }
 
 /**
+ * @param success TRUE if the query succeeded here, FALSE otherwise.
+ **/
+static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql) {
+    char *tok, *t=NULL, buff[BUFSIZ];
+    ulong clone_trans_id = 0;
+    my_bool commit = TRUE;
+    int errno;
+
+    /* Get the transaction ID from the clone */
+    tok = strtok_r((char*) query, ";", &t);
+    if (!tok)
+        goto err;
+
+    tok += 3;
+    clone_trans_id = strtol(tok, NULL, 10);
+
+    /* Check for a valid transaction ID and notify the coordinator */
+    if (clone_trans_id <= 0 || errno)
+        goto err;
+
+    snprintf(buff, BUFSIZ, "PROXY %s %lu;", success ? "SUCCESS" : "FAILURE", clone_trans_id);
+    mysql_query((MYSQL*) coordinator, buff);
+
+    /* If we failed here, or failed to communicate to the coordinator, we should rollback */
+    if ((errno = mysql_errno((MYSQL*) coordinator)))
+        proxy_log(LOG_ERROR, "Error notifying coordinator about status of transaction %lu", clone_trans_id);
+    if (errno || !success) {
+        mysql_real_query(mysql, "ROLLBACK", 8);
+        return;
+    }
+
+    /* TODO: Need to wait until COMMIT/ROLLBACK message is received
+     *       and update commit value accordingly */
+    if (commit)
+        mysql_real_query(mysql, "COMMIT", 6);
+    else
+        mysql_real_query(mysql, "ROLLBACK", 8);
+
+    if (mysql_error(mysql))
+        proxy_log(LOG_ERROR, "Error completing transaction %lu on clone", clone_trans_id);
+
+    return;
+
+err:
+    proxy_log(LOG_ERROR, "Invalid transaction ID when attempting to complete transaction on clone");
+}
+
+/**
  * Forward a query to a backend connection
  *
  * @param conn           Connection where the query should be sent.
@@ -1083,6 +1131,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     my_ulonglong affected_rows=0;
     my_ulonglong insert_id=0;
     uint server_status=0, warnings=0;
+    int start_server_id = server_id;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1130,7 +1179,12 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     success = (mysql->net.read_pos[0] != 0xFF) ? TRUE : FALSE;
 
     /* Wait for other backends to finish */
-    backend_query_wait(commit, bi, success);
+    if (options.cloneable && server_id != start_server_id && options.two_pc) {
+        backend_clone_query_wait(success, (char*) query, mysql);
+        return TRUE;
+    } else {
+        backend_query_wait(commit, bi, success);
+    }
 
     /* Check if all transactions succeeded and commit or rollback accordingly */
     /* XXX: This currently assumes that queries requiring two-phase commit

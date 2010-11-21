@@ -30,7 +30,7 @@
 #define ID_SIZE 3 + LONG_LEN
 
 /** Current transaction identifier */
-ulong transaction_id;
+extern ulong transaction_id;
 /** Host which coordinates transactions between clones */
 volatile MYSQL *coordinator;
 /** Master hosts which handles cloning */
