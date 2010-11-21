@@ -25,12 +25,16 @@ extern struct hashtable *trans_table;
  * commit or roll back a transaction.
  **/
 typedef struct {
-    union {
-        /** Number of clones which have agreed to commit. */
-        int num;
-        /** TRUE if we should commit, FALSE to roll back. */
-        my_bool success;
-    } commit;
+    /** Number of clones which have agreed to commit. */
+    volatile sig_atomic_t num;
+    /** TRUE if we should commit, FALSE to roll back. */
+    my_bool success;
+
+    /** Condition variable for notifying threads of
+     *  new commit information. */
+    pthread_cond_t cv;
+    /** Mutex for locking access to condition variable. */
+    pthread_mutex_t cv_mutex;
 } proxy_trans_t;
 
 void proxy_trans_init();

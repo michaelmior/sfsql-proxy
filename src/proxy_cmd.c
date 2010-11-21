@@ -494,24 +494,32 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
         __attribute__((unused)) status_t *status) {
     char *tok;
-    ulong transaction_id;
+    ulong commit_trans_id;
+    proxy_trans_t *trans;
 
     /* Ensure that we are the coordinator */
-    if (!options.coordinator)
-        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as coordinator");
+    if (!options.cloneable)
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
 
     /* Get the transaction ID */
     tok = strtok_r(NULL, " ", &t);
     if (tok)
-        transaction_id = strtol(tok, NULL, 10);
-    if (!tok || errno || transaction_id <= 0)
+        commit_trans_id = strtol(tok, NULL, 10);
+    if (!tok || errno || commit_trans_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
 
-    /* XXX need to actually perform the commit or rollback */
+    /* Grab the transaction data from the hashtable, waiting if necessary */
+    while (!(trans = proxy_trans_search(&commit_trans_id))) { usleep(100); }
+
+    /* Tell the waiting thread to proceed with commit/rollback */
+    trans->num = 1;
+    trans->success = success;
+    proxy_cond_signal(&trans->cv);
+
     if (success)
-        proxy_log(LOG_INFO, "Committing transaction %lu", transaction_id);
+        proxy_debug(LOG_INFO, "Committing transaction %lu", commit_trans_id);
     else
-        proxy_log(LOG_INFO, "Rolling back transaction %lu", transaction_id);
+        proxy_debug(LOG_INFO, "Rolling back transaction %lu", commit_trans_id);
 
     return proxy_net_send_ok(mysql, 0, 0, 0);
 }

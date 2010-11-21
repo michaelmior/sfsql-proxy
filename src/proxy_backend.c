@@ -1065,11 +1065,13 @@ static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool succ
 
 /**
  * @param success TRUE if the query succeeded here, FALSE otherwise.
+ * @param query   Query string where transaction ID can be parsed from.
+ * @param mysql   MYSQL object for backend where commit/rollback message should be sent.
  **/
 static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql) {
     char *tok, *t=NULL, buff[BUFSIZ];
     ulong clone_trans_id = 0;
-    my_bool commit = TRUE;
+    proxy_trans_t trans;
     int errno;
 
     /* Get the transaction ID from the clone */
@@ -1095,15 +1097,31 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
         return;
     }
 
-    /* TODO: Need to wait until COMMIT/ROLLBACK message is received
-     *       and update commit value accordingly */
-    if (commit)
+    /* Initialize transaction commit data and insert into hashtable */
+    proxy_cond_init(&trans.cv);
+    proxy_mutex_init(&trans.cv_mutex);
+    trans.num = 0;
+    trans.success = FALSE;
+    proxy_trans_insert(&clone_trans_id, &trans);
+
+    /* Wait to receive the commit or rollback info */
+    proxy_mutex_lock(&trans.cv_mutex);
+    while (!trans.num) { proxy_cond_wait(&trans.cv, &trans.cv_mutex); }
+
+    /* Execute the commit or rollback */
+    if (trans.success)
         mysql_real_query(mysql, "COMMIT", 6);
     else
         mysql_real_query(mysql, "ROLLBACK", 8);
 
     if (mysql_error(mysql))
         proxy_log(LOG_ERROR, "Error completing transaction %lu on clone", clone_trans_id);
+
+    /* Destroy synchronization primitives and remove from hashtable */
+    proxy_cond_destroy(&trans.cv);
+    proxy_mutex_unlock(&trans.cv_mutex);
+    proxy_mutex_destroy(&trans.cv_mutex);
+    proxy_trans_remove(&clone_trans_id);
 
     return;
 
