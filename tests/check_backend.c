@@ -65,7 +65,7 @@ START_TEST (test_backend_read_not_exists) {
     fail_unless(num < 0);
 } END_TEST
 
-/** @test NULL produced when reading empty f ile */
+/** @test NULL produced when reading empty file */
 START_TEST (test_backend_read_empty_file) {
     int num;
     proxy_host_t **backends;

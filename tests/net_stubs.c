@@ -75,3 +75,8 @@ void __wrap_randominit(struct rand_struct *rand_st, __attribute__((unused)) ulon
 void __wrap_proxy_do_clone(__attribute__((unused)) int nclones, __attribute__((unused)) char *err, __attribute__((unused)) int errlen) {}
 void __wrap_list_tickets(void) {}
 void __wrap_read_ticket_info(__attribute__((unused)) char *ticket) {}
+my_bool __wrap_proxy_cmd(
+        __attribute__((unused)) MYSQL *mysql,
+        __attribute__((unused)) char *query,
+        __attribute__((unused)) ulong query_len,
+        __attribute__((unused)) status_t *status) { return FALSE; }
