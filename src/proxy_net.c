@@ -331,7 +331,8 @@ void* proxy_net_new_thread(void *ptr) {
         }
 
         /* Wait for work to be available */
-        proxy_cond_wait(&(thread->cv), &(thread->lock));
+        while (!thread->data.work.addr)
+            proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         proxy_debug("Thread %d signaled", thread->id);
 

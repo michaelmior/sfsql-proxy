@@ -852,7 +852,8 @@ void* proxy_backend_new_thread(void *ptr) {
         }
 
         /* Wait for work to be available */
-        proxy_cond_wait(&thread->cv, &thread->lock);
+        while (!query->query)
+            proxy_cond_wait(&thread->cv, &thread->lock);
 
         /* If no query specified, must be ready to exit */
         if (query->query == NULL) {
