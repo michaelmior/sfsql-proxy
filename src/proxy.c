@@ -48,7 +48,6 @@
 #define PID_FILE      "/var/run/sfsql-proxy.pid"
 
 volatile sig_atomic_t run = 0;
-volatile sig_atomic_t cloning  = 0;
 /** PID of process which signaled to start cloning */
 pid_t signaller = -1;
 

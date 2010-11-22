@@ -14,4 +14,7 @@
 /** Identifier of the server (clone ID) */
 extern volatile sig_atomic_t server_id;
 
+/** Signify that we are currently cloning */
+extern volatile sig_atomic_t cloning;
+
 int proxy_do_clone(int nclones, char **err, int errlen);

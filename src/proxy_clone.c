@@ -27,6 +27,7 @@
 #endif
 
 volatile sig_atomic_t server_id = 0;
+volatile sig_atomic_t cloning  = 0;
 
 /**
  * Execute a cloning operation.
@@ -45,6 +46,8 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     char ticket[SF_TICKET_SIZE+1];
     int vmid = -1;
 
+    cloning = 1;
+
     /* Get a clone ticket and check its validity */
     proxy_log(LOG_INFO, "Requesting ticket for %d clones", nclones);
     result = REQUEST_VM_TICKET(nclones);
@@ -57,7 +60,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
         }
     } else {
         snprintf(*err, errlen, "Unable to get clone ticket");
-        return -1;
+        goto out;
     }
 
     /* Print ticket information */
@@ -90,6 +93,8 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     }
 
 out:
+    cloning = 0;
+
     if (result)
         FREE_SF_RES(result);
     return vmid;

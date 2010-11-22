@@ -38,9 +38,6 @@
 
 #include <pthread.h>
 
-/** Signify that we are currently cloning */
-extern volatile sig_atomic_t cloning;
-
 /** Data required for two-phase commit. */
 typedef struct {
     /** Barrier for ensuring all queries execute
