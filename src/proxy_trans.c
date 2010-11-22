@@ -48,8 +48,8 @@ unsigned int trans_hash(void *key) {
 
 void proxy_trans_init() {
     /* Initialize the transaction hashtable */
-    if (options.two_pc && (options.coordinator || options.coordinator)
-            && options.add_ids)
+    if (options.two_pc &&
+            ((options.coordinator && options.add_ids) || options.cloneable))
         trans_table = create_hashtable(16, trans_hash, trans_eq);
     else
         proxy_log(LOG_INFO, "Skipping transaction hashtable initialization");
