@@ -207,13 +207,14 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
 static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) status_t *status) {
     char *buff = alloca(BUFSIZ), *tok, *t=NULL, host[HOST_NAME_MAX+1];
-    int nclones = 1, ret, errno;
+    int nclones = 1, ret, sql_errno;
 
     /* Check if we think we can clone */
     if (options.cloneable) {
         /* Get the number of clones to create */
         tok = strtok_r(query, " ", &t);
         if (tok) {
+            errno = 0;
             nclones = strtol(tok, NULL, 10);
             if (errno || nclones <= 0)
                 return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid number of clones");
@@ -250,8 +251,8 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         if (proxy_clone_wait(1))
             return proxy_net_send_error(mysql, ER_LOCK_WAIT_TIMEOUT, "Error waiting for new clones");
 
-        if ((errno = mysql_errno((MYSQL*) master)))
-            return proxy_net_send_error(mysql, errno, mysql_error((MYSQL*) master));
+        if ((sql_errno = mysql_errno((MYSQL*) master)))
+            return proxy_net_send_error(mysql, sql_errno, mysql_error((MYSQL*) master));
         else
             return proxy_net_send_ok(mysql, 0, 0, 0);
     } else {
@@ -340,6 +341,7 @@ static void parse_host(char *str, char **host, int *port) {
     *host = strtok_r(str, ":", &t);
     str = strtok_r(NULL, ":", &t);
     if (str) {
+        errno = 0;
         *port = strtol(str, NULL, 10);
         if (errno || *port <= 0)
             *port = -1;
@@ -483,15 +485,19 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 
     /* Get the clone ID */
     tok = strtok_r(NULL, " ", &t);
-    if (tok)
+    if (tok) {
+        errno = 0;
         clone_id = strtol(tok, NULL, 10);
+    }
     if (!tok || errno || clone_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone ID");
 
     /* Get the transaction ID */
     tok = strtok_r(NULL, " ", &t);
-    if (tok)
+    if (tok) {
+        errno = 0;
         transaction_id = strtol(tok, NULL, 10);
+    }
     if (!tok || errno || transaction_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
 
@@ -524,8 +530,10 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
 
     /* Get the transaction ID */
     tok = strtok_r(NULL, " ", &t);
-    if (tok)
+    if (tok) {
+        errno = 0;
         commit_trans_id = strtol(tok, NULL, 10);
+    }
     if (!tok || errno || commit_trans_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
 
@@ -557,6 +565,12 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
  **/
 my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) {
     char *tok, *last_tok, *t=NULL;
+
+    /* Strip trailing semicolons */
+    while (query[query_len-1] == ';') {
+        query[query_len-1] = '\0';
+        query_len--;
+    }
 
     status->bytes_recv += query_len;
 

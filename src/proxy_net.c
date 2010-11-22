@@ -501,7 +501,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
                 return proxy_backend_query(mysql, thread_id, packet, pkt_len, commit, status) ? ERROR_BACKEND : ERROR_OK;
             } else {
                 /* Execute the proxy command */
-                return proxy_cmd(mysql, packet + sizeof(PROXY_CMD)-1, pkt_len, status) ? ERROR_CLIENT : ERROR_OK;
+                return proxy_cmd(mysql, packet + sizeof(PROXY_CMD)-1, pkt_len-sizeof(PROXY_CMD)+1, status) ? ERROR_CLIENT : ERROR_OK;
             }
         case COM_QUIT:
             return ERROR_CLOSE;
