@@ -3,10 +3,10 @@
 TESTS = check_options check_pool check_net check_backend check_map check_trans
 check_PROGRAMS = check_options check_pool check_net check_backend check_map check_trans
 
-AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir)/src
+AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir) -I$(top_srcdir)/src
 AM_LDFLAGS = -Wl,--wrap,_proxy_log
 
-SRC_DIR = $(abs_top_srcdir)/src
+SRC_DIR = $(top_srcdir)/src
 
 check_pool_SOURCES = check_pool.c log_stub.c
 check_pool_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@

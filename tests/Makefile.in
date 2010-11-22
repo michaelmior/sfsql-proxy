@@ -254,9 +254,9 @@ sysconfdir = @sysconfdir@
 target_alias = @target_alias@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir)/src
+AM_CFLAGS = $(MYSQL_CFLAGS) @CHECK_CFLAGS@ $(LTDLINCL) -DTESTS_DIR="\"$(top_srcdir)/tests/\"" -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir) -I$(top_srcdir)/src
 AM_LDFLAGS = -Wl,--wrap,_proxy_log
-SRC_DIR = $(abs_top_srcdir)/src
+SRC_DIR = $(top_srcdir)/src
 check_pool_SOURCES = check_pool.c log_stub.c
 check_pool_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
 check_pool_DEPENDENCIES = $(SRC_DIR)/proxy_pool.c $(SRC_DIR)/proxy_pool.h
