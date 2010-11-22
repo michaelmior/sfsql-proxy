@@ -207,45 +207,51 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
 static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) status_t *status) {
     char *buff = alloca(BUFSIZ), *tok, *t=NULL, host[HOST_NAME_MAX+1];
-    int nclones = 1, ret;
-    my_bool error;
+    int nclones = 1, ret, errno;
 
     /* Check if we think we can clone */
-    if (!options.cloneable)
-        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
+    if (options.cloneable) {
+        /* Get the number of clones to create */
+        tok = strtok_r(query, " ", &t);
+        if (tok) {
+            nclones = strtol(tok, NULL, 10);
+            if (errno || nclones <= 0)
+                return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid number of clones");
+        }
 
-    /* Get the number of clones to create */
-    tok = strtok_r(query, " ", &t);
-    if (tok) {
-        nclones = strtol(tok, NULL, 10);
-        if (errno || nclones <= 0)
-            return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid number of clones");
-    }
+        /* Perform the clone and return the result */
+        ret = proxy_do_clone(nclones, &buff, BUFSIZ);
 
-    /* Perform the clone and return the result */
-    ret = proxy_do_clone(nclones, &buff, BUFSIZ);
+        if (ret < 0) {
+            /* Cloning failed */
+            return proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, buff);
+        } else if (ret == 0) {
+            /* This is the master, and cloning succeeded */
+            return proxy_net_send_ok(mysql, 0, 0, 0);
+        } else {
+            /* This a clone, notify the coordinator */
+            if (gethostname(host, HOST_NAME_MAX+1))
+                return TRUE;
 
-    if (ret < 0) {
-        /* Cloning failed */
-        error = proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, buff);
-    } else if (ret == 0) {
-        /* This is the master, and cloning succeeded */
-        error = proxy_net_send_ok(mysql, 0, 0, 0);
-    } else {
-        /* This a clone, notify the coordinator */
-        if (gethostname(host, HOST_NAME_MAX+1))
+            snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", host, options.pport);
+            mysql_query((MYSQL*) coordinator, buff);
+
+            if (mysql_errno((MYSQL*) coordinator))
+                proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d", ret);
+
             return TRUE;
+        }
+    } else if (options.coordinator) {
+        /* Contact the master to perform cloning */
+        mysql_query((MYSQL*) master, "PROXY CLONE;");
 
-        snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", host, options.pport);
-        mysql_query((MYSQL*) coordinator, buff);
-
-        if (mysql_errno((MYSQL*) coordinator))
-            proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d", ret);
-
-        return TRUE;
+        if ((errno = mysql_errno((MYSQL*) master)))
+            return proxy_net_send_error(mysql, errno, mysql_error((MYSQL*) master));
+        else
+            return proxy_net_send_ok(mysql, 0, 0, 0);
+    } else {
+        return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server can't be cloned");
     }
-
-    return error;
 }
 
 #ifdef HAVE_SF_H
