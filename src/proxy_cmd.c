@@ -245,6 +245,10 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         /* Contact the master to perform cloning */
         mysql_query((MYSQL*) master, "PROXY CLONE;");
 
+        /* Wait for the clones to be ready */
+        if (proxy_clone_wait(1))
+            return proxy_net_send_error(mysql, ER_LOCK_WAIT_TIMEOUT, "Error waiting for new clones");
+
         if ((errno = mysql_errno((MYSQL*) master)))
             return proxy_net_send_error(mysql, errno, mysql_error((MYSQL*) master));
         else

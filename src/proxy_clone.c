@@ -25,9 +25,81 @@
 #ifdef HAVE_SF_H
 #include <sf.h>
 #endif
+#include <time.h>
+
+/** Maximum amount of time to wait for new clones */
+#define CLONE_TIMEOUT 30
 
 volatile sig_atomic_t server_id = 0;
 volatile sig_atomic_t cloning  = 0;
+volatile sig_atomic_t new_clones = 0;
+
+/** Number of clones requested by
+ *  the current cloning operation. */
+static volatile sig_atomic_t req_clones = 0;
+
+/** Condition variable for notifying of new clones */
+static pthread_cond_t new_cv;
+/** Mutex associated with :new_cv */
+static pthread_mutex_t new_mutex;
+
+/**
+ * Wait for new clones to become live on the coordinator.
+ *
+ * @param nclones Number of clones to wait for.
+ *
+ * @return TRUE on error, FALSE otherwise.
+ **/
+my_bool proxy_clone_wait(int nclones) {
+    struct timespec wait_time = { .tv_sec=CLONE_TIMEOUT, .tv_nsec=0 };
+    int wait_errno = 0;
+    my_bool error = FALSE;
+
+    req_clones = nclones;
+    new_clones = 0;
+
+    /* Initialize locking */
+    proxy_cond_init(&new_cv);
+    proxy_mutex_init(&new_mutex);
+
+    /* Wait for the clones */
+    proxy_log(LOG_INFO, "Waiting %ds for new clones", CLONE_TIMEOUT);
+    proxy_mutex_lock(&new_mutex);
+    while (new_clones != req_clones && !wait_errno)
+        wait_errno = pthread_cond_timedwait(&new_cv, &new_mutex, &wait_time);
+
+    /* Check if we timed out waiting */
+    if (wait_errno == ETIMEDOUT) {
+        proxy_log(LOG_ERROR, "Timed out waiting for new clones");
+        error = TRUE;
+    }
+
+    req_clones = 0;
+    proxy_mutex_destroy(&new_mutex);
+    proxy_cond_destroy(&new_cv);
+
+    return FALSE;
+}
+
+/**
+ * Used by the backend to notify the coordinator
+ * that some new clone has arrived.
+ **/
+void proxy_clone_notify() {
+    /* Check if we're not expecting new clones */
+    if (!req_clones) {
+        proxy_log(LOG_ERROR, "Attempted to notify of new clone with no outstanding requests");
+        return;
+    }
+
+    /* Increment the number of clones and check if we're done */
+    new_clones++;
+    if (new_clones == req_clones)
+        pthread_cond_signal(&new_cv);
+
+    if (new_clones > req_clones)
+        proxy_log(LOG_ERROR, "More clones arrived than expected");
+}
 
 /**
  * Execute a cloning operation.
@@ -47,6 +119,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     int vmid = -1;
 
     cloning = 1;
+    req_clones = nclones;
 
     /* Get a clone ticket and check its validity */
     proxy_log(LOG_INFO, "Requesting ticket for %d clones", nclones);

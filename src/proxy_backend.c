@@ -713,6 +713,7 @@ my_bool proxy_backend_add(char *host, int port) {
     backend_new_connect(backend_conns, backend_pools, backend_num);
 
     backend_num++;
+    proxy_clone_notify();
     pthread_mutex_unlock(&add_mutex);
 
     return FALSE;

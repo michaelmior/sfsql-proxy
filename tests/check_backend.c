@@ -61,6 +61,8 @@ void* hashtable_remove(
     __attribute__((unused)) struct hashtable *h,
     __attribute__((unused)) void *k) { return NULL; }
 
+void proxy_clone_notify() {}
+
 volatile sig_atomic_t cloning = 0;
 
 /** @test Error when trying to read backend with no filename */

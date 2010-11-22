@@ -18,3 +18,5 @@ extern volatile sig_atomic_t server_id;
 extern volatile sig_atomic_t cloning;
 
 int proxy_do_clone(int nclones, char **err, int errlen);
+my_bool proxy_clone_wait(int nclones);
+void proxy_clone_notify();
