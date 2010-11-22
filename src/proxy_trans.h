@@ -53,6 +53,7 @@ DEFINE_HASHTABLE_REMOVE(_proxy_trans_remove, ulong, proxy_trans_t);
  * @return Zero on success, anything else on failure.
  **/
 inline __attribute__((always_inline)) int proxy_trans_insert(ulong *transaction_id, proxy_trans_t *trans) {
+    proxy_debug("Adding transaction %lu to hashtable", *transaction_id);
     return _proxy_trans_insert(trans_table, transaction_id, trans);
 }
 
@@ -65,6 +66,7 @@ inline __attribute__((always_inline)) int proxy_trans_insert(ulong *transaction_
  * could not be found.
  **/
 inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_search(ulong *transaction_id) {
+    proxy_debug("Looking up transaction %lu in hashtable", *transaction_id);
     return _proxy_trans_search(trans_table, transaction_id);
 }
 
@@ -77,6 +79,7 @@ inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_search(ulong *t
  *         exists with the specified key.
  **/
 inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_remove(ulong *transaction_id) {
+    proxy_debug("Removing transaction %lu from hashtable", *transaction_id);
     return _proxy_trans_remove(trans_table, transaction_id);
 }
 

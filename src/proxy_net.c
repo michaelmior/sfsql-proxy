@@ -200,6 +200,7 @@ my_bool check_user(
         __attribute__((unused)) char *db,
         __attribute__((unused)) uint db_len) {
     /* XXX: Not doing auth. see sql/sql_connect.cc:check_user */
+    proxy_debug("Authentication request from user %s on database %s", user, db);
     return TRUE;
 }
 
@@ -333,7 +334,7 @@ void* proxy_net_new_thread(void *ptr) {
         while (!thread->data.work.addr)
             proxy_cond_wait(&(thread->cv), &(thread->lock));
 
-        proxy_debug("Thread %d signaled", thread->id);
+        proxy_debug("Client thread %d signaled", thread->id);
 
         /* If no work specified, must be ready to exit */
         if (thread->data.work.addr == NULL) {
@@ -486,7 +487,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    proxy_debug("Got command %d", command);
+    proxy_debug("Got command %d for connection on thread %d", command, thread_id);
 
     switch (command) {
         case COM_PROXY_QUERY:

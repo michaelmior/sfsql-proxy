@@ -243,6 +243,7 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         }
     } else if (options.coordinator) {
         /* Contact the master to perform cloning */
+        proxy_log(LOG_INFO, "Requesting clone from master");
         mysql_query((MYSQL*) master, "PROXY CLONE;");
 
         /* Wait for the clones to be ready */

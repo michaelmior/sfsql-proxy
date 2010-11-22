@@ -558,6 +558,8 @@ my_bool proxy_backends_connect() {
     backends = backend_read_file(options.backend_file, &num_backends);
     if (!backends)
         return TRUE;
+    else
+        proxy_debug("Successfully read backends from file");
 
     /* Allocate backend data structures */
     if (backends_alloc(num_backends))
@@ -588,6 +590,8 @@ my_bool proxy_backends_connect() {
 static inline void backends_switch(int new_num, proxy_host_t **new_backends) {
     int oldnum;
     proxy_host_t **old_backends;
+
+    proxy_debug("Switching to new set of backends");
 
     /* Switch to the new set of backends */
     old_backends = backends;
@@ -699,6 +703,8 @@ static void backend_conns_free(int bi) {
 my_bool proxy_backend_add(char *host, int port) {
     pthread_mutex_lock(&add_mutex);
 
+    proxy_log(LOG_INFO, "Adding new clone %s:%d", host, port);
+
     /* Allocate space for the new backend */
     if (backend_resize(backend_num+1, TRUE) ||
         backend_resize(backend_num+1, FALSE))
@@ -730,6 +736,8 @@ my_bool proxy_backend_add(char *host, int port) {
 static my_bool backend_resize(int num, my_bool before) {
     int i;
     void *ptr;
+
+    proxy_debug("Resizing backends from %d to %d", backend_num, num);
 
     /* Reallocate memory */
     if ((before && num > backend_num) || (!before && num < backend_num)) {
@@ -773,6 +781,8 @@ void proxy_backends_update() {
     int num, i, j, keep[backend_num];
     my_bool changed = FALSE;
     proxy_host_t **new_backends = backend_read_file(options.backend_file, &num);
+
+    proxy_debug("Updating backends from file");
 
     /* Block others from getting backends */
     for (i=0; i<backend_num; i++) {
@@ -843,6 +853,8 @@ void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     proxy_backend_query_t *query = &thread->data.backend.query;
 
+    proxy_debug("Starting thread %d for backend %d", thread->id, thread->data.backend.bi);
+
     proxy_threading_mask();
     proxy_mutex_lock(&thread->lock);
 
@@ -876,7 +888,7 @@ void* proxy_backend_new_thread(void *ptr) {
         proxy_pool_return(backend_thread_pool[thread->data.backend.bi], thread->id);
     }
 
-    proxy_log(LOG_INFO, "Exiting loop on backend %d, thead %d", thread->data.backend.bi, thread->id);
+    proxy_debug("Exiting loop on backend %d, thead %d", thread->data.backend.bi, thread->id);
     pthread_exit(NULL);
 }
 
@@ -1106,14 +1118,18 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     proxy_trans_insert(&clone_trans_id, &trans);
 
     /* Wait to receive the commit or rollback info */
+    proxy_debug("Waiting for decision on transaction %lu", clone_trans_id);
     proxy_mutex_lock(&trans.cv_mutex);
     while (!trans.num) { proxy_cond_wait(&trans.cv, &trans.cv_mutex); }
 
     /* Execute the commit or rollback */
-    if (trans.success)
+    if (trans.success) {
+        proxy_debug("Committing transaction %lu", clone_trans_id);
         mysql_real_query(mysql, "COMMIT", 6);
-    else
+    } else {
+        proxy_debug("Rolling back transaction %lu", clone_trans_id);
         mysql_real_query(mysql, "ROLLBACK", 8);
+    }
 
     if (mysql_error(mysql))
         proxy_log(LOG_ERROR, "Error completing transaction %lu on clone", clone_trans_id);
@@ -1354,6 +1370,7 @@ void proxy_backend_close() {
                 conn_free(backend_threads[i][j].data.backend.conn);
 
             /* Shut down threads */
+            proxy_log(LOG_INFO, "Cancelling backend threads...");
             proxy_threading_cancel(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
             proxy_threading_cleanup(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
         }

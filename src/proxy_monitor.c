@@ -100,6 +100,7 @@ my_bool monitor_master_connect() {
         }
     }
 
+    proxy_log(LOG_INFO, "Successfully connected to master");
     return FALSE;
 }
 
