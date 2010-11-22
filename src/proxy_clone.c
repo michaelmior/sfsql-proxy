@@ -75,6 +75,7 @@ my_bool proxy_clone_wait(int nclones) {
     }
 
     req_clones = 0;
+    proxy_mutex_unlock(&new_mutex);
     proxy_mutex_destroy(&new_mutex);
     proxy_cond_destroy(&new_cv);
 
