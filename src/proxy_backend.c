@@ -1043,7 +1043,7 @@ static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char
     ci = backend_pools ? proxy_pool_get(backend_pools[bi]) : ci;
     conn = backend_conns[bi][ci];
 
-    proxy_debug("Sending read-only query %s to backend %d, connection %d\n", query, bi, ci);
+    proxy_debug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
 
     /*Send the query */
     error = backend_query(conn, proxy, query, length, bi, NULL, status);
