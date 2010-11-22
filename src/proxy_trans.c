@@ -35,7 +35,7 @@ int trans_eq(void *key1, void *key2) {
     return *((ulong*) key1) == *((ulong*) key2);
 }
 
-inline uint32_t SuperFastHash (const char * data, int len);
+__attribute__((always_inline)) uint32_t SuperFastHash (const char * data, int len);
 
 /**
  * Hash function which wraps SuperFastHash.

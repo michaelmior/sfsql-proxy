@@ -517,9 +517,9 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
     proxy_cond_signal(&trans->cv);
 
     if (success)
-        proxy_debug(LOG_INFO, "Committing transaction %lu", commit_trans_id);
+        proxy_debug("Committing transaction %lu", commit_trans_id);
     else
-        proxy_debug(LOG_INFO, "Rolling back transaction %lu", commit_trans_id);
+        proxy_debug("Rolling back transaction %lu", commit_trans_id);
 
     return proxy_net_send_ok(mysql, 0, 0, 0);
 }

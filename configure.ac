@@ -120,9 +120,9 @@ AC_MSG_RESULT([$MYSQL_LIBS])
 AC_SUBST(MYSQL_CFLAGS)
 AC_SUBST(MYSQL_LIBS)
 
-AC_ARG_WITH(debug,
-  [AS_HELP_STRING([--with-debug], [enable debugging])])
-if test "$with_debug" = "yes"; then
+AC_ARG_ENABLE(debug,
+  [AS_HELP_STRING([--enable-debug], [enable debugging])])
+if test "$enable_debug" = "yes"; then
   CFLAGS="$CFLAGS -g -O0 -DDEBUG"
 else
   CFLAGS="$CFLAGS -O3"
