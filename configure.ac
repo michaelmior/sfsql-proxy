@@ -83,8 +83,8 @@ AC_ARG_WITH(snowflock,
     [], [with_snowflock=yes])
 
 if test "$with_snowflock" = "yes"; then
-    AC_CHECK_HEADERS([sf.h])
-    AC_CHECK_FUNCS([CLONE_MASTER])
+    AC_CHECK_LIB([sf], [clone_master], [],
+        [AC_MSG_ERROR([SnowFlock support requested, but library not found])])
 fi
 
 # Configure MySQL

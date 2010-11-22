@@ -22,7 +22,7 @@
 
 #include "proxy.h"
 
-#ifdef HAVE_SF_H
+#ifdef HAVE_LIBSF
 #include <sf.h>
 #endif
 #include <time.h>
@@ -112,7 +112,7 @@ void proxy_clone_notify() {
  * @return ID of the created clone (0 on the master)
  *         or negative on error.
  **/
-#ifdef HAVE_SF_H
+#ifdef HAVE_LIBSF
 int proxy_do_clone(int nclones, char **err, int errlen) {
     sf_result *result;
     char ticket[SF_TICKET_SIZE+1];
@@ -179,4 +179,4 @@ int proxy_do_clone(
         __attribute__((unused)) int errlen) {
     return -1;
 }
-#endif
+#endif /* HAVE_LIBSF */

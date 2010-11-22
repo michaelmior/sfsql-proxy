@@ -30,9 +30,6 @@
 /* Define to 1 if you have the `bzero' function. */
 #undef HAVE_BZERO
 
-/* Define to 1 if you have the `CLONE_MASTER' function. */
-#undef HAVE_CLONE_MASTER
-
 /* Define to 1 if you have the `closedir' function. */
 #undef HAVE_CLOSEDIR
 
@@ -88,6 +85,9 @@
 /* Define to 1 if you have the `mysqlclient_r' library (-lmysqlclient_r). */
 #undef HAVE_LIBMYSQLCLIENT_R
 
+/* Define to 1 if you have the `sf' library (-lsf). */
+#undef HAVE_LIBSF
+
 /* Define this if a modern libltdl is already installed */
 #undef HAVE_LTDL
 
@@ -123,9 +123,6 @@
 
 /* Define to 1 if you have the `select' function. */
 #undef HAVE_SELECT
-
-/* Define to 1 if you have the <sf.h> header file. */
-#undef HAVE_SF_H
 
 /* Define if you have the shl_load function. */
 #undef HAVE_SHL_LOAD

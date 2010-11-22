@@ -22,7 +22,7 @@
 
 #include "proxy.h"
 
-#ifdef HAVE_SF_H
+#ifdef HAVE_LIBSF
 #include <sf.h>
 #endif
 #include <netdb.h>
@@ -258,7 +258,7 @@ static my_bool net_clone(MYSQL *mysql, char *query,
     }
 }
 
-#ifdef HAVE_SF_H
+#ifdef HAVE_LIBSF
 static my_bool net_show_clones(MYSQL *mysql,
         __attribute__((unused)) char *query,
         __attribute__((unused)) ulong query_len,
@@ -319,7 +319,7 @@ static my_bool net_show_clones(MYSQL *mysql,
         __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) {
     proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy not compiled with SnowFlock support");
-#endif
+#endif /* HAVE_LIB_SF */
 
     return FALSE;
 }
