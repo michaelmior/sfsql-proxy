@@ -32,7 +32,6 @@ AC_PROG_RANLIB
 # Checks for libraries.
 ACX_PTHREAD
 AC_CHECK_LIB(mysqlclient_r, mysql_real_connect)
-PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
 
 # Checks for header files.
 AC_HEADER_STDC
@@ -67,6 +66,16 @@ DX_XML_FEATURE(OFF)
 DX_PDF_FEATURE(OFF)
 DX_PS_FEATURE(OFF)
 DX_INIT_DOXYGEN([$PACKAGE_NAME], [doxygen.cfg], [doc])
+
+# Configure check
+AC_ARG_WITH(check,
+    AS_HELP_STRING([--without-check], [Disable support for unit tests using check]),
+    [], [with_check=yes])
+
+AM_CONDITIONAL([COND_CHECK], [test "$with_check" = yes])
+if test "$with_check" = "yes"; then
+    PKG_CHECK_MODULES([CHECK], [check >= 0.9.4])
+fi
 
 # Configure SnowFlock
 AC_ARG_WITH(snowflock,

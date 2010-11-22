@@ -1,4 +1,7 @@
-SUBDIRS = libltdl src map tests
+if COND_CHECK
+  MAYBE_CHECK = tests
+endif
+SUBDIRS = libltdl src map $(MAYBE_CHECK)
 
 EXTRA_DIST = \
 	doxygen.cfg
