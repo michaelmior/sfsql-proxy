@@ -247,14 +247,13 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         proxy_log(LOG_INFO, "Requesting clone from master");
         mysql_query((MYSQL*) master, "PROXY CLONE;");
 
-        /* Wait for the clones to be ready */
-        if (proxy_clone_wait(1))
-            return proxy_net_send_error(mysql, ER_LOCK_WAIT_TIMEOUT, "Error waiting for new clones");
-
         if ((sql_errno = mysql_errno((MYSQL*) master)))
             return proxy_net_send_error(mysql, sql_errno, mysql_error((MYSQL*) master));
         else
-            return proxy_net_send_ok(mysql, 0, 0, 0);
+            if (proxy_clone_wait(1))
+                return proxy_net_send_error(mysql, ER_LOCK_WAIT_TIMEOUT, "Error waiting for new clones");
+            else
+                return proxy_net_send_ok(mysql, 0, 0, 0);
     } else {
         return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server can't be cloned");
     }
