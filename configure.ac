@@ -41,8 +41,7 @@ AC_CHECK_HEADERS([\
     arpa/inet.h \
     netdb.h \
     netinet/in.h \
-    sys/socket.h \
-    sf.h ])
+    sys/socket.h ])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
@@ -54,7 +53,6 @@ AC_C_RESTRICT
 
 # Checks for library functions.
 AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])
-AC_CHECK_FUNCS([CLONE_MASTER])
 AC_FUNC_FORK
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_VPRINTF
@@ -69,6 +67,16 @@ DX_XML_FEATURE(OFF)
 DX_PDF_FEATURE(OFF)
 DX_PS_FEATURE(OFF)
 DX_INIT_DOXYGEN([$PACKAGE_NAME], [doxygen.cfg], [doc])
+
+# Configure SnowFlock
+AC_ARG_WITH(snowflock,
+    AS_HELP_STRING([--without-snowflock], [Disable support for the SnowFlock C API]),
+    [], [with_snowflock=yes])
+
+if test "$with_snowflock" = "yes"; then
+    AC_CHECK_HEADERS([sf.h])
+    AC_CHECK_FUNCS([CLONE_MASTER])
+fi
 
 # Configure MySQL
 MYSQL_CFLAGS=""

@@ -22,7 +22,9 @@
 
 #include "proxy.h"
 
+#ifdef HAVE_SF_H
 #include <sf.h>
+#endif
 
 volatile sig_atomic_t server_id = 0;
 
@@ -37,6 +39,7 @@ volatile sig_atomic_t server_id = 0;
  * @return ID of the created clone (0 on the master)
  *         or negative on error.
  **/
+#ifdef HAVE_SF_H
 int proxy_do_clone(int nclones, char **err, int errlen) {
     sf_result *result;
     char ticket[SF_TICKET_SIZE+1];
@@ -91,3 +94,11 @@ out:
         FREE_SF_RES(result);
     return vmid;
 }
+#else
+int proxy_do_clone(
+        __attribute__((unused)) int nclones,
+        __attribute__((unused)) char **err,
+        __attribute__((unused)) int errlen) {
+    return -1;
+}
+#endif

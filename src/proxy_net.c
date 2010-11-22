@@ -22,7 +22,6 @@
 
 #include "proxy.h"
 
-#include <sf.h>
 #include <netdb.h>
 
 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
