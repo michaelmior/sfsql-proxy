@@ -25,6 +25,11 @@
 #include <check.h>
 #include <signal.h>
 
+/* Externs */
+ulong transaction_id;
+struct hashtable *trans_table;
+volatile sig_atomic_t server_id;
+
 /* Dummy threading functions */
 void __wrap_proxy_threading_cancel(
     __attribute__((unused)) proxy_thread_t *threads,
@@ -46,6 +51,15 @@ my_bool __wrap_proxy_net_send_error(
         __attribute__((unused))MYSQL *mysql,
         __attribute__((unused))int sql_errno,
         __attribute__((unused))const char *err) { return FALSE; }
+
+/* Dummy hash functions */
+int hashtable_insert(
+    __attribute__((unused)) struct hashtable *h,
+    __attribute__((unused)) void *k,
+    __attribute__((unused)) void *v) { return 0; }
+void* hashtable_remove(
+    __attribute__((unused)) struct hashtable *h,
+    __attribute__((unused)) void *k) { return NULL; }
 
 volatile sig_atomic_t cloning = 0;
 
