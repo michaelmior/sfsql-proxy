@@ -37,8 +37,8 @@ volatile MYSQL *coordinator;
 MYSQL *master;
 
 /** Command to send for queries which must be tracked */
-/* XXX: This will break if COM_END is equal to the size
- *      of an enum, but this will never happen */
+/* This will break if COM_END is equal to the size
+ * of an enum, but this will never happen */
 #define COM_PROXY_QUERY COM_END+1
 
 /**

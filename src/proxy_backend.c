@@ -132,7 +132,7 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
 
     /* XXX: need to return error to client */
     if (unlikely(pkt_len == packet_error || pkt_len == 0)) {
-        if (! (net->vio && vio_was_interrupted(net->vio))) {
+        if (net->vio && vio_was_interrupted(net->vio)) {
             /* XXX: fatal error, close down 
              * should give soft error to client and reconnect with backend */
             proxy_log(LOG_ERROR, "Interrupted when reading backend response");
@@ -742,7 +742,8 @@ static my_bool backend_resize(int num, my_bool before) {
     /* Reallocate memory */
     if ((before && num > backend_num) || (!before && num < backend_num)) {
         /* XXX: A little ugly below, but it ensures the proxy
-         *      can continue without new backends if realloc fails */
+         *      can continue without new backends if realloc fails.
+         *      We should probably allocate more memory in advance. */
 
 #define SAFE_REALLOC(mem, size) \
         ptr = realloc(mem, num * size); \
@@ -931,8 +932,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
     }
 
     /* Spin until query can proceed */
-    while (backend_pools && !backend_pools[0]) { usleep(1000); } /* XXX: should maybe lock here */
-    while (cloning) { usleep(1000); }           /* Wait until cloning is done */
+    while (backend_pools && !backend_pools[0]) { usleep(100); } /* XXX: should maybe lock here */
+    while (cloning) { usleep(100); }           /* Wait until cloning is done */
 
     /* Speed things up with only one backend
      * by avoiding synchronization */
@@ -946,9 +947,9 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
              * backends are in the process of changing */
             bi = rand() % backend_num;
 
-            /* XXX: This guards against the unlikely case that we
-             *      get here while backends are being updated */
-            while (backend_pools && !backend_pools[bi]) { bi = rand() % backend_num; }
+            /* This guards against the unlikely case that we
+             * get here while backends are being updated */
+            while (!backend_pools || !backend_pools[bi]) { bi = rand() % backend_num; }
 
             if (backend_query_idx(bi, ci, proxy, query, length, status)) {
                 error = TRUE;
@@ -1245,11 +1246,11 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* Check if all transactions succeeded and commit or rollback accordingly */
-    /* XXX: This currently assumes that queries requiring two-phase commit
-     *      do not return any results, and thus have a single packet which
-     *      has already been consumed at this point. This holds for UPDATE
-     *      INSERT, and DELETE. If this assumption breaks, subsequent
-     *      queries will fail, although the client can then reconnect. */
+    /* This currently assumes that queries requiring two-phase commit do not
+     * return any results, and thus have a single packet which has already
+     * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
+     * If this assumption breaks, subsequent queries will fail, although the
+     * client can then reconnect. */
     if (commit && options.two_pc) {
         if (clone_generation != start_generation) {
             /* Get the query ID and wait for it to be available in the transaction hashtable */

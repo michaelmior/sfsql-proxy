@@ -43,8 +43,7 @@ static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_l
 /**
  * Perform client authentication.
  *
- * This code is derived from sql/sql_connect.cc:check_connection
- * XXX: not currently using thread ID
+ * This code is derived from sql/sql_connect.cc:check_connection.
  *
  * @param mysql MySQL object corresponding to the client connection.
  * @param clientaddr Address of the newly connected client.
@@ -56,7 +55,7 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attr
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
     ulong server_caps, client_caps, pkt_len=0;
-    struct rand_struct rand; /* XXX: reuse this */
+    struct rand_struct rand;
     uint16 port = PROXY_PORT;
     CHARSET_INFO *charset;
 
@@ -71,14 +70,14 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attr
     end += 4;
 
     /* Generate scramble string */
-    randominit(&rand, time(NULL), thread_id); /* XXX: init elsewhere */
+    randominit(&rand, time(NULL), thread_id);
     create_random_string(scramble, SCRAMBLE_LENGTH, &rand);
     end = strmake(end, scramble, SCRAMBLE_LENGTH_323) + 1;
 
     /* Add capabilities */
-    /* XXX: transactions flag? get from backend?
-     *      don't allow client to pick a DB or use multiple statements for now */
-    server_caps = CLIENT_BASIC_FLAGS & ~(CLIENT_CONNECT_WITH_DB & CLIENT_MULTI_STATEMENTS);
+    /* Don't allow client to pick a DB or use multiple statements for now.
+     * We also tell the client we don't support transactions, since we need them for 2PC. */
+    server_caps = CLIENT_BASIC_FLAGS & ~(CLIENT_CONNECT_WITH_DB & CLIENT_MULTI_STATEMENTS & CLIENT_TRANSACTIONS);
     int2store(end, server_caps);
 
     end[2] = (char) default_charset_info->number;
@@ -168,7 +167,6 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attr
                 /* XXX: need to set DB here eventually */
             }
         } else {
-            /* XXX: send error, not authenticated */
             proxy_net_send_error(mysql, ER_HANDSHAKE_ERROR, "Error authenticating user");
             return TRUE;
         }
@@ -491,7 +489,8 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
 
     switch (command) {
         case COM_PROXY_QUERY:
-            /* XXX: for now, we do nothing different here */
+            /* We do nothing different here, except skip parsing of PROXY commands */
+            status->queries++;
             return proxy_backend_query(mysql, thread_id, packet, pkt_len, commit, status) ? ERROR_BACKEND : ERROR_OK;
         case COM_QUERY:
             status->queries++;
@@ -563,7 +562,8 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
     pos = net_store_length(buff + 1, affected_rows);
     pos = net_store_length(pos, last_insert_id);
 
-    /* XXX: ignoring 4.0 protocol */
+    /* We ignore 4.0 protocol details here, but these clients
+     * should never have been able to connect anyway. */
 
     int2store(pos, mysql->server_status);
     pos += 2;
