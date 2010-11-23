@@ -1,7 +1,7 @@
 /*
  * proxy_clone.h
  *
- * Main proxy include file with useful macros, structs, and default configuration options
+ * Functionality related to SnowFlock cloning.
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file "COPYING" in the main directory of
@@ -11,11 +11,14 @@
  *
  */
 
-/** Identifier of the server (clone ID) */
+/** Identifier of the server (clone ID). */
 extern volatile sig_atomic_t server_id;
 
-/** Signify that we are currently cloning */
+/** Signify that we are currently cloning. */
 extern volatile sig_atomic_t cloning;
+
+/** Current generation of clones. */
+extern volatile sig_atomic_t clone_generation;
 
 int proxy_do_clone(int nclones, char **err, int errlen);
 my_bool proxy_clone_wait(int nclones);

@@ -27,7 +27,10 @@ extern struct hashtable *trans_table;
 typedef struct {
     /** Number of clones which have agreed to commit. */
     volatile sig_atomic_t num;
-    /** TRUE if we should commit, FALSE to roll back. */
+    /* Total number which must agree to commit. */
+    int total;
+
+    /* TRUE to commit, FALSE to roll back */
     my_bool success;
 
     /** Condition variable for notifying threads of

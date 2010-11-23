@@ -1,7 +1,7 @@
 /******************************************************************************
  * proxy_clone.h
  *
- * Main proxy executable and server setup
+ * Functionality related to SnowFlock cloning.
  *
  * Copyright (c) 2010, Michael Mior <mmior@cs.toronto.edu>
  *
@@ -33,6 +33,7 @@
 volatile sig_atomic_t server_id = 0;
 volatile sig_atomic_t cloning  = 0;
 volatile sig_atomic_t new_clones = 0;
+volatile sig_atomic_t clone_generation = 0;
 
 /** Number of clones requested by
  *  the current cloning operation. */
@@ -119,6 +120,11 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     char ticket[SF_TICKET_SIZE+1];
     int vmid = -1;
 
+    if (req_clones) {
+        proxy_log(LOG_ERROR, "Previous cloning operation not yet complete");
+        return -1;
+    }
+
     cloning = 1;
     req_clones = nclones;
 
@@ -158,6 +164,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             vmid = -1;
         } else {
             if (vmid == 0) {
+                (void) __sync_fetch_and_add(&clone_generation, 1);
                 proxy_log(LOG_INFO, "%d clones successfully created", result->rc.number_clones);
             } else {
                 server_id = vmid;

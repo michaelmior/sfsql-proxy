@@ -1077,35 +1077,55 @@ static inline void backend_query_wait(commitdata_t *commit, int bi, my_bool succ
 }
 
 /**
+ * Extract the transaction ID from a query string.
+ *
+ * @param query Query string to parse.
+ *
+ * @return ID of the transaction or zero on error;
+ **/
+static inline ulong id_from_query(const char *query) {
+    char *tok;
+    ulong query_trans_id = 0;
+
+    /* Get the transaction ID from the clone */
+    tok = strrchr(query, '-');
+    if (!tok)
+        return 0;
+
+    errno = 0;
+    tok++;
+    query_trans_id = strtol(tok, NULL, 10);
+
+    /* Check for a valid transaction ID and notify the coordinator */
+    if (errno)
+        return 0;
+    else
+        return query_trans_id;
+}
+
+/**
  * @param success TRUE if the query succeeded here, FALSE otherwise.
  * @param query   Query string where transaction ID can be parsed from.
  * @param mysql   MYSQL object for backend where commit/rollback message should be sent.
  **/
 static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql) {
-    char *tok, *t=NULL, buff[BUFSIZ];
+    char buff[BUFSIZ];
     ulong clone_trans_id = 0;
     proxy_trans_t trans;
-    int errno;
+    int sql_errno;
 
-    /* Get the transaction ID from the clone */
-    tok = strtok_r((char*) query, ";", &t);
-    if (!tok)
-        goto err;
-
-    tok += 3;
-    clone_trans_id = strtol(tok, NULL, 10);
-
-    /* Check for a valid transaction ID and notify the coordinator */
-    if (clone_trans_id <= 0 || errno)
+    /* Get the transaction ID */
+    clone_trans_id = id_from_query(query);
+    if (clone_trans_id <= 0)
         goto err;
 
     snprintf(buff, BUFSIZ, "PROXY %s %lu;", success ? "SUCCESS" : "FAILURE", clone_trans_id);
     mysql_query((MYSQL*) coordinator, buff);
 
     /* If we failed here, or failed to communicate to the coordinator, we should rollback */
-    if ((errno = mysql_errno((MYSQL*) coordinator)))
+    if ((sql_errno = mysql_errno((MYSQL*) coordinator)))
         proxy_log(LOG_ERROR, "Error notifying coordinator about status of transaction %lu", clone_trans_id);
-    if (errno || !success) {
+    if (sql_errno || !success) {
         mysql_real_query(mysql, "ROLLBACK", 8);
         return;
     }
@@ -1114,7 +1134,7 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     proxy_cond_init(&trans.cv);
     proxy_mutex_init(&trans.cv_mutex);
     trans.num = 0;
-    trans.success = FALSE;
+    trans.total = 1;
     proxy_trans_insert(&clone_trans_id, &trans);
 
     /* Wait to receive the commit or rollback info */
@@ -1124,10 +1144,10 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
 
     /* Execute the commit or rollback */
     if (trans.success) {
-        proxy_debug("Committing transaction %lu", clone_trans_id);
+        proxy_debug("Committing transaction %lu on clone", clone_trans_id);
         mysql_real_query(mysql, "COMMIT", 6);
     } else {
-        proxy_debug("Rolling back transaction %lu", clone_trans_id);
+        proxy_debug("Rolling back transaction %lu on clone", clone_trans_id);
         mysql_real_query(mysql, "ROLLBACK", 8);
     }
 
@@ -1167,7 +1187,9 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     my_ulonglong affected_rows=0;
     my_ulonglong insert_id=0;
     uint server_status=0, warnings=0;
-    int start_server_id = server_id;
+    int start_server_id = server_id, start_generation = clone_generation;
+    ulong query_trans_id;
+    proxy_trans_t *trans;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1229,6 +1251,20 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
      *      INSERT, and DELETE. If this assumption breaks, subsequent
      *      queries will fail, although the client can then reconnect. */
     if (commit && options.two_pc) {
+        if (clone_generation != start_generation) {
+            /* Get the query ID and wait for it to be available in the transaction hashtable */
+            query_trans_id = id_from_query(query);
+            while (!(trans = proxy_trans_search(&query_trans_id))) { usleep(100); }
+
+            /* Wait until we have received messages from all backends */
+            proxy_mutex_lock(&trans->cv_mutex);
+            while (trans->total != trans->num) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
+
+            /* If some cloned failed, force a rollback */
+            if (!success)
+                *(commit->results) = 0;
+        }
+
         if (*(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1)) {
             if (proxy)
                 error = proxy_net_send_ok(proxy, warnings, affected_rows, insert_id);

@@ -29,6 +29,7 @@
 ulong transaction_id;
 struct hashtable *trans_table;
 volatile sig_atomic_t server_id;
+volatile sig_atomic_t clone_generation;
 
 /* Dummy threading functions */
 void __wrap_proxy_threading_cancel(
@@ -58,6 +59,9 @@ int hashtable_insert(
     __attribute__((unused)) void *k,
     __attribute__((unused)) void *v) { return 0; }
 void* hashtable_remove(
+    __attribute__((unused)) struct hashtable *h,
+    __attribute__((unused)) void *k) { return NULL; }
+void* hashtable_search(
     __attribute__((unused)) struct hashtable *h,
     __attribute__((unused)) void *k) { return NULL; }
 
@@ -134,6 +138,21 @@ START_TEST (test_backend_read_file_noport) {
     free(backends);
 } END_TEST
 
+/** @test Correct parsing of valid IDs */
+START_TEST (test_backend_valid_id) {
+    fail_unless(id_from_query("SELECT 1; -- 123456") == 123456);
+} END_TEST
+
+/** @test Correct parsing of invaldi IDs */
+START_TEST (test_backend_invalid_id) {
+    fail_unless(id_from_query("SELECT 1; -- asdf") == 0);
+} END_TEST
+
+/** @test Error returned when no ID specified */
+START_TEST (test_backend_no_id) {
+    fail_unless(id_from_query("SELECT 1;") == 0);
+} END_TEST
+
 Suite *backend_suite(void) {
     Suite *s = suite_create("Backend");
 
@@ -144,6 +163,12 @@ Suite *backend_suite(void) {
     tcase_add_test(tc_file, test_backend_read_file);
     tcase_add_test(tc_file, test_backend_read_file_noport);
     suite_add_tcase(s, tc_file);
+
+    TCase *tc_id = tcase_create("Transaction ID parsing");
+    tcase_add_test(tc_id, test_backend_valid_id);
+    tcase_add_test(tc_id, test_backend_invalid_id);
+    tcase_add_test(tc_id, test_backend_no_id);
+    suite_add_tcase(s, tc_id);
 
     return s;
 }

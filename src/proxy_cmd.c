@@ -36,6 +36,9 @@ static void send_status_field(MYSQL *mysql, char *name, char *org_name, status_t
 static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t *status);
 static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 
+/** Mutex for locking transaction results so we can safely make insertions into the hashtable */
+static pthread_mutex_t result_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /* taken from sql/protocol.cc */
 static uchar *net_store_data(uchar *to, const uchar *from, size_t length) {
   to = net_store_length(to,length);
@@ -477,6 +480,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
     char *tok;
     int clone_id;
     ulong transaction_id;
+    proxy_trans_t *trans;
 
     /* Ensure that we are the coordinator */
     if (!options.coordinator)
@@ -500,7 +504,26 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
     if (!tok || errno || transaction_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
 
-    /* XXX need to actually do something with these values */
+    /* We lock around this next section so only one message can mess with the hashtable */
+    proxy_mutex_lock(&result_mutex);
+
+    /* Check if we have already received some message about this transaction */
+    if (!(trans = proxy_trans_search(&transaction_id))) {
+        /* Create a new entry in the transaction hashtable */
+        trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
+        trans->total = 1; /* XXX: need to get actual number of clones */
+        trans->num = 1;
+        trans->success = success;
+        proxy_cond_init(&trans->cv);
+        proxy_mutex_init(&trans->cv_mutex);
+    } else {
+        /* Update the commit data */
+        trans->num++;
+        trans->success = trans->success && success;
+    }
+
+    proxy_mutex_unlock(&result_mutex);
+
     proxy_log(LOG_INFO, "Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
 
     return proxy_net_send_ok(mysql, 0, 0, 0);
@@ -523,7 +546,7 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
     ulong commit_trans_id;
     proxy_trans_t *trans;
 
-    /* Ensure that we are the coordinator */
+    /* Ensure that we are cloneable */
     if (!options.cloneable)
         return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as cloneable");
 
@@ -541,13 +564,14 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
 
     /* Tell the waiting thread to proceed with commit/rollback */
     trans->num = 1;
+    trans->total = 1;
     trans->success = success;
     proxy_cond_signal(&trans->cv);
 
     if (success)
-        proxy_debug("Committing transaction %lu", commit_trans_id);
+        proxy_debug("Signalled commit for transaction %lu", commit_trans_id);
     else
-        proxy_debug("Rolling back transaction %lu", commit_trans_id);
+        proxy_debug("Signalled rollback for transaction %lu", commit_trans_id);
 
     return proxy_net_send_ok(mysql, 0, 0, 0);
 }
