@@ -70,7 +70,6 @@ static void backend_free(proxy_host_t *backend);
 static void backends_free(proxy_host_t **backends, int num);
 static void backend_conns_free(int bi);
 static my_bool backends_alloc(int num_backends);
-static void backend_conns_free(int bi);
 
 static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn, my_bool bypass);
 static void backend_new_threads(int bi);
@@ -932,8 +931,9 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
     }
 
     /* Spin until query can proceed */
-    while (backend_pools && !backend_pools[0]) { usleep(100); } /* XXX: should maybe lock here */
-    while (cloning) { usleep(100); }           /* Wait until cloning is done */
+    if (backend_pools)
+        while (!backend_pools[0]) { usleep(100); } /* XXX: should maybe lock here */
+    while (cloning) { usleep(100); }               /* Wait until cloning is done */
 
     /* Speed things up with only one backend
      * by avoiding synchronization */
@@ -949,7 +949,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
 
             /* This guards against the unlikely case that we
              * get here while backends are being updated */
-            while (!backend_pools || !backend_pools[bi]) { bi = rand() % backend_num; }
+            if (backend_num > 1)
+                while (!backend_pools || !backend_pools[bi]) { bi = rand() % backend_num; }
 
             if (backend_query_idx(bi, ci, proxy, query, length, status)) {
                 error = TRUE;
