@@ -126,7 +126,8 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     }
 
     cloning = 1;
-    req_clones = nclones;
+    if (options.coordinator)
+        req_clones = nclones;
 
     /* Get a clone ticket and check its validity */
     proxy_log(LOG_INFO, "Requesting ticket for %d clones", nclones);
