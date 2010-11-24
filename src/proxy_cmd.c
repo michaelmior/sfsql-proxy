@@ -233,6 +233,20 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             /* This is the master, and cloning succeeded */
             return proxy_net_send_ok(mysql, 0, 0, 0);
         } else {
+            /* Reconnect to the coordinator */
+            MYSQL *new_coordinator = mysql_init(NULL), *old_coordinator;
+            my_bool reconnect = 1;
+            mysql_options(new_coordinator, MYSQL_OPT_RECONNECT, &reconnect);
+
+            if (!mysql_real_connect(new_coordinator, coordinator->host, options.user, options.pass, NULL, coordinator->port, NULL, 0)) {
+                mysql_close(new_coordinator);
+                return TRUE;
+            }
+
+            old_coordinator = (MYSQL*) coordinator;
+            coordinator = new_coordinator;
+            mysql_close(old_coordinator);
+
             /* This a clone, notify the coordinator */
             if (gethostname(host, HOST_NAME_MAX+1))
                 return TRUE;
