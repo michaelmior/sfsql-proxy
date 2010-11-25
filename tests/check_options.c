@@ -305,18 +305,24 @@ Suite *options_suite(void) {
     tcase_add_test(tc_cli, test_options_short);
     tcase_add_test(tc_cli, test_options_long);
     tcase_add_test(tc_cli, test_options_defaults);
-    tcase_add_test(tc_cli, test_options_bad_file);
-    tcase_add_test(tc_cli, test_options_backend_and_file);
-    tcase_add_test(tc_cli, test_options_file_and_socket);
-    tcase_add_test(tc_cli, test_options_backend_and_socket);
-    tcase_add_test(tc_cli, test_options_socket_default);
-    tcase_add_test(tc_cli, test_options_no_file);
-    tcase_add_test(tc_cli, test_options_file_short);
-    tcase_add_test(tc_cli, test_options_file_long);
-    tcase_add_test(tc_cli, test_options_file_default);
-    tcase_add_test(tc_cli, test_options_iface);
-    tcase_add_test(tc_cli, test_options_iface_any);
     suite_add_tcase(s, tc_cli);
+
+    TCase *tc_file = tcase_create("File and socket parsing");
+    tcase_add_test(tc_file, test_options_bad_file);
+    tcase_add_test(tc_file, test_options_backend_and_file);
+    tcase_add_test(tc_file, test_options_file_and_socket);
+    tcase_add_test(tc_file, test_options_backend_and_socket);
+    tcase_add_test(tc_file, test_options_socket_default);
+    tcase_add_test(tc_file, test_options_no_file);
+    tcase_add_test(tc_file, test_options_file_short);
+    tcase_add_test(tc_file, test_options_file_long);
+    tcase_add_test(tc_file, test_options_file_default);
+    suite_add_tcase(s, tc_file);
+
+    TCase *tc_iface = tcase_create("Interface option parsing");
+    tcase_add_test(tc_iface, test_options_iface);
+    tcase_add_test(tc_iface, test_options_iface_any);
+    suite_add_tcase(s, tc_iface);
 
     return s;
 }
