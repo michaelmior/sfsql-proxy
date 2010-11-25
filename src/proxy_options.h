@@ -37,8 +37,6 @@ int parse_options(int argc, char *argv[]);
 
 /** Global struct holding program options. */
 struct {
-    /** TRUE if the user asked for help */
-    my_bool help;
     /** TRUE if we need to daemonize */
     my_bool daemonize;
     /** TRUE if this proxy acts as coordinator. */

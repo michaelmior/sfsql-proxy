@@ -75,7 +75,6 @@ static void usage() {
  **/
 void set_option_defaults() {
     /* Set options to default values */
-    options.help            = FALSE;
     options.daemonize       = FALSE;
     options.coordinator     = FALSE;
     options.cloneable       = FALSE;
@@ -140,9 +139,8 @@ int parse_options(int argc, char *argv[]) {
     while((c = getopt_long(argc, argv, "?dCch:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
-                options.help = TRUE;
                 usage();
-                return EXIT_SUCCESS;
+                return EX_USAGE;
             case 'd':
                 options.daemonize = TRUE;
                 break;

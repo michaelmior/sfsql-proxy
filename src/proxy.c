@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
 
     /* Parse command-lne options */
     ret = parse_options(argc, argv);
-    if (ret != EX_OK || options.help)
+    if (ret != EX_OK)
         goto out_free;
 
     /* Check for existing process */
