@@ -11,6 +11,8 @@
  *
  */
 
+#include <netinet/in.h>
+
 #ifndef _proxy_options_h
 #define _proxy_options_h
 
@@ -29,9 +31,14 @@
 /** Default number of connections per backend. */
 #define NUM_CONNS       10
 
-#define PROXY_PORT      4040        /** Default port to listen on for incoming connections. */
-#define CLIENT_THREADS  10          /** Default number of threads started to do client work. */
-#define CLIENT_TIMEOUT  5*60        /** Default seconds to wait before disconnecting client. */
+/** Default binding interface */
+#define PROXY_IFACE     "eth0"
+/** Default port to listen on for incoming connections. */
+#define PROXY_PORT      4040
+/** Default number of threads started to do client work. */
+#define CLIENT_THREADS  10
+/** Default seconds to wait before disconnecting client. */
+#define CLIENT_TIMEOUT  5*60
 
 int parse_options(int argc, char *argv[]);
 
@@ -71,7 +78,9 @@ struct {
     my_bool two_pc;
 
     /** Host for proxy to bind to. */
-    char *phost;
+    char phost[INET6_ADDRSTRLEN];
+    /** Interface for proxy to bind to. */
+    char *iface;
     /** Port for proxy to listen on. */
     int pport;
     /** Seconds to wait before disconnecting client. */

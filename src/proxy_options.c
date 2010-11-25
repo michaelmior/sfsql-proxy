@@ -22,6 +22,10 @@
 
 #include <getopt.h>
 #include <sysexits.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <net/if.h>
 
 #include "proxy.h"
 
@@ -56,6 +60,7 @@ static void usage() {
 
             "Proxy options:\n"
             "\t--proxy-host,      -b\tBinding address (default is 0.0.0.0)\n"
+            "\t--interface,       -I\tInterface to bind to, or 'any' for all interfaces (default is eth0)\n"
             "\t--proxy-port,      -L\tPort for the proxy server to listen on (default: 4040)\n"
             "\t--timeout,         -n\tSeconds to wait wihout data before disconnecting clients,\n"
             "\t                     \tnegative to wait forever (default: 5)\n\n"
@@ -92,7 +97,8 @@ void set_option_defaults() {
     options.pass            = NULL;
     options.db              = NULL;
     options.backend_file    = NULL;
-    options.phost           = NULL;
+    options.phost[0]        = '\0';
+    options.iface           = NULL;
     options.pport           = PROXY_PORT;
     options.timeout         = CLIENT_TIMEOUT;
     options.mapper          = NULL;
@@ -125,6 +131,7 @@ int parse_options(int argc, char *argv[]) {
         {"add-ids",         no_argument,       0, 'i'},
         {"two-pc",          no_argument,       0, '2'},
         {"proxy-host",      required_argument, 0, 'b'},
+        {"interface" ,      required_argument, 0, 'I'},
         {"proxy-port",      required_argument, 0, 'L'},
         {"timeout",         required_argument, 0, 'n'},
         {"mapper",          required_argument, 0, 'm'},
@@ -136,7 +143,7 @@ int parse_options(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dCch:P:y:s::n:D:u:p:f:N:i2aAb:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?dCch:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 usage();
@@ -194,7 +201,10 @@ int parse_options(int argc, char *argv[]) {
                 options.autocommit = FALSE;
                 break;
             case 'b':
-                options.phost = optarg;
+                strncpy(options.phost, optarg, INET6_ADDRSTRLEN);
+                break;
+            case 'I':
+                options.iface = optarg;
                 break;
             case 'L':
                 options.pport = atoi(optarg);
@@ -214,6 +224,32 @@ int parse_options(int argc, char *argv[]) {
         }
 
         opt = 0;
+    }
+
+    /* Can't specify both a binding interface and address */
+    if (options.iface && options.phost[0]) {
+        usage();
+        return EX_USAGE;
+    }
+
+    if (!options.iface)
+        options.iface = PROXY_IFACE;
+
+    /* Get the IP address of the interface */
+    if (options.phost[0] == '\0' && strcasecmp("any", options.iface)) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        struct ifreq ifr;
+        char *phost;
+
+        ifr.ifr_addr.sa_family = AF_UNSPEC;
+        strncpy(ifr.ifr_name, options.iface, IFNAMSIZ-1);
+
+        ioctl(fd, SIOCGIFADDR, &ifr);
+        close(fd);
+
+        /* Convert to string and save in the binding address */
+        phost = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr);
+        strncpy(options.phost, phost, INET6_ADDRSTRLEN);
     }
 
     /* Set defaults for unspecified options */

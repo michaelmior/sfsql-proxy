@@ -328,8 +328,8 @@ int main(int argc, char *argv[]) {
 
     /* Start proxying */
     proxy_log(LOG_INFO, "Starting proxy on %s:%d",
-        options.phost ?: "0.0.0.0", options.pport);
-    server_run(options.phost, options.pport);
+        options.phost[0] != '\0' ? options.phost : "0.0.0.0", options.pport);
+    server_run(options.phost[0] != '\0' ? options.phost : NULL, options.pport);
 
     /* Shutdown */
 out:

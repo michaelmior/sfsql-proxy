@@ -32,6 +32,7 @@
 #define TEST_USER            "test"
 #define TEST_PASS            "test"
 #define TEST_NUM_CONNS       "5"
+#define TEST_PROXY_IFACE     "lo"
 #define TEST_PROXY_HOST      "127.0.0.3"
 #define TEST_PROXY_PORT      "4041"
 #define TEST_MAPPER          "dummy"
@@ -160,7 +161,6 @@ START_TEST (test_options_defaults) {
     fail_unless(strcmp(options.db, BACKEND_DB) == 0);
     fail_unless(options.backend_file == NULL);
     fail_unless(options.num_conns = NUM_CONNS);
-    fail_unless(options.phost == NULL);
     fail_unless(options.pport == PROXY_PORT);
     fail_unless(options.timeout == CLIENT_TIMEOUT);
     fail_unless(options.mapper == NULL);
@@ -273,6 +273,30 @@ START_TEST (test_options_file_default) {
     fail_unless(options.backend_threads = BACKEND_THREADS);
 } END_TEST
 
+/** @test Interface options parsing */
+START_TEST (test_options_iface) {
+    char *argv1[] = { "./sfsql-proxy",
+        "-I" TEST_PROXY_IFACE };
+
+    extern int optind;
+    char *argv2[] = { "./sfsql-proxy",
+        "--interface=" TEST_PROXY_IFACE };
+
+    fail_unless(parse_options(sizeof(argv1)/sizeof(*argv1), argv1) == EXIT_SUCCESS);
+    fail_unless(options.phost[0] != '\0');
+
+    optind = 0;
+    fail_unless(parse_options(sizeof(argv2)/sizeof(*argv2), argv2) == EXIT_SUCCESS);
+} END_TEST
+
+/** @test Specification of 'any' interface */
+START_TEST (test_options_iface_any) {
+    char *argv[] = { "./sfsql-proxy",
+        "-Iany" };
+    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(options.phost[0] == '\0');
+} END_TEST
+
 Suite *options_suite(void) {
     Suite *s = suite_create("Options");
 
@@ -290,6 +314,8 @@ Suite *options_suite(void) {
     tcase_add_test(tc_cli, test_options_file_short);
     tcase_add_test(tc_cli, test_options_file_long);
     tcase_add_test(tc_cli, test_options_file_default);
+    tcase_add_test(tc_cli, test_options_iface);
+    tcase_add_test(tc_cli, test_options_iface_any);
     suite_add_tcase(s, tc_cli);
 
     return s;
