@@ -209,7 +209,7 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
  **/
 static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) status_t *status) {
-    char *buff, *tok, *t=NULL;
+    char *buff=alloca(BUFSIZ), *tok, *t=NULL;
     int nclones = 1, ret, sql_errno;
     my_bool error = FALSE;
 
@@ -257,7 +257,6 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                  * the construct and send a query to the coordinator. */
                 proxy_options_update_host();
 
-                buff = alloca(BUFSIZ);
                 snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", options.phost, options.pport);
                 mysql_query((MYSQL*) coordinator, buff);
             }
