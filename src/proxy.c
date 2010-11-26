@@ -236,7 +236,7 @@ int main(int argc, char *argv[]) {
     char *buf;
 
     /* Parse command-lne options */
-    ret = parse_options(argc, argv);
+    ret = proxy_options_parse(argc, argv);
     if (ret != EX_OK)
         goto out_free;
 

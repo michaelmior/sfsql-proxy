@@ -78,7 +78,7 @@ START_TEST (test_options_short) {
         "-m" TEST_MAPPER,
         "-t" TEST_CLIENT_THREADS };
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
@@ -119,7 +119,7 @@ START_TEST (test_options_long) {
         "--mapper="          TEST_MAPPER,
         "--client-threads="  TEST_CLIENT_THREADS };
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
@@ -142,7 +142,7 @@ START_TEST (test_options_long) {
 /** @test Assignment of default options */
 START_TEST (test_options_defaults) {
     /* Specify no arguments */
-    fail_unless(parse_options(0, NULL) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(0, NULL) == EXIT_SUCCESS);
 
     /* Check that all options have their correct values */
     fail_unless(!options.daemonize);
@@ -174,7 +174,7 @@ START_TEST (test_options_bad_file) {
     FILE *null = fopen("/dev/null", "w");
     if (null) { fclose(stderr); stderr = null; }
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_NOINPUT);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EX_NOINPUT);
 } END_TEST
 
 /** @test Specification of both backend and filename */
@@ -185,7 +185,7 @@ START_TEST (test_options_backend_and_file) {
     if (null) { fclose(stderr); stderr = null; }
     if (null) { fclose(stdout); stdout = null; }
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
 /** @test Specification of both file and socket */
@@ -196,7 +196,7 @@ START_TEST (test_options_file_and_socket) {
     if (null) { fclose(stderr); stderr = null; }
     if (null) { fclose(stdout); stdout = null; }
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
 /** @test Specification of both backend and socket */
@@ -207,14 +207,14 @@ START_TEST (test_options_backend_and_socket) {
     if (null) { fclose(stderr); stderr = null; }
     if (null) { fclose(stdout); stdout = null; }
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EX_USAGE);
 } END_TEST
 
 /** @test Default socket path assigned if none specified */
 START_TEST (test_options_socket_default) {
     char *argv[] = { "./sfsql-proxy", "-s" };
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(strcmp(options.socket_file, MYSQL_UNIX_ADDR) == 0);
 } END_TEST
@@ -231,10 +231,10 @@ START_TEST (test_options_no_file) {
     FILE *null = fopen("/dev/null", "w");
     if (null) { fclose(stderr); stderr = null; }
 
-    fail_unless(parse_options(sizeof(argv1)/sizeof(*argv1), argv1) == EX_USAGE);
+    fail_unless(proxy_options_parse(sizeof(argv1)/sizeof(*argv1), argv1) == EX_USAGE);
 
     optind = 0;
-    fail_unless(parse_options(sizeof(argv2)/sizeof(*argv2), argv2) == EX_USAGE);
+    fail_unless(proxy_options_parse(sizeof(argv2)/sizeof(*argv2), argv2) == EX_USAGE);
 } END_TEST;
 
 /** @test Short options only valid with file specified */
@@ -244,7 +244,7 @@ START_TEST (test_options_file_short) {
         "-N" TEST_NUM_CONNS,
         "-T" TEST_BACKEND_THREADS };
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.num_conns = atoi(TEST_NUM_CONNS));
     fail_unless(options.backend_threads = atoi(TEST_BACKEND_THREADS));
@@ -257,7 +257,7 @@ START_TEST (test_options_file_long) {
         "--num-conns="       TEST_NUM_CONNS,
         "--backend-threads=" TEST_BACKEND_THREADS };
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.num_conns = atoi(TEST_NUM_CONNS));
     fail_unless(options.backend_threads = atoi(TEST_BACKEND_THREADS));
@@ -267,7 +267,7 @@ START_TEST (test_options_file_long) {
 START_TEST (test_options_file_default) {
     char *argv[] = { "./sfsql-proxy", "-f" TESTS_DIR "backend/backends.txt" };
 
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
     fail_unless(options.num_conns == NUM_CONNS);
     fail_unless(options.backend_threads = BACKEND_THREADS);
@@ -282,18 +282,18 @@ START_TEST (test_options_iface) {
     char *argv2[] = { "./sfsql-proxy",
         "--interface=" TEST_PROXY_IFACE };
 
-    fail_unless(parse_options(sizeof(argv1)/sizeof(*argv1), argv1) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv1)/sizeof(*argv1), argv1) == EXIT_SUCCESS);
     fail_unless(options.phost[0] != '\0');
 
     optind = 0;
-    fail_unless(parse_options(sizeof(argv2)/sizeof(*argv2), argv2) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv2)/sizeof(*argv2), argv2) == EXIT_SUCCESS);
 } END_TEST
 
 /** @test Specification of 'any' interface */
 START_TEST (test_options_iface_any) {
     char *argv[] = { "./sfsql-proxy",
         "-Iany" };
-    fail_unless(parse_options(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
     fail_unless(options.phost[0] == '\0');
 } END_TEST
 

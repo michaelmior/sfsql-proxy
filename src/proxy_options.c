@@ -78,7 +78,7 @@ static void usage() {
 /**
  * Set default values for options in the ::options structure.
  **/
-void set_option_defaults() {
+static void set_option_defaults() {
     /* Set options to default values */
     options.daemonize       = FALSE;
     options.coordinator     = FALSE;
@@ -112,7 +112,7 @@ void set_option_defaults() {
  * @param argc Number of arguments.
  * @param argv Argument list.
  **/
-int parse_options(int argc, char *argv[]) {
+int proxy_options_parse(int argc, char *argv[]) {
     int c, opt=0;
     static struct option long_options[] = {
         {"help",            no_argument,       0, '?'},
