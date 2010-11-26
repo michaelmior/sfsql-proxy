@@ -260,7 +260,7 @@ int proxy_options_parse(int argc, char *argv[]) {
         options.iface = PROXY_IFACE;
 
     /* Get the IP address of the interface */
-    if (options.phost[0] == '\0' && strcasecmp("any", options.iface))
+    if (options.phost[0] == '\0' && strcasecmp("any", options.iface) && !options.cloneable)
         proxy_options_update_host();
 
     /* Set defaults for unspecified options */
