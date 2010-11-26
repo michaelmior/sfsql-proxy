@@ -23,6 +23,7 @@ CFLAGS=""
 AC_PROG_CC
 AM_PROG_CC_C_O
 AC_PROG_CC_C99
+AC_PROG_GCC_TRADITIONAL
 AX_CFLAGS_GCC_OPTION(-Wall)
 AX_CFLAGS_GCC_OPTION(-Werror)
 AX_CFLAGS_GCC_OPTION(-Wextra)
@@ -40,19 +41,27 @@ AC_CHECK_HEADERS([\
     arpa/inet.h \
     netdb.h \
     netinet/in.h \
-    sys/socket.h ])
+    sys/socket.h \
+    sys/ioctl.h ])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
 AC_TYPE_INTPTR_T
 AC_TYPE_SIGNAL
 AC_TYPE_PID_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT8_T
 AC_C_INLINE
 AC_C_RESTRICT
 
 # Checks for library functions.
-AC_CHECK_FUNCS([bzero memmove memset strdup select socket strerror gethostbyname strncasecmp strchr strndup])
+AC_CHECK_FUNCS([ \
+    bzero memmove memset \
+    strdup strndup strchr strrchr strncasecmp strcasecmp strtol strerror \
+    select socket gethostname gethostbyname inet_ntoa ])
 AC_FUNC_FORK
+AC_FUNC_ALLOCA
 AC_FUNC_SELECT_ARGTYPES
 AC_FUNC_VPRINTF
 
