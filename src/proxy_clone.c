@@ -52,7 +52,8 @@ static pthread_mutex_t new_mutex;
  * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_clone_wait(int nclones) {
-    struct timespec wait_time = { .tv_sec=CLONE_TIMEOUT, .tv_nsec=0 };
+    struct timespec wait_time;
+    struct timeval tp;
     int wait_errno = 0;
     my_bool error = FALSE;
 
@@ -62,6 +63,11 @@ my_bool proxy_clone_wait(int nclones) {
     /* Initialize locking */
     proxy_cond_init(&new_cv);
     proxy_mutex_init(&new_mutex);
+
+    /* Prepare time for waiting */
+    gettimeofday(&tp, NULL);
+    wait_time.tv_sec  = tp.tv_sec + CLONE_TIMEOUT;
+    wait_time.tv_nsec = tp.tv_usec * 1000;
 
     /* Wait for the clones */
     proxy_log(LOG_INFO, "Waiting %ds for new clones", CLONE_TIMEOUT);
