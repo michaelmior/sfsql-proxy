@@ -239,6 +239,10 @@ int parse_options(int argc, char *argv[]) {
     if (options.phost[0] == '\0' && strcasecmp("any", options.iface)) {
         int fd = socket(AF_INET, SOCK_STREAM, 0);
         struct ifreq ifr;
+        union {
+            struct sockaddr *sa;
+            struct sockaddr_in *sin;
+        } addr;
         char *phost;
 
         ifr.ifr_addr.sa_family = AF_UNSPEC;
@@ -248,7 +252,8 @@ int parse_options(int argc, char *argv[]) {
         close(fd);
 
         /* Convert to string and save in the binding address */
-        phost = inet_ntoa(((struct sockaddr_in *)&ifr.ifr_addr)->sin_addr);
+        addr.sa = &ifr.ifr_addr;
+        phost = inet_ntoa(addr.sin->sin_addr);
         strncpy(options.phost, phost, INET6_ADDRSTRLEN);
     }
 
