@@ -76,6 +76,30 @@ static void usage() {
 }
 
 /**
+ * Update ::options.phost with the IP address from the selected interface.
+ **/
+void proxy_options_update_host() {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    struct ifreq ifr;
+    union {
+        struct sockaddr *sa;
+        struct sockaddr_in *sin;
+    } addr;
+    char *phost;
+
+    ifr.ifr_addr.sa_family = AF_UNSPEC;
+    strncpy(ifr.ifr_name, options.iface, IFNAMSIZ-1);
+
+    ioctl(fd, SIOCGIFADDR, &ifr);
+    close(fd);
+
+    /* Convert to string and save in the binding address */
+    addr.sa = &ifr.ifr_addr;
+    phost = inet_ntoa(addr.sin->sin_addr);
+    strncpy(options.phost, phost, INET6_ADDRSTRLEN);
+}
+
+/**
  * Set default values for options in the ::options structure.
  **/
 static void set_option_defaults() {
@@ -236,26 +260,8 @@ int proxy_options_parse(int argc, char *argv[]) {
         options.iface = PROXY_IFACE;
 
     /* Get the IP address of the interface */
-    if (options.phost[0] == '\0' && strcasecmp("any", options.iface)) {
-        int fd = socket(AF_INET, SOCK_STREAM, 0);
-        struct ifreq ifr;
-        union {
-            struct sockaddr *sa;
-            struct sockaddr_in *sin;
-        } addr;
-        char *phost;
-
-        ifr.ifr_addr.sa_family = AF_UNSPEC;
-        strncpy(ifr.ifr_name, options.iface, IFNAMSIZ-1);
-
-        ioctl(fd, SIOCGIFADDR, &ifr);
-        close(fd);
-
-        /* Convert to string and save in the binding address */
-        addr.sa = &ifr.ifr_addr;
-        phost = inet_ntoa(addr.sin->sin_addr);
-        strncpy(options.phost, phost, INET6_ADDRSTRLEN);
-    }
+    if (options.phost[0] == '\0' && strcasecmp("any", options.iface))
+        proxy_options_update_host();
 
     /* Set defaults for unspecified options */
     options.user = options.user ?: BACKEND_USER;

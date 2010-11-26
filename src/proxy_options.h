@@ -40,6 +40,7 @@
 /** Default seconds to wait before disconnecting client. */
 #define CLIENT_TIMEOUT  5*60
 
+void proxy_options_update_host();
 int proxy_options_parse(int argc, char *argv[]);
 
 /** Global struct holding program options. */

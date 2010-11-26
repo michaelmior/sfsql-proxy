@@ -209,8 +209,9 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
  **/
 static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) status_t *status) {
-    char *buff = alloca(BUFSIZ), *tok, *t=NULL, host[HOST_NAME_MAX+1];
+    char *buff, *tok, *t=NULL;
     int nclones = 1, ret, sql_errno;
+    my_bool error = FALSE;
 
     /* Check if we think we can clone */
     if (options.cloneable) {
@@ -233,28 +234,35 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             /* This is the master, and cloning succeeded */
             return proxy_net_send_ok(mysql, 0, 0, 0);
         } else {
-            /* Reconnect to the coordinator */
+            /* Reconnect to the coordinator for notification */
             MYSQL *new_coordinator = mysql_init(NULL), *old_coordinator;
             my_bool reconnect = 1;
             mysql_options(new_coordinator, MYSQL_OPT_RECONNECT, &reconnect);
 
-            if (!mysql_real_connect(new_coordinator, coordinator->host, options.user, options.pass, NULL, coordinator->port, NULL, 0)) {
+            if (!mysql_real_connect(new_coordinator, coordinator->host,
+                    options.user, options.pass,
+                    NULL, coordinator->port, NULL, 0)) {
                 mysql_close(new_coordinator);
-                return TRUE;
+                error = TRUE;
             }
 
-            old_coordinator = (MYSQL*) coordinator;
-            coordinator = new_coordinator;
-            mysql_close(old_coordinator);
+            /* Switch coordinators and construct the query */
+            if (!error) {
+                old_coordinator = (MYSQL*) coordinator;
+                coordinator = new_coordinator;
+                mysql_close(old_coordinator);
 
-            /* This a clone, notify the coordinator */
-            if (gethostname(host, HOST_NAME_MAX+1))
-                return TRUE;
+                /* Here we assume the host is listening on the correct IP address,
+                 * and not on all interfaces. We first update with the new IP,
+                 * the construct and send a query to the coordinator. */
+                proxy_options_update_host();
 
-            snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", host, options.pport);
-            mysql_query((MYSQL*) coordinator, buff);
+                buff = alloca(BUFSIZ);
+                snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", options.phost, options.pport);
+                mysql_query((MYSQL*) coordinator, buff);
+            }
 
-            if (mysql_errno((MYSQL*) coordinator))
+            if (error || mysql_errno((MYSQL*) coordinator))
                 proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d", ret);
 
             return TRUE;
