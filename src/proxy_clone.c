@@ -55,7 +55,6 @@ my_bool proxy_clone_wait(int nclones) {
     struct timespec wait_time;
     struct timeval tp;
     int wait_errno = 0;
-    my_bool error = FALSE;
 
     req_clones = nclones;
     new_clones = 0;
@@ -72,14 +71,19 @@ my_bool proxy_clone_wait(int nclones) {
     /* Wait for the clones */
     proxy_log(LOG_INFO, "Waiting %ds for new clones", CLONE_TIMEOUT);
     proxy_mutex_lock(&new_mutex);
-    while (new_clones != req_clones && !wait_errno)
+    while (new_clones < req_clones && !wait_errno)
         wait_errno = pthread_cond_timedwait(&new_cv, &new_mutex, &wait_time);
+
+    proxy_debug("After waiting for clones, got %d/%d", new_clones, req_clones);
 
     /* Check if we timed out waiting */
     if (wait_errno == ETIMEDOUT) {
         proxy_log(LOG_ERROR, "Timed out waiting for new clones");
-        error = TRUE;
+        return TRUE;
     }
+
+    if (new_clones > req_clones)
+        proxy_log(LOG_ERROR, "More clones arrived than expected");
 
     req_clones = 0;
     proxy_mutex_unlock(&new_mutex);
@@ -101,12 +105,11 @@ void proxy_clone_notify() {
     }
 
     /* Increment the number of clones and check if we're done */
-    new_clones++;
+    (void) __sync_fetch_and_add(&new_clones, 1);
     if (new_clones == req_clones)
         pthread_cond_signal(&new_cv);
 
-    if (new_clones > req_clones)
-        proxy_log(LOG_ERROR, "More clones arrived than expected");
+    proxy_debug("Received notification for %d of %d clones", new_clones, req_clones);
 }
 
 /**
