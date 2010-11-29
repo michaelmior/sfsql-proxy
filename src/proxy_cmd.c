@@ -545,7 +545,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 
     proxy_mutex_unlock(&result_mutex);
 
-    proxy_log(LOG_INFO, "Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
+    proxy_debug("Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
 
     return proxy_net_send_ok(mysql, 0, 0, 0);
 }

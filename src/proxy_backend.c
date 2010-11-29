@@ -1127,7 +1127,8 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
 
     /* If we failed here, or failed to communicate to the coordinator, we should rollback */
     if ((sql_errno = mysql_errno((MYSQL*) coordinator)))
-        proxy_log(LOG_ERROR, "Error notifying coordinator about status of transaction %lu", clone_trans_id);
+        proxy_log(LOG_ERROR, "Error notifying coordinator about status of transaction %lu: %s",
+                clone_trans_id, mysql_error((MYSQL*) coordinator));
     if (sql_errno || !success) {
         mysql_real_query(mysql, "ROLLBACK", 8);
         return;

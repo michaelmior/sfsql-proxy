@@ -69,7 +69,6 @@ inline __attribute__((always_inline)) int proxy_trans_insert(ulong *transaction_
  * could not be found.
  **/
 inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_search(ulong *transaction_id) {
-    proxy_debug("Looking up transaction %lu in hashtable", *transaction_id);
     return _proxy_trans_search(trans_table, transaction_id);
 }
 
