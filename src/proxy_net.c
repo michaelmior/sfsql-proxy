@@ -51,7 +51,7 @@ static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_l
  *
  * @return TRUE on error, FALSE otherwise
  **/
-my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, __attribute__((unused)) int thread_id) {
+my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id) {
     NET *net;
     char ip[30], buff[SERVER_VERSION_LENGTH + 1 + SCRAMBLE_LENGTH + 1 + 64], scramble[SCRAMBLE_LENGTH + 1], *end;
     ulong server_caps, client_caps, pkt_len=0;
@@ -385,7 +385,7 @@ void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, sta
         return;
 
     /* Perform "authentication" (credentials not checked) */
-    if (proxy_net_handshake(work->proxy, work->addr, 0))
+    if (proxy_net_handshake(work->proxy, work->addr, thread_id))
         return;
 
     /* from sql/sql_connect.cc:handle_one_connection */
