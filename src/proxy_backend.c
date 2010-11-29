@@ -937,6 +937,11 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
         while (!backend_pools[0]) { usleep(100); } /* XXX: should maybe lock here */
     while (cloning) { usleep(100); }               /* Wait until cloning is done */
 
+    /* Add an identifier to the query if necessary */
+    if (map == QUERY_MAP_ALL && options.add_ids)
+        length += sprintf(query + length, "-- %lu",
+            __sync_fetch_and_add(&transaction_id, 1));
+
     /* Speed things up with only one backend
      * by avoiding synchronization */
     if (backend_num == 1)
@@ -962,12 +967,6 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
 
         case QUERY_MAP_ALL:
             /* Send a query to the other backends and keep only the first result */
-
-            /* Add an identifier to the query if necessary */
-            if (options.add_ids) {
-                (void) __sync_fetch_and_add(&transaction_id, 1);
-                length += sprintf(query + length, "-- %lu", transaction_id);
-            }
 
             /* Set up synchronization */
             pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
