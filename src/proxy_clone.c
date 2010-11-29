@@ -78,6 +78,10 @@ my_bool proxy_clone_wait(int nclones) {
 
     /* Check if we timed out waiting */
     if (wait_errno == ETIMEDOUT) {
+        /* If no clones came up, then pretend cloning didn't happen */
+        if (new_clones == 0)
+            (void) __sync_fetch_and_sub(&clone_generation, 1);
+
         proxy_log(LOG_ERROR, "Timed out waiting for new clones");
         return TRUE;
     }
