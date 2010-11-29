@@ -134,6 +134,9 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
         return -1;
     }
 
+    /* Wait until any outstanding queries have committed */
+    while (committing) { usleep(100); }
+
     cloning = 1;
     if (options.coordinator)
         req_clones = nclones;

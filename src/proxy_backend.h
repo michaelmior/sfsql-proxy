@@ -70,5 +70,6 @@ my_bool proxy_backend_add(char *host, int port);
 void proxy_backend_close();
 
 extern volatile sig_atomic_t querying;
+extern volatile sig_atomic_t committing;
 
 #endif /* _proxy_backend_h */

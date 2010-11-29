@@ -52,7 +52,9 @@ static pool_t **backend_thread_pool = NULL;
 static pthread_mutex_t add_mutex;
 
 /** Signify that a backend is currently querying */
-volatile sig_atomic_t querying = 0;
+volatile sig_atomic_t querying   = 0;
+/** Signify that a backend is currently in commit phase */
+volatile sig_atomic_t committing = 0;
 
 volatile MYSQL *coordinator = NULL;
 MYSQL *master = NULL;
@@ -1183,7 +1185,7 @@ err:
  * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status) {
-    my_bool error = FALSE, success;
+    my_bool error = FALSE, success, needs_commit = FALSE;
     ulong pkt_len = 8, field_count;
     MYSQL *mysql;
     my_ulonglong affected_rows=0;
@@ -1246,28 +1248,45 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
         backend_query_wait(commit, bi, success);
     }
 
+    /* Signify that we are in commit phase and wait
+     * for any outstanding cloning operations */
+    (void) __sync_fetch_and_add(&committing, 1);
+    while (cloning) { usleep(100); }
+
     /* Check if all transactions succeeded and commit or rollback accordingly */
     /* This currently assumes that queries requiring two-phase commit do not
      * return any results, and thus have a single packet which has already
      * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
      * If this assumption breaks, subsequent queries will fail, although the
      * client can then reconnect. */
-    if (commit && options.two_pc) {
-        if (clone_generation != start_generation) {
-            /* Get the query ID and wait for it to be available in the transaction hashtable */
-            query_trans_id = id_from_query(query);
-            while (!(trans = proxy_trans_search(&query_trans_id))) { usleep(100); }
+    if (clone_generation != start_generation) {
+        /* Get the query ID and wait for it to be available in the transaction hashtable */
+        query_trans_id = id_from_query(query);
+        while (!(trans = proxy_trans_search(&query_trans_id))
+                && clone_generation != start_generation) { usleep(100); }
+
+        /* Check if all clones failed and we rolled back a generation */
+        if (clone_generation == start_generation) {
+            needs_commit = FALSE;
+        } else {
+            proxy_debug("Cloned during transaction %lu, waiting for new backends", query_trans_id);
 
             /* Wait until we have received messages from all backends */
             proxy_mutex_lock(&trans->cv_mutex);
             while (trans->total != trans->num) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
 
-            /* If some cloned failed, force a rollback */
-            if (!success)
-                *(commit->results) = 0;
+            success = trans->success;
+            needs_commit = TRUE;
         }
+    }
+    if (commit && options.two_pc) {
+        needs_commit = TRUE;
+        success = *(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1) ? TRUE : FALSE;
+    }
 
-        if (*(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1)) {
+    /* If we need to commit, then check if transactions were successful and proceed accordingly */
+    if (needs_commit) {
+        if (success) {
             if (proxy)
                 error = proxy_net_send_ok(proxy, warnings, affected_rows, insert_id);
 
@@ -1282,17 +1301,18 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             proxy_debug("Rolling back on backend %d", bi);
             mysql_real_query(mysql, "ROLLBACK", 8);
         }
-
-        return error;
     }
 
     /* Flush the write buffer */
     error = backend_proxy_write(mysql, proxy, pkt_len, status);
     proxy_net_flush(proxy);
 
+    /* Signify that we are done committing, and another clone operation may happen */
+    (void) __sync_fetch_and_sub(&committing, 1);
+
     /* If query has zero results, then we can stop here */
     if (!success || net_field_length(&mysql->net.read_pos) == 0)
-        return error;
+        goto out;
 
     /* read field info */
     if (backend_read_rows(mysql, proxy, 7, status)) {
