@@ -8,14 +8,13 @@ struct hashtable;
 /* Example of use:
  *
  *      struct hashtable  *h;
- *      struct some_key   *k;
+ *      unsigned long      k;
  *      struct some_value *v;
  *
- *      static unsigned int         hash_from_key_fn( void *k );
- *      static int                  keys_equal_fn ( void *key1, void *key2 );
+ *      static unsigned int         hash_from_key_fn( unsigned long k );
+ *      static int                  keys_equal_fn ( unsigned long key1, unsigned long key2 );
  *
- *      h = create_hashtable(16, hash_from_key_fn, keys_equal_fn);
- *      k = (struct some_key *)     malloc(sizeof(struct some_key));
+ *      h = create_hashtable(16);
  *      v = (struct some_value *)   malloc(sizeof(struct some_value));
  *
  *      (initialise k and v to suitable values)
@@ -38,20 +37,15 @@ struct hashtable;
  *
  * Insert this at the start of your file:
  *
- * DEFINE_HASHTABLE_INSERT(insert_some, struct some_key, struct some_value);
- * DEFINE_HASHTABLE_SEARCH(search_some, struct some_key, struct some_value);
- * DEFINE_HASHTABLE_REMOVE(remove_some, struct some_key, struct some_value);
+ * DEFINE_HASHTABLE_INSERT(insert_some, struct some_value);
+ * DEFINE_HASHTABLE_SEARCH(search_some, struct some_value);
+ * DEFINE_HASHTABLE_REMOVE(remove_some, struct some_value);
  *
  * This defines the functions 'insert_some', 'search_some' and 'remove_some'.
  * These operate just like hashtable_insert etc., with the same parameters,
- * but their function signatures have 'struct some_key *' rather than
+ * but their function signatures have 'struct some_value *' rather than
  * 'void *', and hence can generate compile time errors if your program is
- * supplying incorrect data as a key (and similarly for value).
- *
- * Note that the hash and key equality functions passed to create_hashtable
- * still take 'void *' parameters instead of 'some key *'. This shouldn't be
- * a difficult issue as they're only defined and passed once, and the other
- * functions will ensure that only valid keys are supplied to them.
+ * supplying incorrect data as a value.
  *
  * The cost for this checking is increased code size and runtime overhead
  * - if performance is important, it may be worth switching back to the
@@ -66,15 +60,11 @@ struct hashtable;
    
  * @name                    create_hashtable
  * @param   minsize         minimum initial size of hashtable
- * @param   hashfunction    function for hashing keys
- * @param   key_eq_fn       function for determining key equality
  * @return                  newly created hashtable or NULL on failure
  */
 
 struct hashtable *
-create_hashtable(unsigned int minsize,
-                 unsigned int (*hashfunction) (void*),
-                 int (*key_eq_fn) (void*,void*));
+create_hashtable(unsigned int minsize);
 
 /*****************************************************************************
  * hashtable_insert
@@ -96,10 +86,10 @@ create_hashtable(unsigned int minsize,
  */
 
 int 
-hashtable_insert(struct hashtable *h, void *k, void *v);
+hashtable_insert(struct hashtable *h, unsigned long k, void *v);
 
-#define DEFINE_HASHTABLE_INSERT(fnname, keytype, valuetype) \
-inline __attribute__((always_inline)) int fnname (struct hashtable *h, keytype *k, valuetype *v) \
+#define DEFINE_HASHTABLE_INSERT(fnname, valuetype) \
+inline __attribute__((always_inline)) int fnname (struct hashtable *h, unsigned long k, valuetype *v) \
 { \
     return hashtable_insert(h,k,v); \
 }
@@ -114,10 +104,10 @@ inline __attribute__((always_inline)) int fnname (struct hashtable *h, keytype *
  */
 
 void *
-hashtable_search(struct hashtable *h, void *k);
+hashtable_search(struct hashtable *h, unsigned long k);
 
-#define DEFINE_HASHTABLE_SEARCH(fnname, keytype, valuetype) \
-inline __attribute__((always_inline)) valuetype * fnname (struct hashtable *h, keytype *k) \
+#define DEFINE_HASHTABLE_SEARCH(fnname, valuetype) \
+inline __attribute__((always_inline)) valuetype * fnname (struct hashtable *h, unsigned long k) \
 { \
     return (valuetype *) (hashtable_search(h,k)); \
 }
@@ -132,10 +122,10 @@ inline __attribute__((always_inline)) valuetype * fnname (struct hashtable *h, k
  */
 
 void * /* returns value */
-hashtable_remove(struct hashtable *h, void *k);
+hashtable_remove(struct hashtable *h, unsigned long k);
 
-#define DEFINE_HASHTABLE_REMOVE(fnname, keytype, valuetype) \
-inline __attribute__((always_inline)) valuetype * fnname (struct hashtable *h, keytype *k) \
+#define DEFINE_HASHTABLE_REMOVE(fnname, valuetype) \
+inline __attribute__((always_inline)) valuetype * fnname (struct hashtable *h, unsigned long k) \
 { \
     return (valuetype *) (hashtable_remove(h,k)); \
 }

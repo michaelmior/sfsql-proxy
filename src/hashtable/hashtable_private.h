@@ -8,7 +8,7 @@
 /*****************************************************************************/
 struct entry
 {
-    void *k, *v;
+    unsigned long k, *v;
     unsigned int h;
     struct entry *next;
 };
@@ -19,13 +19,12 @@ struct hashtable {
     unsigned int entrycount;
     unsigned int loadlimit;
     unsigned int primeindex;
-    unsigned int (*hashfn) (void *k);
-    int (*eqfn) (void *k1, void *k2);
+    unsigned int (*hashfn) (unsigned long k);
 };
 
 /*****************************************************************************/
 unsigned int
-hash(struct hashtable *h, void *k);
+hash(unsigned long k);
 
 /*****************************************************************************/
 /* indexFor */
@@ -41,11 +40,6 @@ indexFor(unsigned int tablelength, unsigned int hashvalue)
     return (hashvalue & (tablelength - 1u));
 }
 */
-
-/*****************************************************************************/
-/* #define freekey(X) free(X) */
-#define freekey(X) ;
-
 
 /*****************************************************************************/
 

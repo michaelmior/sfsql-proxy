@@ -1139,7 +1139,7 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     proxy_mutex_init(&trans.cv_mutex);
     trans.num = 0;
     trans.total = 1;
-    proxy_trans_insert(&clone_trans_id, &trans);
+    proxy_trans_insert(clone_trans_id, &trans);
 
     /* Wait to receive the commit or rollback info */
     proxy_debug("Waiting for decision on transaction %lu", clone_trans_id);
@@ -1162,7 +1162,7 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     proxy_cond_destroy(&trans.cv);
     proxy_mutex_unlock(&trans.cv_mutex);
     proxy_mutex_destroy(&trans.cv_mutex);
-    proxy_trans_remove(&clone_trans_id);
+    proxy_trans_remove(clone_trans_id);
 
     return;
 
@@ -1262,7 +1262,9 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     if (clone_generation != start_generation) {
         /* Get the query ID and wait for it to be available in the transaction hashtable */
         query_trans_id = id_from_query(query);
-        while (!(trans = proxy_trans_search(&query_trans_id))
+        proxy_debug("Cloning happened during query %lu, waiting", query_trans_id);
+
+        while (!(trans = proxy_trans_search(query_trans_id))
                 && clone_generation != start_generation) { usleep(100); }
 
         /* Check if all clones failed and we rolled back a generation */

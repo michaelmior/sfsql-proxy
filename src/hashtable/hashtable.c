@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdint.h>
 
 /*
 Credit for primes table: Aaron Krowne
@@ -24,11 +25,69 @@ static const unsigned int primes[] = {
 const unsigned int prime_table_length = sizeof(primes)/sizeof(primes[0]);
 const float max_load_factor = 0.65;
 
+#undef get16bits
+#if (defined(__GNUC__) && defined(__i386__)) || defined(__WATCOMC__) \
+  || defined(_MSC_VER) || defined (__BORLANDC__) || defined (__TURBOC__)
+#define get16bits(d) (*((const uint16_t *) (d)))
+#endif
+
+#if !defined (get16bits)
+#define get16bits(d) ((((uint32_t)(((const uint8_t *)(d))[1])) << 8)\
+                       +(uint32_t)(((const uint8_t *)(d))[0]) )
+#endif
+
+__attribute__((always_inline)) uint32_t SuperFastHash (const char * data, int len) {
+    uint32_t hash = len, tmp;
+    int rem;
+
+    if (len <= 0 || data == NULL) return 0;
+
+    rem = len & 3;
+    len >>= 2;
+
+    /* Main loop */
+    for (;len > 0; len--) {
+        hash  += get16bits (data);
+        tmp    = (get16bits (data+2) << 11) ^ hash;
+        hash   = (hash << 16) ^ tmp;
+        data  += 2*sizeof (uint16_t);
+        hash  += hash >> 11;
+    }
+
+    /* Handle end cases */
+    switch (rem) {
+        case 3: hash += get16bits (data);
+                hash ^= hash << 16;
+                hash ^= data[sizeof (uint16_t)] << 18;
+                hash += hash >> 11;
+                break;
+        case 2: hash += get16bits (data);
+                hash ^= hash << 11;
+                hash += hash >> 17;
+                break;
+        case 1: hash += *data;
+                hash ^= hash << 10;
+                hash += hash >> 1;
+    }
+
+    /* Force "avalanching" of final 127 bits */
+    hash ^= hash << 3;
+    hash += hash >> 5;
+    hash ^= hash << 4;
+    hash += hash >> 17;
+    hash ^= hash << 25;
+    hash += hash >> 6;
+
+    return hash;
+}
+
+unsigned int hash(unsigned long key) {
+    return SuperFastHash((char*) key, sizeof(unsigned long));
+}
+
 /*****************************************************************************/
 struct hashtable *
-create_hashtable(unsigned int minsize,
-                 unsigned int (*hashf) (void*),
-                 int (*eqf) (void*,void*))
+create_hashtable(unsigned int minsize)
 {
     struct hashtable *h;
     unsigned int pindex, size = primes[0];
@@ -46,24 +105,8 @@ create_hashtable(unsigned int minsize,
     h->tablelength  = size;
     h->primeindex   = pindex;
     h->entrycount   = 0;
-    h->hashfn       = hashf;
-    h->eqfn         = eqf;
     h->loadlimit    = (unsigned int) ceil(size * max_load_factor);
     return h;
-}
-
-/*****************************************************************************/
-unsigned int
-hash(struct hashtable *h, void *k)
-{
-    /* Aim to protect against poor hash functions by adding logic here
-     * - logic taken from java 1.4 hashtable source */
-    unsigned int i = h->hashfn(k);
-    i += ~(i << 9);
-    i ^=  ((i >> 14) | (i << 18)); /* >>> */
-    i +=  (i << 4);
-    i ^=  ((i >> 10) | (i << 22)); /* >>> */
-    return i;
 }
 
 /*****************************************************************************/
@@ -134,7 +177,7 @@ hashtable_count(struct hashtable *h)
 
 /*****************************************************************************/
 int
-hashtable_insert(struct hashtable *h, void *k, void *v)
+hashtable_insert(struct hashtable *h, unsigned long k, void *v)
 {
     /* This method allows duplicate keys - but they shouldn't be used */
     unsigned int index;
@@ -149,7 +192,7 @@ hashtable_insert(struct hashtable *h, void *k, void *v)
     }
     e = (struct entry *)malloc(sizeof(struct entry));
     if (NULL == e) { --(h->entrycount); return 0; } /*oom*/
-    e->h = hash(h,k);
+    e->h = hash(k);
     index = indexFor(h->tablelength,e->h);
     e->k = k;
     e->v = v;
@@ -160,17 +203,17 @@ hashtable_insert(struct hashtable *h, void *k, void *v)
 
 /*****************************************************************************/
 void * /* returns value associated with key */
-hashtable_search(struct hashtable *h, void *k)
+hashtable_search(struct hashtable *h, unsigned long k)
 {
     struct entry *e;
     unsigned int hashvalue, index;
-    hashvalue = hash(h,k);
+    hashvalue = hash(k);
     index = indexFor(h->tablelength,hashvalue);
     e = h->table[index];
     while (NULL != e)
     {
         /* Check hash value to short circuit heavier comparison */
-        if ((hashvalue == e->h) && (h->eqfn(k, e->k))) return e->v;
+        if ((hashvalue == e->h) && (k == e->k)) return e->v;
         e = e->next;
     }
     return NULL;
@@ -178,7 +221,7 @@ hashtable_search(struct hashtable *h, void *k)
 
 /*****************************************************************************/
 void * /* returns value associated with key */
-hashtable_remove(struct hashtable *h, void *k)
+hashtable_remove(struct hashtable *h, unsigned long k)
 {
     /* TODO: consider compacting the table when the load factor drops enough,
      *       or provide a 'compact' method. */
@@ -188,19 +231,18 @@ hashtable_remove(struct hashtable *h, void *k)
     void *v;
     unsigned int hashvalue, index;
 
-    hashvalue = hash(h,k);
-    index = indexFor(h->tablelength,hash(h,k));
+    hashvalue = hash(k);
+    index = indexFor(h->tablelength,hash(k));
     pE = &(h->table[index]);
     e = *pE;
     while (NULL != e)
     {
         /* Check hash value to short circuit heavier comparison */
-        if ((hashvalue == e->h) && (h->eqfn(k, e->k)))
+        if ((hashvalue == e->h) && (k == e->k))
         {
             *pE = e->next;
             h->entrycount--;
             v = e->v;
-            freekey(e->k);
             free(e);
             return v;
         }
@@ -224,7 +266,7 @@ hashtable_destroy(struct hashtable *h, int free_values)
         {
             e = table[i];
             while (NULL != e)
-            { f = e; e = e->next; freekey(f->k); free(f->v); free(f); }
+            { f = e; e = e->next; free(f->v); free(f); }
         }
     }
     else
@@ -233,7 +275,7 @@ hashtable_destroy(struct hashtable *h, int free_values)
         {
             e = table[i];
             while (NULL != e)
-            { f = e; e = e->next; freekey(f->k); free(f); }
+            { f = e; e = e->next; free(f); }
         }
     }
     free(h->table);

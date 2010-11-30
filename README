@@ -1,7 +1,7 @@
 The sfsql-proxy server is a MySQL proxy server designed to support cloning of virtual machines running the MySQL server. It is being developed by the systems group at the University of Toronto (http://sysweb.cs.toronto.edu/).
 
-Hash table implementation by Chrisrtopher Clark, taken from http://www.cl.cam.ac.uk/~cwc22/hashtable/ and licensed under the new BSD license.
-SuperFastHash implementation by Paul Hsieh, taken from http://www.azillionmonkeys.com/qed/hash.html and licensced under the GPLv2 license.
+Hash table based on implementation by Chrisrtopher Clark, obtained from http://www.cl.cam.ac.uk/~cwc22/hashtable/ and licensed under the new BSD license.
+SuperFastHash implementation by Paul Hsieh, obtained from http://www.azillionmonkeys.com/qed/hash.html and licensed under the GPLv2 license.
 
 This software is released under the GPLv2 (see COPYING)
 

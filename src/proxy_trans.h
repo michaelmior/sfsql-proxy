@@ -43,9 +43,9 @@ typedef struct {
 void proxy_trans_init();
 void proxy_trans_end();
 
-DEFINE_HASHTABLE_INSERT(_proxy_trans_insert, ulong, proxy_trans_t);
-DEFINE_HASHTABLE_SEARCH(_proxy_trans_search, ulong, proxy_trans_t);
-DEFINE_HASHTABLE_REMOVE(_proxy_trans_remove, ulong, proxy_trans_t);
+DEFINE_HASHTABLE_INSERT(_proxy_trans_insert, proxy_trans_t);
+DEFINE_HASHTABLE_SEARCH(_proxy_trans_search, proxy_trans_t);
+DEFINE_HASHTABLE_REMOVE(_proxy_trans_remove, proxy_trans_t);
 
 /**
  * Insert a new transaction in the transaction hashtable.
@@ -55,8 +55,8 @@ DEFINE_HASHTABLE_REMOVE(_proxy_trans_remove, ulong, proxy_trans_t);
  *
  * @return Zero on success, anything else on failure.
  **/
-inline __attribute__((always_inline)) int proxy_trans_insert(ulong *transaction_id, proxy_trans_t *trans) {
-    proxy_debug("Adding transaction %lu to hashtable", *transaction_id);
+inline __attribute__((always_inline)) int proxy_trans_insert(ulong transaction_id, proxy_trans_t *trans) {
+    proxy_debug("Adding transaction %lu to hashtable", transaction_id);
     return _proxy_trans_insert(trans_table, transaction_id, trans);
 }
 
@@ -68,7 +68,7 @@ inline __attribute__((always_inline)) int proxy_trans_insert(ulong *transaction_
  * @return The found transaction, or NULL if the transaction
  * could not be found.
  **/
-inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_search(ulong *transaction_id) {
+inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_search(ulong transaction_id) {
     return _proxy_trans_search(trans_table, transaction_id);
 }
 
@@ -80,8 +80,8 @@ inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_search(ulong *t
  * @return The removed transaction, or NULL if no transaction
  *         exists with the specified key.
  **/
-inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_remove(ulong *transaction_id) {
-    proxy_debug("Removing transaction %lu from hashtable", *transaction_id);
+inline __attribute__((always_inline)) proxy_trans_t* proxy_trans_remove(ulong transaction_id) {
+    proxy_debug("Removing transaction %lu from hashtable", transaction_id);
     return _proxy_trans_remove(trans_table, transaction_id);
 }
 

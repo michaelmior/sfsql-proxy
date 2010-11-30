@@ -529,7 +529,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
     proxy_mutex_lock(&result_mutex);
 
     /* Check if we have already received some message about this transaction */
-    if (!(trans = proxy_trans_search(&transaction_id))) {
+    if (!(trans = proxy_trans_search(transaction_id))) {
         /* Create a new entry in the transaction hashtable */
         trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
         trans->total = 1; /* XXX: need to get actual number of clones */
@@ -581,7 +581,7 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
 
     /* Grab the transaction data from the hashtable, waiting if necessary */
-    while (!(trans = proxy_trans_search(&commit_trans_id))) { usleep(100); }
+    while (!(trans = proxy_trans_search(commit_trans_id))) { usleep(100); }
 
     /* Tell the waiting thread to proceed with commit/rollback */
     trans->num = 1;
