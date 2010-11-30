@@ -82,7 +82,7 @@ __attribute__((always_inline)) uint32_t SuperFastHash (const char * data, int le
 }
 
 unsigned int hash(unsigned long key) {
-    return SuperFastHash((char*) key, sizeof(unsigned long));
+    return SuperFastHash((char*) &key, sizeof(unsigned long));
 }
 
 /*****************************************************************************/

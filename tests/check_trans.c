@@ -36,25 +36,14 @@ void teardown() {
     proxy_trans_end();
 }
 
-/** @test Equality function for keys */
-START_TEST (test_trans_key_eq) {
-    ulong key1, key2;
-
-    key1 = key2 = 1;
-    fail_unless(trans_eq(&key1, &key2));
-
-    key1 = 1; key2 = 2;
-    fail_unless(!trans_eq(&key1, &key2));
-} END_TEST
-
 /** @test Different keys produce different hashes */
 START_TEST (test_trans_hash_diff) {
     ulong key1, key2;
     unsigned int hash1, hash2;
 
     key1 = 1; key2 = 2;
-    hash1 = trans_hash(&key1);
-    hash2 = trans_hash(&key2);
+    hash1 = hash(key1);
+    hash2 = hash(key2);
 
     fail_unless(hash1 != hash2);
 } END_TEST
@@ -65,18 +54,17 @@ START_TEST (test_trans_hash_eq) {
     unsigned int hash1, hash2;
 
     key1 = 1; key2 = 1;
-    hash1 = trans_hash(&key1);
-    hash2 = trans_hash(&key2);
+    hash1 = hash(key1);
+    hash2 = hash(key2);
 
     fail_unless(hash1 == hash2);
 } END_TEST
 
 /** @test Add new transaction to hashtable */
 START_TEST (test_trans_add) {
-    ulong *key = (ulong*) malloc(sizeof(ulong));
+    ulong key = 1;
     proxy_trans_t *trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
 
-    *key = 1;
     proxy_trans_insert(key, trans);
     fail_unless(hashtable_count(trans_table) == 1);
     fail_unless(proxy_trans_search(key) == trans);
@@ -84,10 +72,9 @@ START_TEST (test_trans_add) {
 
 /** @test Remove a transaction from the hashtable */
 START_TEST (test_trans_remove) {
-    ulong *key = (ulong*) malloc(sizeof(ulong));
+    ulong key = 1;
     proxy_trans_t *trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
 
-    *key = 1;
     proxy_trans_insert(key, trans);
     fail_unless(proxy_trans_remove(key) == trans);
     fail_unless(hashtable_count(trans_table) == 0);
@@ -97,7 +84,6 @@ Suite *pool_suite(void) {
     Suite *s = suite_create("Transaction management");
 
     TCase *tc_funcs = tcase_create("Functions");
-    tcase_add_test(tc_funcs, test_trans_key_eq);
     tcase_add_test(tc_funcs, test_trans_hash_diff);
     tcase_add_test(tc_funcs, test_trans_hash_eq);
     suite_add_tcase(s, tc_funcs);

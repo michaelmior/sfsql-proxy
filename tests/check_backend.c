@@ -56,14 +56,14 @@ my_bool __wrap_proxy_net_send_error(
 /* Dummy hash functions */
 int hashtable_insert(
     __attribute__((unused)) struct hashtable *h,
-    __attribute__((unused)) void *k,
+    __attribute__((unused)) unsigned long k,
     __attribute__((unused)) void *v) { return 0; }
 void* hashtable_remove(
     __attribute__((unused)) struct hashtable *h,
-    __attribute__((unused)) void *k) { return NULL; }
+    __attribute__((unused)) unsigned long k) { return NULL; }
 void* hashtable_search(
     __attribute__((unused)) struct hashtable *h,
-    __attribute__((unused)) void *k) { return NULL; }
+    __attribute__((unused)) unsigned long k) { return NULL; }
 
 void proxy_clone_notify() {}
 
