@@ -237,6 +237,17 @@ START_TEST (test_options_no_file) {
     fail_unless(proxy_options_parse(sizeof(argv2)/sizeof(*argv2), argv2) == EX_USAGE);
 } END_TEST;
 
+/** @test Backend threads and number of connections can be specified for one backend
+ *        if we are the coordinator */
+START_TEST (test_options_coordinator) {
+    char *argv[] = { "./sfsql-proxy",
+        "-C",
+        "-N" TEST_NUM_CONNS,
+        "-T" TEST_BACKEND_THREADS };
+
+    fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
+} END_TEST;
+
 /** @test Short options only valid with file specified */
 START_TEST (test_options_file_short) {
     char *argv[] = { "./sfsql-proxy",
@@ -314,6 +325,7 @@ Suite *options_suite(void) {
     tcase_add_test(tc_file, test_options_backend_and_socket);
     tcase_add_test(tc_file, test_options_socket_default);
     tcase_add_test(tc_file, test_options_no_file);
+    tcase_add_test(tc_file, test_options_coordinator);
     tcase_add_test(tc_file, test_options_file_short);
     tcase_add_test(tc_file, test_options_file_long);
     tcase_add_test(tc_file, test_options_file_default);

@@ -281,7 +281,7 @@ int proxy_options_parse(int argc, char *argv[]) {
         options.backend_threads = BACKEND_THREADS;
         options.num_conns = NUM_CONNS;
     } else {
-        if (options.backend_threads > 0 || options.num_conns > 0) {
+        if ((options.backend_threads > 0 || options.num_conns > 0) && !options.coordinator) {
             fprintf(stderr, "Can't specify backend threads or connections with only one backend\n");
             return EX_USAGE;
         }
@@ -294,9 +294,10 @@ int proxy_options_parse(int argc, char *argv[]) {
         options.backend.host = options.backend.host ?: BACKEND_HOST;
         options.backend.port = options.backend.port ?: BACKEND_PORT;
 
-        if (options.coordinator)
+        if (options.coordinator && options.backend_threads < 0)
             options.backend_threads = BACKEND_THREADS;
-        options.num_conns = options.client_threads;
+        options.num_conns = options.client_threads
+            + options.coordinator ? 5 : 0; // Extra connections to send commit/rollback messages
     }
     
     return EXIT_SUCCESS;
