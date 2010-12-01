@@ -303,7 +303,7 @@ static my_bool backends_alloc(int num_backends)  {
         goto error;
 
     for (i=0; i<num_backends; i++)
-        backend_pools[i] = proxy_pool_new(backend_num);
+        backend_pools[i] = proxy_pool_new(options.num_conns);
 
     /* Create a thread pool */
     if (!backend_thread_pool) {
