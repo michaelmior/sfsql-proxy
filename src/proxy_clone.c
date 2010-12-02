@@ -44,6 +44,27 @@ static pthread_cond_t new_cv;
 /** Mutex associated with :new_cv */
 static pthread_mutex_t new_mutex;
 
+/** Hashtable for storing ID-to-IP mappings for clones */
+struct hashtable *clone_table = NULL;
+
+/**
+ * Initialize data structures required for cloning.
+ **/
+void proxy_clone_init() {
+    /* Create the clone hashtable */
+    if (options.coordinator)
+        clone_table = create_hashtable(16);
+}
+
+/**
+ * Destroy data structures required for cloning.
+ **/
+void proxy_clone_end() {
+    /* Destroy the hashtable */
+    if (options.coordinator)
+        hashtable_destroy(clone_table, 1);
+}
+
 /**
  * Wait for new clones to become live on the coordinator.
  *

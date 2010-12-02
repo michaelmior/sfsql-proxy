@@ -695,6 +695,67 @@ static void backend_conns_free(int bi) {
 }
 
 /**
+ * Complete a transaction on clone backends.
+ *
+ * @param clone_ids      Array of clone IDs which require transaction completion.
+ * @param nclones        Number of clone IDs in the array.
+ * @param clone_trans_id Transaction ID to complete.
+ * @param commit         TRUE to commit, FALSE to roll back.
+ *
+ * @return TRUE on error, FALSE otherwise.
+ **/
+my_bool proxy_backend_clone_complete(int *clone_ids, int nclones, ulong clone_trans_id, my_bool commit) {
+    int i, bi, ci;
+    proxy_host_t *host;
+    char query[BUFSIZ];
+    MYSQL *mysql;
+    my_bool found = FALSE, error = FALSE;
+    ulong query_len;
+
+    for (i=0; i<nclones; i++) {
+        host = proxy_clone_search(clone_ids[i]);
+        found = FALSE;
+
+        /* Find the clone in the list of backends
+         * and tell it to commit or rollback */
+        for (bi=0; bi<backend_num; bi++) {
+            if (strcmp(host->host, backends[bi]->host) == 0
+                && host->port == backends[bi]->port) {
+                ci = proxy_pool_get(backend_pools[bi]);
+                mysql = backend_conns[bi][ci]->mysql;
+                query_len = snprintf(query, BUFSIZ, "PROXY %s %lu",
+                    commit ? "COMMIT" : "ROLLBACK",
+                    clone_trans_id);
+
+                proxy_debug("Found matching backend %d, sending query %s on connection %d",
+                    bi, query, ci);
+                mysql_real_query(mysql, query, query_len);
+
+                if (mysql_errno(mysql))
+                    proxy_log(LOG_ERROR, "Error completing transaction on clone %d: %s",
+                            clone_ids[i], mysql_error(mysql));
+                else
+                    proxy_debug("Completed transaction %lu on clone %d",
+                        clone_trans_id, clone_ids[i]);
+
+                found = TRUE;
+                break;
+            }
+        }
+
+        /* We could just open a new connection to the clone here, but
+         * if it doesn't already exist, something has gone wrong. */
+        if (!found) {
+            proxy_log(LOG_ERROR, "Couldn't find corresponding backend for clone %d with address %s:%d",
+                clone_ids[i], host->host, host->port);
+            error = TRUE;
+        }
+    }
+
+    return error;
+}
+
+/**
  * Add and connect to a new backend host.
  *
  * @param host Backend host to connect to.

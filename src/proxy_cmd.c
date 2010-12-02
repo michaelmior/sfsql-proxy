@@ -257,12 +257,13 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                  * the construct and send a query to the coordinator. */
                 proxy_options_update_host();
 
-                snprintf(buff, BUFSIZ, "PROXY ADD %s:%d;", options.phost, options.pport);
+                snprintf(buff, BUFSIZ, "PROXY ADD %d %s:%d;", server_id, options.phost, options.pport);
                 mysql_query((MYSQL*) coordinator, buff);
             }
 
-            if (error || mysql_errno((MYSQL*) coordinator))
-                proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d", ret);
+            if (mysql_errno((MYSQL*) coordinator))
+                proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d: %s",
+                    ret, mysql_error((MYSQL*) coordinator));
 
             return TRUE;
         }
@@ -468,18 +469,35 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
  **/
 static my_bool net_add_clone(MYSQL *mysql, char *t,
         __attribute__((unused)) status_t *status) {
-    char *host;
-    int port;
+    char *host, *tok;
+    proxy_host_t *store_host;
+    int port, clone_id;
 
     /* Ensure that we are the coordinator */
     if (!options.coordinator)
         return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Proxy server not started as coordinator");
+
+    /* Get the clone ID */
+    tok = strtok_r(NULL, " ", &t);
+    if (tok) {
+        errno = 0;
+        clone_id = strtol(tok, NULL, 10);
+    }
+    if (!tok || errno || clone_id <= 0)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone ID");
 
     /* Extract and validate host information */
     parse_host(t, &host, &port);
 
     if (port < 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone port number");
+
+    /* Save the clone's IP in the hashtable */
+    store_host = (proxy_host_t*) malloc(sizeof(proxy_host_t));
+    store_host->host = malloc(HOST_NAME_MAX+1);
+    strncpy(store_host->host, host, HOST_NAME_MAX+1);
+    store_host->port = port;
+    proxy_clone_insert((ulong) clone_id, store_host);
 
     /* Attempt to add the new host and report success/failure */
     if (proxy_backend_add(host, port))
@@ -502,7 +520,7 @@ static my_bool net_add_clone(MYSQL *mysql, char *t,
 static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
         __attribute__((unused)) status_t *status) {
     char *tok;
-    int clone_id;
+    int clone_id, i;
     ulong transaction_id;
     proxy_trans_t *trans;
 
@@ -530,25 +548,52 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 
     /* We lock around this next section so only one message can mess with the hashtable */
     proxy_mutex_lock(&result_mutex);
+    proxy_debug("Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
 
     /* Check if we have already received some message about this transaction */
     if (!(trans = proxy_trans_search(transaction_id))) {
+        proxy_debug("Creating new hashtable entry for transaction %lu", transaction_id);
+
         /* Create a new entry in the transaction hashtable */
         trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
         trans->total = 1; /* XXX: need to get actual number of clones */
-        trans->num = 1;
-        trans->success = success;
+        trans->num = 0;
+        trans->success = TRUE;
         proxy_cond_init(&trans->cv);
         proxy_mutex_init(&trans->cv_mutex);
-    } else {
-        /* Update the commit data */
-        trans->num++;
-        trans->success = trans->success && success;
+
+        /* Create space to store the IDs of clones */
+        trans->clone_ids = malloc(sizeof(int)*trans->total);
+        for (i=0; i<trans->total;i++)
+            trans->clone_ids[i] = -1;
+
+        proxy_trans_insert(transaction_id, trans);
+    }
+
+    /* Update the commit data */
+    trans->clone_ids[trans->num] = clone_id;
+    trans->num++;
+    trans->success = trans->success && success;
+
+    /* Check if all responses have been received */
+    if (trans->num == trans->total) {
+        proxy_debug("Transaction %lu completed on all clones, signalling %s",
+                transaction_id, trans->success ? "commit" : "rollback");
+
+        /* Notify clones that they should commit */
+        proxy_backend_clone_complete(trans->clone_ids, trans->total, transaction_id, trans->success);
+        free(trans->clone_ids);
+        trans->clone_ids = NULL;
+
+        proxy_debug("Signalling local threads for transaction %lu", transaction_id);
+
+        /* Signal local threads to commit */
+        proxy_mutex_lock(&trans->cv_mutex);
+        proxy_cond_broadcast(&trans->cv);
+        proxy_mutex_unlock(&trans->cv_mutex);
     }
 
     proxy_mutex_unlock(&result_mutex);
-
-    proxy_debug("Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
 
     return proxy_net_send_ok(mysql, 0, 0, 0);
 }
@@ -583,14 +628,22 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
     if (!tok || errno || commit_trans_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
 
+    proxy_debug("Received %s message for transaction %lu",
+        success ? "commit" : "rollback", commit_trans_id);
+
     /* Grab the transaction data from the hashtable, waiting if necessary */
     while (!(trans = proxy_trans_search(commit_trans_id))) { usleep(100); }
+
+    proxy_debug("Found transaction %lu in hashtable for completion",
+        commit_trans_id);
 
     /* Tell the waiting thread to proceed with commit/rollback */
     trans->num = 1;
     trans->total = 1;
     trans->success = success;
+    proxy_mutex_lock(&trans->cv_mutex);
     proxy_cond_signal(&trans->cv);
+    proxy_mutex_unlock(&trans->cv_mutex);
 
     if (success)
         proxy_debug("Signalled commit for transaction %lu", commit_trans_id);
