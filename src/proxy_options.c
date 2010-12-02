@@ -297,7 +297,7 @@ int proxy_options_parse(int argc, char *argv[]) {
         if (options.coordinator && options.backend_threads < 0)
             options.backend_threads = BACKEND_THREADS;
         options.num_conns = options.client_threads
-            + options.coordinator ? 5 : 0; // Extra connections to send commit/rollback messages
+            + (options.coordinator ? 5 : 0); /* Extra connections to send commit/rollback messages */
     }
     
     return EXIT_SUCCESS;
