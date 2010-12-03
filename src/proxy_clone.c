@@ -76,6 +76,7 @@ my_bool proxy_clone_wait(int nclones) {
     struct timespec wait_time;
     struct timeval tp;
     int wait_errno = 0;
+    my_bool error = FALSE;
 
     req_clones = nclones;
     new_clones = 0;
@@ -104,7 +105,7 @@ my_bool proxy_clone_wait(int nclones) {
             (void) __sync_fetch_and_sub(&clone_generation, 1);
 
         proxy_log(LOG_ERROR, "Timed out waiting for new clones");
-        return TRUE;
+        error = TRUE;
     }
 
     if (new_clones > req_clones)
@@ -115,7 +116,7 @@ my_bool proxy_clone_wait(int nclones) {
     proxy_mutex_destroy(&new_mutex);
     proxy_cond_destroy(&new_cv);
 
-    return FALSE;
+    return error;
 }
 
 /**
