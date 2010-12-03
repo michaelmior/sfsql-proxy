@@ -288,6 +288,7 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             return proxy_net_send_error(mysql, sql_errno, mysql_error((MYSQL*) master));
         } else {
             (void) __sync_fetch_and_add(&clone_generation, 1);
+            proxy_debug("Cloning successful, clone generation is %d", clone_generation);
 
             if (proxy_clone_wait(1))
                 return proxy_net_send_error(mysql, ER_LOCK_WAIT_TIMEOUT, "Error waiting for new clones");
@@ -655,7 +656,6 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
 
     /* Tell the waiting thread to proceed with commit/rollback */
     trans->num = 1;
-    trans->total = 1;
     trans->success = success;
     proxy_mutex_lock(&trans->cv_mutex);
     proxy_cond_signal(&trans->cv);
