@@ -535,6 +535,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
     int clone_id, i;
     ulong transaction_id;
     proxy_trans_t *trans;
+    my_bool error = FALSE;
 
     /* Ensure that we are the coordinator */
     if (!options.coordinator)
@@ -557,6 +558,9 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
     }
     if (!tok || errno || transaction_id <= 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid transaction ID");
+
+    /* Message received, clone */
+    error = proxy_net_send_ok(mysql, 0, 0, 0);
 
     /* We lock around this next section so only one message can mess with the hashtable */
     proxy_mutex_lock(&result_mutex);
@@ -607,7 +611,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 
     proxy_mutex_unlock(&result_mutex);
 
-    return proxy_net_send_ok(mysql, 0, 0, 0);
+    return error;
 }
 
 /**
