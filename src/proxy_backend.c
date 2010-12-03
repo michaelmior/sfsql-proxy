@@ -1195,23 +1195,28 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     if (clone_trans_id <= 0)
         goto err;
 
-    snprintf(buff, BUFSIZ, "PROXY %s %lu;", success ? "SUCCESS" : "FAILURE", clone_trans_id);
+    snprintf(buff, BUFSIZ, "PROXY %s %d %lu;", success ? "SUCCESS" : "FAILURE", server_id, clone_trans_id);
+    proxy_debug("Sending status message %s to coordinator", buff);
     mysql_query((MYSQL*) coordinator, buff);
 
-    /* If we failed here, or failed to communicate to the coordinator, we should rollback */
+    /* If we failed to communicate to the coordinator, we should roll back */
     if ((sql_errno = mysql_errno((MYSQL*) coordinator)))
         proxy_log(LOG_ERROR, "Error notifying coordinator about status of transaction %lu: %s",
                 clone_trans_id, mysql_error((MYSQL*) coordinator));
-    if (sql_errno || !success) {
+    if (sql_errno) {
         mysql_real_query(mysql, "ROLLBACK", 8);
         return;
     }
+
+    proxy_debug("Successfully notified coordinator about status of transaction %lu, adding to hashtable",
+            clone_trans_id);
 
     /* Initialize transaction commit data and insert into hashtable */
     proxy_cond_init(&trans.cv);
     proxy_mutex_init(&trans.cv_mutex);
     trans.num = 0;
     trans.total = 1;
+    trans.clone_ids = NULL;
     proxy_trans_insert(clone_trans_id, &trans);
 
     /* Wait to receive the commit or rollback info */
@@ -1228,13 +1233,14 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
         mysql_real_query(mysql, "ROLLBACK", 8);
     }
 
-    if (mysql_error(mysql))
-        proxy_log(LOG_ERROR, "Error completing transaction %lu on clone", clone_trans_id);
+    if (mysql_errno(mysql))
+        proxy_log(LOG_ERROR, "Error completing transaction %lu on clone: %s",
+            clone_trans_id, mysql_error(mysql));
 
     /* Destroy synchronization primitives and remove from hashtable */
-    proxy_cond_destroy(&trans.cv);
     proxy_mutex_unlock(&trans.cv_mutex);
     proxy_mutex_destroy(&trans.cv_mutex);
+    proxy_cond_destroy(&trans.cv);
     proxy_trans_remove(clone_trans_id);
 
     return;
