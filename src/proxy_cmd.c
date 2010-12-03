@@ -210,7 +210,7 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
 static my_bool net_clone(MYSQL *mysql, char *query,
         __attribute__((unused)) status_t *status) {
     char *buff=alloca(BUFSIZ), *tok, *t=NULL;
-    int nclones = 1, ret, sql_errno;
+    int nclones = 1, ret, sql_errno, i;
     my_bool error = FALSE;
 
     /* Check if we think we can clone */
@@ -239,11 +239,23 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             my_bool reconnect = 1;
             mysql_options(new_coordinator, MYSQL_OPT_RECONNECT, &reconnect);
 
-            if (!mysql_real_connect(new_coordinator, coordinator->host,
-                    options.user, options.pass,
-                    NULL, coordinator->port, NULL, 0)) {
-                mysql_close(new_coordinator);
-                error = TRUE;
+            /* Give 5 tries at reconnecting to the coordinator */
+            for (i=0; i<5; i++) {
+                error = FALSE;
+
+                proxy_debug("Attempt %d at reconnecting to coordinator", i);
+                if (!mysql_real_connect(new_coordinator, coordinator->host,
+                        options.user, options.pass,
+                        NULL, coordinator->port, NULL, 0)) {
+                    mysql_close(new_coordinator);
+
+                    proxy_log(LOG_ERROR, "Error reconnecting to coordinator: %s",
+                            mysql_error(new_coordinator));
+                    error = TRUE;
+                }
+
+                if (!error)
+                    break;
             }
 
             /* Switch coordinators and construct the query */
