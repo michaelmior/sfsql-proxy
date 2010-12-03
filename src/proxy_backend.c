@@ -768,14 +768,18 @@ my_bool proxy_backend_clone_complete(int *clone_ids, int nclones, ulong clone_tr
  * @return TRUE on success, FALSE on error.
  **/
 my_bool proxy_backend_add(char *host, int port) {
+    my_bool error;
+
     pthread_mutex_lock(&add_mutex);
 
     proxy_log(LOG_INFO, "Adding new clone %s:%d", host, port);
 
     /* Allocate space for the new backend */
     if (backend_resize(backend_num+1, TRUE) ||
-        backend_resize(backend_num+1, FALSE))
-        return TRUE;
+        backend_resize(backend_num+1, FALSE)) {
+        error = TRUE;
+        goto out;
+    }
 
     /* Add then new host information */
     backends[backend_num] = (proxy_host_t*) malloc(sizeof(proxy_host_t*));
@@ -784,12 +788,15 @@ my_bool proxy_backend_add(char *host, int port) {
 
     /* Connect to the new backend */
     backend_new_connect(backend_conns, backend_pools, backend_num);
-
     backend_num++;
-    proxy_clone_notify();
-    pthread_mutex_unlock(&add_mutex);
 
-    return FALSE;
+    proxy_debug("Connected to new backend, notifying coordinator");
+    proxy_clone_notify();
+    error = FALSE;
+
+out:
+    proxy_mutex_unlock(&add_mutex);
+    return error;
 }
 
 /**
