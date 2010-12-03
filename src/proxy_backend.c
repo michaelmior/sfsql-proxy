@@ -1264,15 +1264,15 @@ err:
  * @return TRUE on error, FALSE otherwise.
  **/
 static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status) {
-    my_bool error = FALSE, success, needs_commit = FALSE;
+    my_bool error = FALSE, success = TRUE, needs_commit = FALSE;
     ulong pkt_len = 8, field_count;
     MYSQL *mysql;
     my_ulonglong affected_rows=0;
     my_ulonglong insert_id=0;
     uint server_status=0, warnings=0;
     int start_server_id = server_id, start_generation = clone_generation;
-    ulong query_trans_id;
-    proxy_trans_t *trans;
+    ulong query_trans_id = 0;
+    proxy_trans_t *trans = NULL;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1283,7 +1283,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* Send the query to the backend */
-    proxy_debug("Sending query %s", query);
+    proxy_debug("Sending query %s to backend %d", query, bi);
 
     /* Add an ID if necessary */
     if (!options.add_ids)
@@ -1319,18 +1319,20 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* Check the success of the transaction */
     success = (mysql->net.read_pos[0] != 0xFF) ? TRUE : FALSE;
 
+    /* Signify that we are in commit phase and wait
+     * for any outstanding cloning operations */
+    (void) __sync_fetch_and_add(&committing, 1);
+    while (cloning) { usleep(100); }
+
     /* Wait for other backends to finish */
     if (options.cloneable && server_id != start_server_id && options.two_pc) {
+        proxy_debug("Server ID changed after query execution from %d to %d",
+            start_server_id, server_id);
         backend_clone_query_wait(success, (char*) query, mysql);
         return TRUE;
     } else {
         backend_query_wait(commit, bi, success);
     }
-
-    /* Signify that we are in commit phase and wait
-     * for any outstanding cloning operations */
-    (void) __sync_fetch_and_add(&committing, 1);
-    while (cloning) { usleep(100); }
 
     /* Check if all transactions succeeded and commit or rollback accordingly */
     /* This currently assumes that queries requiring two-phase commit do not
@@ -1338,13 +1340,36 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
      * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
      * If this assumption breaks, subsequent queries will fail, although the
      * client can then reconnect. */
-    if (clone_generation != start_generation) {
+    if (!options.cloneable && clone_generation != start_generation) {
         /* Get the query ID and wait for it to be available in the transaction hashtable */
         query_trans_id = id_from_query(query);
+
         proxy_debug("Cloning happened during query %lu, waiting", query_trans_id);
 
-        while (!(trans = proxy_trans_search(query_trans_id))
+        /* If we are the master, insert a new transaction into
+         * the hashtable. Otherwise, we are the coordinator and
+         * we wait until a transaction result command inserts
+         * the transaction. */
+        if (options.cloneable) {
+            proxy_debug("Inserting new transaction %lu into hashtable on master",
+                query_trans_id);
+
+            trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
+            /* XXX: need to get real number of clones,
+             * See also proxy_cmd.c:net_trans_result */
+            trans->total = 1;
+            trans->num = 0;
+            trans->success = success;
+            trans->clone_ids = NULL;
+            proxy_mutex_init(&trans->cv_mutex);
+            proxy_cond_init(&trans->cv);
+
+            proxy_trans_insert(query_trans_id, trans);
+        } else {
+            proxy_debug("Waiting for transaction %lu to appear in hashtable", query_trans_id);
+            while (!(trans = proxy_trans_search(query_trans_id))
                 && clone_generation != start_generation) { usleep(100); }
+        }
 
         /* Check if all clones failed and we rolled back a generation */
         if (clone_generation == start_generation) {
@@ -1354,15 +1379,24 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
             /* Wait until we have received messages from all backends */
             proxy_mutex_lock(&trans->cv_mutex);
-            while (trans->total != trans->num) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
+            while (trans->num < trans->total) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
+            proxy_mutex_unlock(&trans->cv_mutex);
 
             success = trans->success;
             needs_commit = TRUE;
         }
+
+        /* If we are the master, then we added the transaction
+         * to the hashtable and must free it */
+        if (options.cloneable) {
+            proxy_mutex_destroy(&trans->cv_mutex);
+            proxy_cond_destroy(&trans->cv);
+            free(trans);
+        }
     }
     if (commit && options.two_pc) {
         needs_commit = TRUE;
-        success = *(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1) ? TRUE : FALSE;
+        success = success && *(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1) ? TRUE : FALSE;
     }
 
     /* If we need to commit, then check if transactions were successful and proceed accordingly */
@@ -1382,6 +1416,9 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             proxy_debug("Rolling back on backend %d", bi);
             mysql_real_query(mysql, "ROLLBACK", 8);
         }
+
+        proxy_net_flush(proxy);
+        return error;
     }
 
     /* Flush the write buffer */
@@ -1390,6 +1427,8 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* Signify that we are done committing, and another clone operation may happen */
     (void) __sync_fetch_and_sub(&committing, 1);
+    if (query_trans_id)
+        proxy_debug("Done committing transaction %lu", query_trans_id);
 
     /* If query has zero results, then we can stop here */
     if (!success || net_field_length(&mysql->net.read_pos) == 0)
