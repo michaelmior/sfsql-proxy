@@ -647,12 +647,15 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
     /* Start new backend threads */
     if (!backend_threads[bi])
         backend_new_threads(bi);
+    proxy_debug("Threads started for backend %d", bi);
 
     /* Create a new thread pool for this backend */
     if (!backend_thread_pool[bi]) {
         backend_thread_pool[bi] = proxy_pool_new(options.backend_threads);
 
         /* Open the MySQL connections for each backend thread */
+        proxy_debug("Opening connections for backend %d", bi);
+
         for (ci=0; ci<options.backend_threads; ci++) {
             if (!backend_threads[bi][ci].data.backend.conn->mysql)
                 backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn, FALSE);
@@ -660,6 +663,8 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
     } else {
         proxy_pool_unlock(backend_thread_pool[bi]);
     }
+
+    proxy_log(LOG_INFO, "Connected to new backend %d", bi);
 }
 
 /**
