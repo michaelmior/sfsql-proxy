@@ -130,12 +130,15 @@ void proxy_clone_notify() {
         return;
     }
 
+    proxy_mutex_lock(&new_mutex);
+
     /* Increment the number of clones and check if we're done */
     (void) __sync_fetch_and_add(&new_clones, 1);
-    if (new_clones == req_clones)
-        pthread_cond_signal(&new_cv);
+    if (new_clones >= req_clones)
+        proxy_cond_signal(&new_cv);
 
     proxy_debug("Received notification for %d of %d clones", new_clones, req_clones);
+    proxy_mutex_unlock(&new_mutex);
 }
 
 /**
