@@ -153,7 +153,6 @@ START_TEST (test_options_defaults) {
     fail_unless(options.autocommit);
     fail_unless(strcmp(options.backend.host, BACKEND_HOST) == 0);
     fail_unless(options.bypass_port < 0);
-    fail_unless(!options.unix_socket);
     fail_unless(options.socket_file == NULL);
     fail_unless(options.backend.port == BACKEND_PORT);
     fail_unless(strcmp(options.user, BACKEND_USER) == 0);

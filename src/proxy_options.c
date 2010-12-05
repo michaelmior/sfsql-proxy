@@ -29,6 +29,8 @@
 
 #include "proxy.h"
 
+#define CONFIG_PATH "/etc/sfsql-proxy.conf"
+
 /**
  * Print a simple usage message with command-line arguments.
  **/
@@ -115,7 +117,6 @@ static void set_option_defaults() {
     options.backend.host    = NULL;
     options.backend.port    = 0;
     options.bypass_port     = -1;
-    options.unix_socket     = FALSE;
     options.socket_file     = NULL;
     options.user            = NULL;
     options.pass            = NULL;
@@ -191,7 +192,6 @@ int proxy_options_parse(int argc, char *argv[]) {
                 options.bypass_port = atoi(optarg);
                 break;
             case 's':
-                options.unix_socket = TRUE;
                 if (optarg)
                     options.socket_file = optarg;
                 else
@@ -270,7 +270,7 @@ int proxy_options_parse(int argc, char *argv[]) {
 
     /* If a file was specified, make sure no other host options were used */
     if (options.backend_file) {
-        if (options.backend.host || options.backend.port || options.unix_socket) {
+        if (options.backend.host || options.backend.port || options.socket_file) {
             usage();
             return EX_USAGE;
         } else if (access(options.backend_file, R_OK)) {
@@ -286,7 +286,7 @@ int proxy_options_parse(int argc, char *argv[]) {
             return EX_USAGE;
         }
 
-        if ((options.backend.host || options.backend.port || options.coordinator) && options.unix_socket) {
+        if ((options.backend.host || options.backend.port || options.coordinator) && options.socket_file) {
             usage();
             return EX_USAGE;
         }

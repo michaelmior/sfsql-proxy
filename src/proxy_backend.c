@@ -400,7 +400,7 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
     mysql_options(mysql, MYSQL_OPT_RECONNECT, &reconnect);
 
     /* Connect to the backend */
-    if (options.unix_socket) {
+    if (options.socket_file) {
         proxy_log(LOG_INFO, "Connecting to %s", options.socket_file);
         ret = mysql_real_connect(mysql, NULL, options.user, options.pass, options.db,
                 0, options.socket_file, 0);
