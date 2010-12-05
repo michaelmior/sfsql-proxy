@@ -575,6 +575,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
         trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
         trans->total = 1; /* XXX: need to get actual number of clones */
         trans->num = 0;
+        trans->done = 0;
         trans->success = TRUE;
         proxy_cond_init(&trans->cv);
         proxy_mutex_init(&trans->cv_mutex);
@@ -607,6 +608,19 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
         /* Signal local threads to commit */
         proxy_mutex_lock(&trans->cv_mutex);
         proxy_cond_broadcast(&trans->cv);
+        proxy_mutex_unlock(&trans->cv_mutex);
+
+        /* Wait for everyone to finish and then
+         * remove and free the transaction. */
+        proxy_debug("Waiting for local threads to commit before removing transaction");
+        proxy_mutex_lock(&trans->cv_mutex);
+        while (trans->done < (proxy_backend_num()-trans->total)) { pthread_cond_wait(&trans->cv, &trans->cv_mutex); }
+
+        if (proxy_trans_remove(transaction_id) != trans)
+            proxy_log(LOG_ERROR, "Transaction %lu changed when removed from hashtable",
+                transaction_id);
+        free(trans);
+
         proxy_mutex_unlock(&trans->cv_mutex);
     }
 

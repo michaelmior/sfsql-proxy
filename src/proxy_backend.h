@@ -60,6 +60,7 @@ typedef struct {
     proxy_backend_query_t query;
 } proxy_backend_data_t;
 
+int proxy_backend_num();
 my_bool proxy_backend_init();
 my_bool proxy_backend_connect();
 my_bool proxy_backends_connect();

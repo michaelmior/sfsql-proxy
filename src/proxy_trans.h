@@ -30,6 +30,12 @@ typedef struct {
     /** Total number which must agree to commit. */
     int total;
 
+    /** Number of backend threads have finished
+     *  using this transaction. */
+    int done;
+    /** Total number of backend threads. */
+    int backends;
+
     /** TRUE to commit, FALSE to roll back */
     my_bool success;
 

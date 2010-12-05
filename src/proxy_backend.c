@@ -83,6 +83,15 @@ static void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **pools);
 static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, int bi);
 
 /**
+ * Get the current number of backends.
+ *
+ * @return Number of backends currently allocated.
+ **/
+int proxy_backend_num() {
+    return backend_num;
+}
+
+/**
  * Write from a backend to a proxy connection.
  *
  * @param backend        Backend MYSQL object to read from.
@@ -1215,6 +1224,7 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     proxy_cond_init(&trans.cv);
     proxy_mutex_init(&trans.cv_mutex);
     trans.num = 0;
+    trans.done = 0;
     trans.total = 1;
     trans.clone_ids = NULL;
     proxy_trans_insert(clone_trans_id, &trans);
@@ -1359,6 +1369,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
              * See also proxy_cmd.c:net_trans_result */
             trans->total = 1;
             trans->num = 0;
+            trans->done = 0;
             trans->success = success;
             trans->clone_ids = NULL;
             proxy_mutex_init(&trans->cv_mutex);
@@ -1380,9 +1391,16 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             /* Wait until we have received messages from all backends */
             proxy_mutex_lock(&trans->cv_mutex);
             while (trans->num < trans->total) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
+
+            /* Save the success state and check if
+             * everyone is now done. */
+            success = trans->success;
+            trans->done++;
+            if (trans->done >= backend_num-trans->total)
+                proxy_cond_signal(&trans->cv);
+
             proxy_mutex_unlock(&trans->cv_mutex);
 
-            success = trans->success;
             needs_commit = TRUE;
         }
 
