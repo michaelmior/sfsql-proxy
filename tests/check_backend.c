@@ -28,6 +28,7 @@
 /* Externs */
 ulong transaction_id;
 struct hashtable *trans_table;
+struct hashtable *clone_table;
 volatile sig_atomic_t server_id;
 volatile sig_atomic_t clone_generation;
 
