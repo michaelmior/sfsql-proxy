@@ -202,6 +202,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
         vmid = -1;
     } else {
         if (result->rc.number_clones == 0) {
+            MERGE_MASTER(ticket);
             snprintf(*err, errlen, "Cloning produced zero clones");
             vmid = -1;
         } else {
