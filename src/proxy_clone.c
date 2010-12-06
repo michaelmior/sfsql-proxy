@@ -217,8 +217,6 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     }
 
 out:
-    cloning = 0;
-
     if (result)
         FREE_SF_RES(result);
     return vmid;
@@ -231,3 +229,11 @@ int proxy_do_clone(
     return -1;
 }
 #endif /* HAVE_LIBSF */
+
+/**
+ * Called after :proxy_do_clone to signify that any post-cloning
+ * actions are complete and querying can now continue .
+ **/
+void proxy_clone_complete() {
+    cloning = 0;
+}

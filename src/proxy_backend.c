@@ -1204,6 +1204,12 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     if (clone_trans_id <= 0)
         goto err;
 
+    /* If we don't have a good coordinator, we're dead in the water */
+    if (!coordinator) {
+        proxy_log(LOG_ERROR, "Invalid coordinator, can't notify status of transaction %lu", clone_trans_id);
+        return;
+    }
+
     snprintf(buff, BUFSIZ, "PROXY %s %d %lu;", success ? "SUCCESS" : "FAILURE", server_id, clone_trans_id);
     proxy_debug("Sending status message %s to coordinator", buff);
     mysql_query((MYSQL*) coordinator, buff);

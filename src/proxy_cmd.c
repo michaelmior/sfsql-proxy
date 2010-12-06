@@ -229,9 +229,11 @@ static my_bool net_clone(MYSQL *mysql, char *query,
 
         if (ret < 0) {
             /* Cloning failed */
+            proxy_clone_complete();
             return proxy_net_send_error(mysql, ER_ERROR_WHEN_EXECUTING_COMMAND, buff);
         } else if (ret == 0) {
             /* This is the master, and cloning succeeded */
+            proxy_clone_complete();
             return proxy_net_send_ok(mysql, 0, 0, 0);
         } else {
             /* Reconnect to the coordinator for notification */
@@ -249,8 +251,6 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                         NULL, coordinator->port, NULL, 0)) {
                     mysql_close(new_coordinator);
 
-                    proxy_log(LOG_ERROR, "Error reconnecting to coordinator: %s",
-                            mysql_error(new_coordinator));
                     error = TRUE;
                 }
 
@@ -270,12 +270,26 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                 proxy_options_update_host();
 
                 snprintf(buff, BUFSIZ, "PROXY ADD %d %s:%d;", server_id, options.phost, options.pport);
+                proxy_debug("Sending add query %s to coordinator", buff);
                 mysql_query((MYSQL*) coordinator, buff);
+            } else {
+                proxy_log(LOG_ERROR, "Error reconnecting to coordinator: %s",
+                    mysql_error(new_coordinator));
+
+                /* Close the old coordinator and signify that the new
+                 * coordinator could not be contacted */
+                mysql_close((MYSQL*) coordinator);
+                coordinator = NULL;
+
+                proxy_clone_complete();
+                return TRUE;
             }
 
             if (mysql_errno((MYSQL*) coordinator))
                 proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d: %s",
                     ret, mysql_error((MYSQL*) coordinator));
+
+            proxy_clone_complete();
 
             return TRUE;
         }

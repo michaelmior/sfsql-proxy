@@ -28,6 +28,7 @@ extern volatile sig_atomic_t clone_generation;
 void proxy_clone_init();
 void proxy_clone_end();
 int proxy_do_clone(int nclones, char **err, int errlen);
+void proxy_clone_complete();
 my_bool proxy_clone_wait(int nclones);
 void proxy_clone_notify();
 
