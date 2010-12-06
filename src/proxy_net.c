@@ -468,7 +468,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
         return ERROR_CLIENT;
     }
 
-    proxy_debug("Read %lu byte packet from client", pkt_len);
+    proxy_vdebug("Read %lu byte packet from client", pkt_len);
     status->bytes_recv += pkt_len;
 
     packet = (char*) net->read_pos;
@@ -485,7 +485,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    proxy_debug("Got command %d for connection on thread %d", command, thread_id);
+    proxy_vdebug("Got command %d for connection on thread %d", command, thread_id);
 
     switch (command) {
         case COM_PROXY_QUERY:

@@ -60,6 +60,7 @@ START_TEST (test_options_test) {
 /** @test Short option parsing */
 START_TEST (test_options_short) {
     char *argv[] = { "./sfsql-proxy",
+        "-v",
         "-d",
         "-C",
         "-c",
@@ -80,6 +81,7 @@ START_TEST (test_options_short) {
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
+    fail_unless(options.verbose);
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
@@ -102,6 +104,7 @@ START_TEST (test_options_short) {
 /** @test Long option parsing */
 START_TEST (test_options_long) {
     char *argv[] = { "./sfsql-proxy",
+        "--verbose",
         "--daemonize",
         "--coordinator",
         "--cloneable",
@@ -121,6 +124,7 @@ START_TEST (test_options_long) {
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
+    fail_unless(options.verbose);
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
@@ -145,6 +149,7 @@ START_TEST (test_options_defaults) {
     fail_unless(proxy_options_parse(0, NULL) == EXIT_SUCCESS);
 
     /* Check that all options have their correct values */
+    fail_unless(!options.verbose);
     fail_unless(!options.daemonize);
     fail_unless(!options.coordinator);
     fail_unless(!options.cloneable);

@@ -1011,7 +1011,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
             free(query);
             query = newq;
         }
-        proxy_debug("Query %s mapped to %d", query, (int) map);
+        proxy_vdebug("Query %s mapped to %d", query, (int) map);
     }
 
     /* Spin until query can proceed */
@@ -1128,7 +1128,7 @@ static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char
     ci = backend_pools ? proxy_pool_get(backend_pools[bi]) : ci;
     conn = backend_conns[bi][ci];
 
-    proxy_debug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
+    proxy_vdebug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
 
     /*Send the query */
     error = backend_query(conn, proxy, query, length, bi, NULL, status);
@@ -1299,7 +1299,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* Send the query to the backend */
-    proxy_debug("Sending query %s to backend %d", query, bi);
+    proxy_vdebug("Sending query %s to backend %d", query, bi);
 
     /* Add an ID if necessary */
     if (!options.add_ids)
@@ -1429,7 +1429,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             if (proxy)
                 error = proxy_net_send_ok(proxy, warnings, affected_rows, insert_id);
 
-            proxy_debug("Commiting on backend %d", bi);
+            proxy_vdebug("Commiting on backend %d", bi);
             mysql_real_query(mysql, "COMMIT", 6);
         } else {
             if (proxy)
@@ -1437,7 +1437,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
                         ER_ERROR_DURING_COMMIT,
                         "Couldn't commit transaction");
 
-            proxy_debug("Rolling back on backend %d", bi);
+            proxy_vdebug("Rolling back on backend %d", bi);
             mysql_real_query(mysql, "ROLLBACK", 8);
         }
 

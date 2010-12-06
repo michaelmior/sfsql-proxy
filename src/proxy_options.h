@@ -88,10 +88,13 @@ struct {
     /** Name of the query mapper to use. */
     char *mapper;
 
-    /** Numberof client threads. */
+    /** Number of client threads. */
     int client_threads;
-    /** Numbr of backend threads. */
+    /** Number of backend threads. */
     int backend_threads;
+
+    /** Enable verbose debugging. */
+    my_bool verbose;
 } options;
 
 #endif /* _proxy_options_h */

@@ -40,6 +40,9 @@ static void usage() {
 
             "Options:\n"
             "\t--help,             -?\tShow this message\n"
+#ifdef DEBUG
+            "\t--verbose,          -v\tEnable verbose debugging\n"
+#endif
             "\t--daemonize,        -d\tDaemonize\n"
             "\t--coordinator,      -C\tProxy should act as coordinator\n"
             "\t--cloneable,        -c\tProxy should execute cloning when signalled\n\n"
@@ -106,6 +109,7 @@ void proxy_options_update_host() {
  **/
 static void set_option_defaults() {
     /* Set options to default values */
+    options.verbose         = FALSE;
     options.daemonize       = FALSE;
     options.coordinator     = FALSE;
     options.cloneable       = FALSE;
@@ -141,6 +145,7 @@ int proxy_options_parse(int argc, char *argv[]) {
     int c, opt=0;
     static struct option long_options[] = {
         {"help",            no_argument,       0, '?'},
+        {"verbose",         no_argument,       0, 'v'},
         {"daemonize",       no_argument,       0, 'd'},
         {"coordinator",     no_argument,       0, 'C'},
         {"cloneable",       no_argument,       0, 'c'},
@@ -168,11 +173,14 @@ int proxy_options_parse(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?dCch:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?vdCch:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 usage();
                 return EX_USAGE;
+            case 'v':
+                options.verbose = TRUE;
+                break;
             case 'd':
                 options.daemonize = TRUE;
                 break;
