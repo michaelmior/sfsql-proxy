@@ -329,13 +329,13 @@ void* proxy_net_new_thread(void *ptr) {
         }
 
         /* Wait for work to be available */
-        while (!thread->data.work.addr)
+        while (!thread->data.work.addr && !thread->exit)
             proxy_cond_wait(&(thread->cv), &(thread->lock));
 
         proxy_debug("Client thread %d signaled", thread->id);
 
-        /* If no work specified, must be ready to exit */
-        if (thread->data.work.addr == NULL) {
+        /* Check if we have been signalled to exit */
+        if (thread->exit) {
             proxy_mutex_unlock(&(thread->lock));
             break;
         }

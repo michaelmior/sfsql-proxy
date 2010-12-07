@@ -949,11 +949,11 @@ void* proxy_backend_new_thread(void *ptr) {
         }
 
         /* Wait for work to be available */
-        while (!query->query)
+        while (!query->query && !thread->exit)
             proxy_cond_wait(&thread->cv, &thread->lock);
 
-        /* If no query specified, must be ready to exit */
-        if (query->query == NULL) {
+        /* Check if we have been signalled to exit*/
+        if (thread->exit) {
             proxy_mutex_unlock(&thread->lock);
             break;
         }
