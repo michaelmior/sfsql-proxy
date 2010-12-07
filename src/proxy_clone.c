@@ -61,7 +61,7 @@ void proxy_clone_init() {
  **/
 void proxy_clone_end() {
     /* Destroy the hashtable */
-    if (options.coordinator)
+    if (clone_table)
         hashtable_destroy(clone_table, 1);
 }
 
