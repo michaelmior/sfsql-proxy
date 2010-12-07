@@ -258,6 +258,8 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                     break;
             }
 
+            proxy_clone_complete();
+
             /* Switch coordinators and construct the query */
             if (!error) {
                 old_coordinator = (MYSQL*) coordinator;
@@ -281,15 +283,12 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                 mysql_close((MYSQL*) coordinator);
                 coordinator = NULL;
 
-                proxy_clone_complete();
                 return TRUE;
             }
 
             if (mysql_errno((MYSQL*) coordinator))
                 proxy_log(LOG_ERROR, "Error notifying coordinator about clone host %d: %s",
                     ret, mysql_error((MYSQL*) coordinator));
-
-            proxy_clone_complete();
 
             return TRUE;
         }
