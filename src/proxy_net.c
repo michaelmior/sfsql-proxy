@@ -320,9 +320,9 @@ void* proxy_net_new_thread(void *ptr) {
 
     proxy_threading_mask();
     pthread_cleanup_push(net_thread_destroy, ptr);
-    proxy_mutex_lock(&(thread->lock));
 
     while (1) {
+        proxy_mutex_lock(&(thread->lock));
         if(thread->exit) {
             proxy_mutex_unlock(&(thread->lock));
             break;
@@ -331,14 +331,13 @@ void* proxy_net_new_thread(void *ptr) {
         /* Wait for work to be available */
         while (!thread->data.work.addr && !thread->exit)
             proxy_cond_wait(&(thread->cv), &(thread->lock));
+        proxy_mutex_unlock(&(thread->lock));
 
         proxy_debug("Client thread %d signaled", thread->id);
 
         /* Check if we have been signalled to exit */
-        if (thread->exit) {
-            proxy_mutex_unlock(&(thread->lock));
+        if (thread->exit)
             break;
-        }
 
         /* Handle client requests */
         (void) __sync_fetch_and_add(&global_connections, 1);
@@ -389,7 +388,7 @@ void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, sta
         return;
 
     /* from sql/sql_connect.cc:handle_one_connection */
-    while (!work->proxy->net.error && work->proxy->net.vio != 0) {
+    while (!work->proxy->net.error && work->proxy->net.vio != 0 && !net_threads[thread_id].exit) {
         error = proxy_net_read_query(work->proxy, thread_id, commit, status);
 
         /* One more flush the write buffer to make
@@ -440,6 +439,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
     char *packet = 0;
     enum enum_server_command command;
     struct pollfd polls[1];
+    int ret;
 
     /* Ensure we have a valid MySQL object */
     if (unlikely(!mysql)) {
@@ -454,8 +454,12 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
     polls[0].fd = net->vio->sd;
     polls[0].events = POLLIN | POLLRDHUP;
 
-    if (poll(polls, 1, options.timeout * 1000) != 1)
+    if ((ret = poll(polls, 1, options.timeout * 1000)) < 0)
         proxy_log(LOG_ERROR, "Error in waiting on socket data");
+
+    /* If no events are pending, we close the connection */
+    if (!polls[0].revents)
+        return ERROR_CLOSE;
 
     /* Check if the connection is gone */
     if (polls[0].revents & POLLRDHUP) {

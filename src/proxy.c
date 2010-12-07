@@ -154,6 +154,8 @@ static void server_run(char *host, int port) {
  * Main signal handler with switch() to handle multiple signals.
  **/
 static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attribute__((unused)) void *ucontext_t) {
+    int i;
+
     switch (sig) {
         /* Tell the server to stop */
         case SIGINT:
@@ -162,6 +164,8 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
             run = 0;
 
             /* Cancel running threads */
+            for (i=0; i<options.client_threads; i++)
+                pthread_kill(net_threads[i].thread, SIGPOLL);
             proxy_threading_cancel(net_threads, options.client_threads, thread_pool);
 
             break;
@@ -289,6 +293,7 @@ int main(int argc, char *argv[]) {
     HANDLE_SIG(SIGINT);
     HANDLE_SIG(SIGUSR1);
     HANDLE_SIG(SIGUSR2);
+    HANDLE_SIG(SIGPOLL);
 
     /* Initialize libmysql */
     mysql_library_init(0, NULL, NULL);
