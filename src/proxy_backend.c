@@ -1406,7 +1406,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     proxy_vdebug("Sending query %s to backend %d", query, bi);
 
     /* Add an ID if necessary */
-    if (!options.add_ids)
+    if (!options.add_ids && !options.coordinator)
         mysql_send_query(mysql, query, length);
     else
         simple_command(mysql, COM_PROXY_QUERY, (uchar*) query, length, 1);
