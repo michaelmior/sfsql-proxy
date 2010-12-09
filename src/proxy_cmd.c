@@ -414,7 +414,8 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
     my_bool error = FALSE;
     MYSQL *old_coordinator, *new_coordinator = NULL;
     uchar buff1[BUFSIZ], buff2[BUFSIZ], *pos;
-    char *tok = strtok_r(NULL, " ", &t), *host;
+    char *tok = strtok_r(NULL, " ", &t), *host, ip[INET6_ADDRSTRLEN];
+    struct hostent *entry;
     int port;
     size_t size;
 
@@ -428,6 +429,18 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
         if (port < 0)
             return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid coordinator port number");
 
+        /* Attempt to get the coordinator IP address */
+        entry = gethostbyname(host);
+        if (!entry) {
+            proxy_log(LOG_ERROR, "Could not resolve coordinator hostname, using IP: %s", hstrerror(h_errno));
+        } else {
+            if (!inet_ntop(entry->h_addrtype, entry->h_addr, ip, INET6_ADDRSTRLEN))
+                proxy_log(LOG_ERROR, "Could not convert IP to string: %s", errstr);
+
+            /* Signify that we should not use the hostname */
+            host = NULL;
+        }
+
         /* Check for a valid host and connect to the coordinator */
         new_coordinator = mysql_init(NULL);
         if (new_coordinator) {
@@ -435,7 +448,7 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
             my_bool reconnect = 1;
             mysql_options(new_coordinator, MYSQL_OPT_RECONNECT, &reconnect);
 
-            if (!mysql_real_connect(new_coordinator, host, options.user, options.pass, NULL, port, NULL, 0)) {
+            if (!mysql_real_connect(new_coordinator, host ?: ip, options.user, options.pass, NULL, port, NULL, 0)) {
                 error = proxy_net_send_error(mysql, mysql_errno(new_coordinator), mysql_error(new_coordinator));
                 mysql_close(new_coordinator);
                 return error;
@@ -447,7 +460,7 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
 
             return proxy_net_send_error(mysql, ER_BAD_HOST_ERROR, "Invalid coordinator host");
         } else {
-            proxy_log(LOG_INFO, "Coordinator successfully changed to %s:%d", host, port);
+            proxy_log(LOG_INFO, "Coordinator successfully changed to %s:%d", host ?: ip, port);
 
             /* Swap to the new coordinator */
             old_coordinator = (MYSQL*) coordinator;
