@@ -1201,8 +1201,10 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
 
     /* Get the transaction ID */
     clone_trans_id = id_from_query(query);
-    if (clone_trans_id <= 0)
-        goto err;
+    if (clone_trans_id <= 0) {
+        proxy_log(LOG_ERROR, "Invalid transaction ID when attempting to complete transaction on clone");
+        return;
+    }
 
     /* If we don't have a good coordinator, we're dead in the water */
     if (!coordinator) {
@@ -1260,9 +1262,6 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     proxy_trans_remove(clone_trans_id);
 
     return;
-
-err:
-    proxy_log(LOG_ERROR, "Invalid transaction ID when attempting to complete transaction on clone");
 }
 
 /**
