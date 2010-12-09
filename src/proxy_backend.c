@@ -1265,6 +1265,114 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
 }
 
 /**
+ * Check if a query requires commit and update success status.
+ *
+ * @param[in,out] needs_commit  Pointer to a boolean which signals the
+ *                              possible need to commit.
+ * @param conn                  Connection where the query should be sent.
+ * @param query                 Query string to execute.
+ * @param[in,out] success       TRUE if the query was successful, FALSE otherwise.
+ * @param length                Length of the query.
+ * @param bi                    Index of the backend executing the query.
+ * @param commit                Data required for synchronization
+ *                              and two-phase commit.
+ *
+ * @return TRUE on error, FALSE otherwise.
+ **/
+static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const char *query, my_bool *success, int bi, commitdata_t *commit) {
+    int start_server_id = server_id, start_generation = clone_generation;
+    proxy_trans_t *trans = NULL;
+    ulong query_trans_id = 0;
+
+    /* Wait for other backends to finish */
+    if (options.cloneable && server_id != start_server_id && options.two_pc) {
+        proxy_debug("Server ID changed after query execution from %d to %d",
+            start_server_id, server_id);
+        backend_clone_query_wait(*success, (char*) query, mysql);
+        return TRUE;
+    } else {
+        backend_query_wait(commit, bi, *success);
+    }
+
+    /* Check if all transactions succeeded and commit or rollback accordingly */
+    /* This currently assumes that queries requiring two-phase commit do not
+     * return any results, and thus have a single packet which has already
+     * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
+     * If this assumption breaks, subsequent queries will fail, although the
+     * client can then reconnect. */
+    if (!options.cloneable && clone_generation != start_generation) {
+        /* Get the query ID and wait for it to be available in the transaction hashtable */
+        query_trans_id = id_from_query(query);
+
+        proxy_debug("Cloning happened during query %lu, waiting", query_trans_id);
+
+        /* If we are the master, insert a new transaction into
+         * the hashtable. Otherwise, we are the coordinator and
+         * we wait until a transaction result command inserts
+         * the transaction. */
+        if (options.cloneable) {
+            proxy_debug("Inserting new transaction %lu into hashtable on master",
+                query_trans_id);
+
+            trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
+            /* XXX: need to get real number of clones,
+             * See also proxy_cmd.c:net_trans_result */
+            trans->total = 1;
+            trans->num = 0;
+            trans->done = 0;
+            trans->success = *success;
+            trans->clone_ids = NULL;
+            proxy_mutex_init(&trans->cv_mutex);
+            proxy_cond_init(&trans->cv);
+
+            proxy_trans_insert(query_trans_id, trans);
+        } else {
+            proxy_debug("Waiting for transaction %lu to appear in hashtable", query_trans_id);
+            while (!(trans = proxy_trans_search(query_trans_id))
+                && clone_generation != start_generation) { usleep(100); }
+        }
+
+        /* Check if all clones failed and we rolled back a generation */
+        if (clone_generation == start_generation) {
+            *needs_commit = FALSE;
+        } else {
+            proxy_debug("Cloned during transaction %lu, waiting for new backends", query_trans_id);
+
+            /* Wait until we have received messages from all backends */
+            proxy_mutex_lock(&trans->cv_mutex);
+            while (trans->num < trans->total) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
+
+            /* Save the success state and check if
+             * everyone is now done. */
+            *success = trans->success;
+            trans->done++;
+            if (trans->done >= backend_num-trans->total)
+                proxy_cond_signal(&trans->cv);
+
+            proxy_mutex_unlock(&trans->cv_mutex);
+
+            *needs_commit = TRUE;
+        }
+
+        /* If we are the master, then we added the transaction
+         * to the hashtable and must free it */
+        if (options.cloneable) {
+            proxy_mutex_destroy(&trans->cv_mutex);
+            proxy_cond_destroy(&trans->cv);
+            free(trans);
+        }
+    }
+    if (commit && options.two_pc) {
+        *needs_commit = TRUE;
+        *success = *success && *(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1) ? TRUE : FALSE;
+    }
+
+    if (query_trans_id)
+        proxy_debug("Done committing transaction %lu", query_trans_id);
+    return FALSE;
+}
+
+/**
  * Forward a query to a backend connection
  *
  * @param conn           Connection where the query should be sent.
@@ -1285,9 +1393,6 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     my_ulonglong affected_rows=0;
     my_ulonglong insert_id=0;
     uint server_status=0, warnings=0;
-    int start_server_id = server_id, start_generation = clone_generation;
-    ulong query_trans_id = 0;
-    proxy_trans_t *trans = NULL;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1339,88 +1444,8 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     (void) __sync_fetch_and_add(&committing, 1);
     while (cloning) { usleep(100); }
 
-    /* Wait for other backends to finish */
-    if (options.cloneable && server_id != start_server_id && options.two_pc) {
-        proxy_debug("Server ID changed after query execution from %d to %d",
-            start_server_id, server_id);
-        backend_clone_query_wait(success, (char*) query, mysql);
+    if (backend_check_commit(&needs_commit, mysql, query, &success, bi, commit))
         return TRUE;
-    } else {
-        backend_query_wait(commit, bi, success);
-    }
-
-    /* Check if all transactions succeeded and commit or rollback accordingly */
-    /* This currently assumes that queries requiring two-phase commit do not
-     * return any results, and thus have a single packet which has already
-     * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
-     * If this assumption breaks, subsequent queries will fail, although the
-     * client can then reconnect. */
-    if (!options.cloneable && clone_generation != start_generation) {
-        /* Get the query ID and wait for it to be available in the transaction hashtable */
-        query_trans_id = id_from_query(query);
-
-        proxy_debug("Cloning happened during query %lu, waiting", query_trans_id);
-
-        /* If we are the master, insert a new transaction into
-         * the hashtable. Otherwise, we are the coordinator and
-         * we wait until a transaction result command inserts
-         * the transaction. */
-        if (options.cloneable) {
-            proxy_debug("Inserting new transaction %lu into hashtable on master",
-                query_trans_id);
-
-            trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
-            /* XXX: need to get real number of clones,
-             * See also proxy_cmd.c:net_trans_result */
-            trans->total = 1;
-            trans->num = 0;
-            trans->done = 0;
-            trans->success = success;
-            trans->clone_ids = NULL;
-            proxy_mutex_init(&trans->cv_mutex);
-            proxy_cond_init(&trans->cv);
-
-            proxy_trans_insert(query_trans_id, trans);
-        } else {
-            proxy_debug("Waiting for transaction %lu to appear in hashtable", query_trans_id);
-            while (!(trans = proxy_trans_search(query_trans_id))
-                && clone_generation != start_generation) { usleep(100); }
-        }
-
-        /* Check if all clones failed and we rolled back a generation */
-        if (clone_generation == start_generation) {
-            needs_commit = FALSE;
-        } else {
-            proxy_debug("Cloned during transaction %lu, waiting for new backends", query_trans_id);
-
-            /* Wait until we have received messages from all backends */
-            proxy_mutex_lock(&trans->cv_mutex);
-            while (trans->num < trans->total) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
-
-            /* Save the success state and check if
-             * everyone is now done. */
-            success = trans->success;
-            trans->done++;
-            if (trans->done >= backend_num-trans->total)
-                proxy_cond_signal(&trans->cv);
-
-            proxy_mutex_unlock(&trans->cv_mutex);
-
-            needs_commit = TRUE;
-        }
-
-        /* If we are the master, then we added the transaction
-         * to the hashtable and must free it */
-        if (options.cloneable) {
-            proxy_mutex_destroy(&trans->cv_mutex);
-            proxy_cond_destroy(&trans->cv);
-            free(trans);
-        }
-    }
-    if (commit && options.two_pc) {
-        needs_commit = TRUE;
-        success = success && *(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1) ? TRUE : FALSE;
-    }
 
     /* If we need to commit, then check if transactions were successful and proceed accordingly */
     if (needs_commit) {
@@ -1450,8 +1475,6 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* Signify that we are done committing, and another clone operation may happen */
     (void) __sync_fetch_and_sub(&committing, 1);
-    if (query_trans_id)
-        proxy_debug("Done committing transaction %lu", query_trans_id);
 
     /* If query has zero results, then we can stop here */
     if (!success || net_field_length(&mysql->net.read_pos) == 0)
