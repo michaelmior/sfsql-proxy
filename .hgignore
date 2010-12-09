@@ -1,6 +1,10 @@
 # Source browsing tools
 ^(.*/)?tags$
 ^(.*/)?cscope.out$
+^(.*/)?GTAGS$
+^(.*/)?GSYMS$
+^(.*/)?GRTAGS$
+^(.*/)?GPATH$
 
 # File types
 .*\.o$
@@ -27,7 +31,7 @@ autom4te.cache/.*
 ^(.*/)?config\.guess$
 ^(.*/)?config\.status$
 ^(.*/)?config\.sub$
-^(.*/)?configure\.scan$
+^(.*/)?configure(\.scan)?$
 ^(.*/)?aclocal\.m4$
 ^(.*/)?stamp-h1$
 ^(.*/)?ltmain.sh$
