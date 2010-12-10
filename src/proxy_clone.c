@@ -155,7 +155,7 @@ void proxy_clone_notify() {
 #ifdef HAVE_LIBSF
 int proxy_do_clone(int nclones, char **err, int errlen) {
     sf_result *result;
-    char ticket[SF_TICKET_SIZE+1];
+    char ticket[SF_TICKET_SIZE+1], oldip[INET6_ADDRSTRLEN+1];
     int vmid = -1;
 
     if (req_clones) {
@@ -190,6 +190,9 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     ticket[SF_TICKET_SIZE] = '\0';
     proxy_log(LOG_INFO, "Received ticket %s for %d clones", result->ticket, result->rc.allowed_clones);
     FREE_SF_RES(result);
+
+    /* Save the old IP address */
+    strncpy(oldip, options.phost, INET6_ADDRSTRLEN);
     
     /* Clone from the ticket and check that the clone succeeded */
     result = CLONE_MASTER(ticket);
@@ -212,6 +215,15 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             } else {
                 server_id = vmid;
                 proxy_log(LOG_INFO, "I am clone %d", vmid);
+
+                /* Wait for IP reconfig */
+                proxy_options_update_host();
+                while (strncmp(options.phost, oldip, INET6_ADDRSTRLEN) == 0) {
+                    usleep(100);
+                    proxy_options_update_host();
+                }
+
+                proxy_debug("New clone IP is %s", options.phost);
             }
         }
     }

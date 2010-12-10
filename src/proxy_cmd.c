@@ -266,11 +266,6 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                 coordinator = new_coordinator;
                 mysql_close(old_coordinator);
 
-                /* Here we assume the host is listening on the correct IP address,
-                 * and not on all interfaces. We first update with the new IP,
-                 * the construct and send a query to the coordinator. */
-                proxy_options_update_host();
-
                 snprintf(buff, BUFSIZ, "PROXY ADD %d %s:%d;", server_id, options.phost, options.pport);
                 proxy_debug("Sending add query %s to coordinator", buff);
                 mysql_query((MYSQL*) coordinator, buff);
