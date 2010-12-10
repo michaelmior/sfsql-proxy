@@ -1399,6 +1399,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     my_ulonglong affected_rows=0;
     my_ulonglong insert_id=0;
     uint server_status=0, warnings=0;
+    int start_server_id = server_id;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1454,8 +1455,14 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* If this query is replicated, check if needs to be committed */
-    if (replicated && backend_check_commit(&needs_commit, mysql, query, &success, bi, commit))
+    if (replicated && backend_check_commit(&needs_commit, mysql, query, &success, bi, commit)) {
         return TRUE;
+    } else {
+        /* Check if we have been cloned, if so
+         * then we can discard query results */
+        if (server_id != start_server_id)
+            proxy = NULL;
+    }
 
     /* If we need to commit, then check if transactions were successful and proceed accordingly */
     if (needs_commit) {
