@@ -63,8 +63,8 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, stat
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
 
-static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, status_t *status);
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status);
+static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, my_bool replicated, status_t *status);
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, my_bool replicated, int bi, commitdata_t *commit, status_t *status);
 
 /* Data structure allocation functions */
 static void conn_free(proxy_backend_conn_t *conn);
@@ -962,7 +962,7 @@ void* proxy_backend_new_thread(void *ptr) {
 
         /* Send the query to the backend server */
         backend_query(thread->data.backend.conn, query->proxy,
-                      query->query, *(query->length),
+                      query->query, *(query->length), TRUE,
                       thread->data.backend.bi, thread->commit, thread->status);
 
         (void) __sync_fetch_and_sub(&querying, 1);
@@ -984,13 +984,15 @@ void* proxy_backend_new_thread(void *ptr) {
  *                       single backend.
  * @param query          A query string received from the client.
  * @param length         Length of the query string.
+ * @param replicated     TRUE if the query is replicated across servers,
+ *                       FALSE otherwise.
  * @param commit         Data required for synchronization and
  *                       two-phase commit.
  * @param[in,out] status Status information for the connection.
  *
  * @return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, commitdata_t *commit, status_t *status) {
+my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_bool replicated, commitdata_t *commit, status_t *status) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE;
@@ -1041,7 +1043,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
             if (backend_num > 1)
                 while (!backend_pools || !backend_pools[bi]) { bi = rand() % backend_num; }
 
-            if (backend_query_idx(bi, ci, proxy, query, length, status)) {
+            if (backend_query_idx(bi, ci, proxy, query, length, replicated, status)) {
                 error = TRUE;
                 goto out;
             }
@@ -1116,11 +1118,13 @@ out:
  * @param proxy          MYSQL object to forward results to.
  * @param query          Query string to execute.
  * @param length         Length of the query.
+ * @param replicated     TRUE if the query is replicated across servers,
+ *                       FALSE otherwise.
  * @param[in,out] status Status information for the connection.
  *
  * @return TRUE on error, FALSE otherwise.
  **/
-static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, status_t *status) {
+static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char *query, ulong length, my_bool replicated, status_t *status) {
     proxy_backend_conn_t *conn;
     my_bool error;
 
@@ -1131,7 +1135,7 @@ static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char
     proxy_vdebug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
 
     /*Send the query */
-    error = backend_query(conn, proxy, query, length, bi, NULL, status);
+    error = backend_query(conn, proxy, query, length, replicated, bi, NULL, status);
 
     if (!conn->freed && backend_pools)
         proxy_pool_return(backend_pools[bi], ci);
@@ -1379,6 +1383,8 @@ static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const c
  * @param proxy          MYSQL object to forward results to.
  * @param query          Query string to execute.
  * @param length         Length of the query.
+ * @param replicated     TRUE if the query is replicated across servers,
+ *                       FALSE otherwise.
  * @param bi             Index of the backend executing the query.
  * @param commit         Data required for synchronization
  *                       and two-phase commit.
@@ -1386,7 +1392,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const c
  *
  * @return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, int bi, commitdata_t *commit, status_t *status) {
+static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const char *query, ulong length, my_bool replicated, int bi, commitdata_t *commit, status_t *status) {
     my_bool error = FALSE, success = TRUE, needs_commit = FALSE;
     ulong pkt_len = 8, field_count;
     MYSQL *mysql;
@@ -1405,11 +1411,12 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* Send the query to the backend */
     proxy_vdebug("Sending query %s to backend %d", query, bi);
 
-    /* Add an ID if necessary */
-    if (!options.add_ids && !options.coordinator)
-        mysql_send_query(mysql, query, length);
-    else
+    /* If this is a replicated command and we are the coordinator,
+     * send the query with the COM_PROXY_QUERY command */
+    if (replicated && options.coordinator)
         simple_command(mysql, COM_PROXY_QUERY, (uchar*) query, length, 1);
+    else
+        mysql_send_query(mysql, query, length);
 
     /* Read the result header packet from the backend */
     pkt_len = backend_read_to_proxy(mysql, NULL, status);
@@ -1441,10 +1448,13 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* Signify that we are in commit phase and wait
      * for any outstanding cloning operations */
-    (void) __sync_fetch_and_add(&committing, 1);
-    while (cloning) { usleep(SYNC_SLEEP); }
+    if (replicated) {
+        (void) __sync_fetch_and_add(&committing, 1);
+        while (cloning) { usleep(SYNC_SLEEP); }
+    }
 
-    if (backend_check_commit(&needs_commit, mysql, query, &success, bi, commit))
+    /* If this query is replicated, check if needs to be committed */
+    if (replicated && backend_check_commit(&needs_commit, mysql, query, &success, bi, commit))
         return TRUE;
 
     /* If we need to commit, then check if transactions were successful and proceed accordingly */
@@ -1474,7 +1484,8 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     proxy_net_flush(proxy);
 
     /* Signify that we are done committing, and another clone operation may happen */
-    (void) __sync_fetch_and_sub(&committing, 1);
+    if (replicated)
+        (void) __sync_fetch_and_sub(&committing, 1);
 
     /* If query has zero results, then we can stop here */
     if (!success || net_field_length(&mysql->net.read_pos) == 0)

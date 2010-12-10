@@ -493,15 +493,16 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
 
     switch (command) {
         case COM_PROXY_QUERY:
-            /* We do nothing different here, except skip parsing of PROXY commands */
+            /* Here we skip parsing of proxy queries and also
+             * specify that this query has been replicated */
             status->queries++;
-            return proxy_backend_query(mysql, thread_id, packet, pkt_len, commit, status) ? ERROR_BACKEND : ERROR_OK;
+            return proxy_backend_query(mysql, thread_id, packet, pkt_len, TRUE, commit, status) ? ERROR_BACKEND : ERROR_OK;
         case COM_QUERY:
             status->queries++;
 
             if (strncasecmp(packet, PROXY_CMD, sizeof(PROXY_CMD)-1)) {
                 /* pass the query to the backend */
-                return proxy_backend_query(mysql, thread_id, packet, pkt_len, commit, status) ? ERROR_BACKEND : ERROR_OK;
+                return proxy_backend_query(mysql, thread_id, packet, pkt_len, FALSE, commit, status) ? ERROR_BACKEND : ERROR_OK;
             } else {
                 /* Execute the proxy command */
                 return proxy_cmd(mysql, packet + sizeof(PROXY_CMD)-1, pkt_len-sizeof(PROXY_CMD)+1, status) ? ERROR_CLIENT : ERROR_OK;
