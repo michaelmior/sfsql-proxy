@@ -164,7 +164,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     }
 
     /* Wait until any outstanding queries have committed */
-    while (committing) { usleep(100); }
+    while (committing) { usleep(SYNC_SLEEP); }
 
     cloning = 1;
     if (options.coordinator)
@@ -219,7 +219,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
                 /* Wait for IP reconfig */
                 proxy_options_update_host();
                 while (strncmp(options.phost, oldip, INET6_ADDRSTRLEN) == 0) {
-                    usleep(100);
+                    usleep(SYNC_SLEEP);
                     proxy_options_update_host();
                 }
 

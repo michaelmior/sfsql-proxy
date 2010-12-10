@@ -83,6 +83,9 @@ pool_t *thread_pool;
 #define TOSTRING(x) STRINGIFY(x)
 #define AT __FILE__ ":" TOSTRING(__LINE__)
 
+/** Time passed to usleep for synchronization */
+#define SYNC_SLEEP 100
+
 /**
  * Copied from client/sql_string.h since this
  * function is not included in the client library. */

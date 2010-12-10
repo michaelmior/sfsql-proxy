@@ -1016,8 +1016,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, com
 
     /* Spin until query can proceed */
     if (backend_pools)
-        while (!backend_pools[0]) { usleep(100); } /* XXX: should maybe lock here */
-    while (cloning) { usleep(100); }               /* Wait until cloning is done */
+        while (!backend_pools[0]) { usleep(SYNC_SLEEP); } /* XXX: should maybe lock here */
+    while (cloning) { usleep(SYNC_SLEEP); }               /* Wait until cloning is done */
 
     /* Add an identifier to the query if necessary */
     if (map == QUERY_MAP_ALL && options.add_ids)
@@ -1329,7 +1329,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const c
         } else {
             proxy_debug("Waiting for transaction %lu to appear in hashtable", query_trans_id);
             while (!(trans = proxy_trans_search(query_trans_id))
-                && clone_generation != start_generation) { usleep(100); }
+                && clone_generation != start_generation) { usleep(SYNC_SLEEP); }
         }
 
         /* Check if all clones failed and we rolled back a generation */
@@ -1442,7 +1442,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* Signify that we are in commit phase and wait
      * for any outstanding cloning operations */
     (void) __sync_fetch_and_add(&committing, 1);
-    while (cloning) { usleep(100); }
+    while (cloning) { usleep(SYNC_SLEEP); }
 
     if (backend_check_commit(&needs_commit, mysql, query, &success, bi, commit))
         return TRUE;

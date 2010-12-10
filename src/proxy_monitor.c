@@ -38,7 +38,7 @@ extern volatile sig_atomic_t run;
  **/
 static void* monitor_thread_start(__attribute__((unused)) void *ptr) {
     /* Wait for the server to be started */
-    while (!run) { usleep(100); }
+    while (!run) { usleep(SYNC_SLEEP); }
 
     /* Connect to the master */
     monitor_master_connect();

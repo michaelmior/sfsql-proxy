@@ -684,7 +684,7 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
         success ? "commit" : "rollback", commit_trans_id);
 
     /* Grab the transaction data from the hashtable, waiting if necessary */
-    while (!(trans = proxy_trans_search(commit_trans_id))) { usleep(100); }
+    while (!(trans = proxy_trans_search(commit_trans_id))) { usleep(SYNC_SLEEP); }
 
     proxy_debug("Found transaction %lu in hashtable for completion",
         commit_trans_id);
