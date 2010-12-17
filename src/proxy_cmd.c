@@ -640,9 +640,11 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
         if (proxy_trans_remove(transaction_id) != trans)
             proxy_log(LOG_ERROR, "Transaction %lu changed when removed from hashtable",
                 transaction_id);
-        free(trans);
 
         proxy_mutex_unlock(&trans->cv_mutex);
+        proxy_cond_destroy(&trans->cv);
+        proxy_mutex_destroy(&trans->cv_mutex);
+        free(trans);
     }
 
     proxy_mutex_unlock(&result_mutex);

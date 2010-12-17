@@ -91,7 +91,7 @@ my_bool proxy_clone_wait(int nclones) {
     wait_time.tv_nsec = tp.tv_usec * 1000;
 
     /* Wait for the clones */
-    proxy_log(LOG_INFO, "Waiting %ds for new clones", CLONE_TIMEOUT);
+    proxy_log(LOG_INFO, "Waiting %ds for %d new clones", CLONE_TIMEOUT, req_clones);
     proxy_mutex_lock(&new_mutex);
     while (new_clones < req_clones && !wait_errno)
         wait_errno = pthread_cond_timedwait(&new_cv, &new_mutex, &wait_time);

@@ -1026,6 +1026,11 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
         length += sprintf(query + length, "-- %lu",
             __sync_fetch_and_add(&transaction_id, 1));
 
+    /* If we are coordinating, base replication status
+     * on the query mapper */
+    if (options.coordinator)
+        replicated = (map == QUERY_MAP_ALL) ? TRUE : FALSE;
+
     /* Speed things up with only one backend
      * by avoiding synchronization */
     if (backend_num == 1)
@@ -1273,6 +1278,8 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
  *
  * @param[in,out] needs_commit  Pointer to a boolean which signals the
  *                              possible need to commit.
+ * @param start_server_id       Server ID at the start of query execution.
+ * @param start_generation      Clone generation ID at the start of query execution.
  * @param conn                  Connection where the query should be sent.
  * @param query                 Query string to execute.
  * @param[in,out] success       TRUE if the query was successful, FALSE otherwise.
@@ -1283,13 +1290,12 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
  *
  * @return TRUE on error, FALSE otherwise.
  **/
-static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const char *query, my_bool *success, int bi, commitdata_t *commit) {
-    int start_server_id = server_id, start_generation = clone_generation;
+static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, int start_generation, MYSQL *mysql, const char *query, my_bool *success, int bi, commitdata_t *commit) {
     proxy_trans_t *trans = NULL;
     ulong query_trans_id = 0;
 
     /* Wait for other backends to finish */
-    if (options.cloneable && server_id != start_server_id && options.two_pc) {
+    if (options.cloneable && server_id != start_server_id) {
         proxy_debug("Server ID changed after query execution from %d to %d",
             start_server_id, server_id);
         backend_clone_query_wait(*success, (char*) query, mysql);
@@ -1299,18 +1305,13 @@ static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const c
     }
 
     /* Check if all transactions succeeded and commit or rollback accordingly */
-    /* This currently assumes that queries requiring two-phase commit do not
-     * return any results, and thus have a single packet which has already
-     * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
-     * If this assumption breaks, subsequent queries will fail, although the
-     * client can then reconnect. */
-    if (!options.cloneable && clone_generation != start_generation) {
+    if (clone_generation != start_generation) {
         /* Get the query ID and wait for it to be available in the transaction hashtable */
         query_trans_id = id_from_query(query);
 
         proxy_debug("Cloning happened during query %lu, waiting", query_trans_id);
 
-        /* If we are the master, insert a new transaction into
+        /* If we are a clone, insert a new transaction into
          * the hashtable. Otherwise, we are the coordinator and
          * we wait until a transaction result command inserts
          * the transaction. */
@@ -1346,19 +1347,24 @@ static my_bool backend_check_commit(my_bool *needs_commit, MYSQL *mysql, const c
             proxy_mutex_lock(&trans->cv_mutex);
             while (trans->num < trans->total) { proxy_cond_wait(&trans->cv, &trans->cv_mutex); }
 
-            /* Save the success state and check if
-             * everyone is now done. */
+            /* Save the success state */
             *success = trans->success;
-            trans->done++;
-            if (trans->done >= backend_num-trans->total)
-                proxy_cond_signal(&trans->cv);
+
+            /* If we are the last thread to commit on the coordinator,
+             * we signal the thread handling the last result message
+             * that it can free the transaction from the hashtable */
+            if (options.coordinator) {
+                trans->done++;
+                if (trans->done >= backend_num-trans->total)
+                    proxy_cond_signal(&trans->cv);
+            }
 
             proxy_mutex_unlock(&trans->cv_mutex);
 
             *needs_commit = TRUE;
         }
 
-        /* If we are the master, then we added the transaction
+        /* If we are a clone, then we added the transaction
          * to the hashtable and must free it */
         if (options.cloneable) {
             proxy_mutex_destroy(&trans->cv_mutex);
@@ -1399,7 +1405,11 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     my_ulonglong affected_rows=0;
     my_ulonglong insert_id=0;
     uint server_status=0, warnings=0;
-    int start_server_id = server_id;
+    int start_server_id, start_generation;
+
+    /* Save cloning information to detect later changes */
+    start_server_id = (int) server_id;
+    start_generation = (int) clone_generation;
 
     /* Check for a valid MySQL object */
     mysql = conn->mysql;
@@ -1455,8 +1465,10 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* If this query is replicated, check if needs to be committed */
-    if (replicated && backend_check_commit(&needs_commit, mysql, query, &success, bi, commit)) {
-        return TRUE;
+    if (replicated && options.two_pc && (!options.cloneable || server_id != 0)) {
+        if (backend_check_commit(&needs_commit, start_server_id, start_generation,
+                mysql, query, &success, bi, commit))
+            return TRUE;
     } else {
         /* Check if we have been cloned, if so
          * then we can discard query results */
@@ -1465,12 +1477,17 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* If we need to commit, then check if transactions were successful and proceed accordingly */
+    /* This currently assumes that queries requiring two-phase commit do not
+     * return any results, and thus have a single packet which has already
+     * been consumed at this point. This holds for UPDATE, INSERT, and DELETE.
+     * If this assumption breaks, subsequent queries will fail, although the
+     * client can then reconnect. */
     if (needs_commit) {
         if (success) {
             if (proxy)
                 error = proxy_net_send_ok(proxy, warnings, affected_rows, insert_id);
 
-            proxy_vdebug("Commiting on backend %d", bi);
+            proxy_vdebug("Committing on backend %d", bi);
             mysql_real_query(mysql, "COMMIT", 6);
         } else {
             if (proxy)
