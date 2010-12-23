@@ -66,7 +66,7 @@ my_bool proxy_monitor_init() {
  * @return TRUE on error, FALSE otherwise.
  **/
 my_bool monitor_master_connect() {
-    char host[HOST_NAME_MAX+1], buff[BUFSIZ];
+    char buff[BUFSIZ];
 
     /* Open a MySQL connection to the master host */
     master = mysql_init(NULL);
@@ -87,13 +87,9 @@ my_bool monitor_master_connect() {
             return TRUE;
         }
 
-        if (gethostname(host, HOST_NAME_MAX+1)) {
-            proxy_log(LOG_ERROR, "Error getting host name to set coordinator");
-            return TRUE;
-        }
-
         /* Construct and send our hostname to the master */
-        snprintf(buff, BUFSIZ, "PROXY COORDINATOR %s:%d;", host, options.pport);
+        proxy_log(LOG_INFO, "Setting coordinator host to %s:%d on master", options.phost, options.pport);
+        snprintf(buff, BUFSIZ, "PROXY COORDINATOR %s:%d;", options.phost, options.pport);
         if (mysql_query(master, buff)) {
             proxy_log(LOG_ERROR, "Couldn't set coordinator on master host: %s", mysql_error(master));
             return TRUE;
