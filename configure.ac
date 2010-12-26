@@ -87,6 +87,8 @@ if test "$with_check" = "yes"; then
 fi
 
 # Configure SnowFlock
+SF_LIBS=""
+
 AC_ARG_WITH(snowflock,
     AS_HELP_STRING([--without-snowflock], [Disable support for the SnowFlock C API]),
     [], [with_snowflock=yes])
@@ -94,6 +96,7 @@ AC_ARG_WITH(snowflock,
 if test "$with_snowflock" = "yes"; then
     AC_CHECK_LIB([sf], [clone_master], [],
         [AC_MSG_ERROR([SnowFlock support requested, but library not found])])
+    SF_LIBS="-lsf"
 fi
 
 # Configure MySQL

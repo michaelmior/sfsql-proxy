@@ -15,7 +15,7 @@ sfsql_proxy_SOURCES = \
 	sql_string.c \
 	hashtable/hashtable.c
 sfsql_proxy_CFLAGS = $(MYSQL_CFLAGS) $(PTHREAD_CFLAGS) $(LTDLINCL) -DPKG_LIB_DIR="\"$(pkglibdir)\"" -I$(top_srcdir)
-sfsql_proxy_LDADD = $(MYSQL_LIBS) $(PTHREAD_LIBS) $(LIBLTDL) -lsf
+sfsql_proxy_LDADD = $(MYSQL_LIBS) $(PTHREAD_LIBS) $(LIBLTDL) $(SF_LIBS)
 sfsql_proxy_DEPENDENCIES = $(LTDLDEPS)
 
 noinst_HEADERS = \
