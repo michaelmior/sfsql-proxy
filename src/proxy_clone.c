@@ -217,11 +217,9 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
                 proxy_log(LOG_INFO, "I am clone %d", vmid);
 
                 /* Wait for IP reconfig */
-                proxy_options_update_host();
-                while (strncmp(options.phost, oldip, INET6_ADDRSTRLEN) == 0) {
-                    usleep(SYNC_SLEEP);
+                do {
                     proxy_options_update_host();
-                }
+                } while (strncmp(options.phost, oldip, INET6_ADDRSTRLEN) == 0);
 
                 proxy_log(LOG_INFO, "New clone IP is %s", options.phost);
             }
