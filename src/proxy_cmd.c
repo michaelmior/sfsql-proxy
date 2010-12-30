@@ -267,7 +267,7 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                 mysql_close(old_coordinator);
 
                 snprintf(buff, BUFSIZ, "PROXY ADD %d %s:%d;", server_id, options.phost, options.pport);
-                proxy_debug("Sending add query %s to coordinator", buff);
+                proxy_log(LOG_INFO, "Sending add query %s to coordinator", buff);
                 mysql_query((MYSQL*) coordinator, buff);
             } else {
                 proxy_log(LOG_ERROR, "Error reconnecting to coordinator: %s",

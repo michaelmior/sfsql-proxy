@@ -223,7 +223,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
                     proxy_options_update_host();
                 }
 
-                proxy_debug("New clone IP is %s", options.phost);
+                proxy_log(LOG_INFO, "New clone IP is %s", options.phost);
             }
         }
     }
