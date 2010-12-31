@@ -27,9 +27,10 @@ extern volatile sig_atomic_t clone_generation;
 
 void proxy_clone_init();
 void proxy_clone_end();
+my_bool proxy_clone_prepare(int nclones);
 int proxy_do_clone(int nclones, char **err, int errlen);
 void proxy_clone_complete();
-my_bool proxy_clone_wait(int nclones);
+my_bool proxy_clone_wait();
 void proxy_clone_notify();
 
 extern struct hashtable *clone_table;

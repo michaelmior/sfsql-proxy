@@ -288,6 +288,14 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             return TRUE;
         }
     } else if (options.coordinator) {
+        /* Wait until we can clone */
+        while (committing) { usleep(SYNC_SLEEP); }
+        cloning = 1;
+
+        /* Get ready and make sure no one else is cloning */
+        if (!proxy_clone_prepare(1))
+            return proxy_net_send_error(mysql, ER_CANT_LOCK, "Previous cloning operation not complete");
+
         /* Contact the master to perform cloning */
         proxy_log(LOG_INFO, "Requesting clone from master");
         mysql_query((MYSQL*) master, "PROXY CLONE;");
@@ -298,7 +306,12 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             (void) __sync_fetch_and_add(&clone_generation, 1);
             proxy_debug("Cloning successful, clone generation is %d", clone_generation);
 
-            if (proxy_clone_wait(1))
+            /* Wait for clones to finish */
+            ret = proxy_clone_wait();
+            cloning = 0;
+
+            /* Send result of cloning to clients */
+            if (ret)
                 return proxy_net_send_error(mysql, ER_LOCK_WAIT_TIMEOUT, "Error waiting for new clones");
             else
                 return proxy_net_send_ok(mysql, 0, 0, 0);

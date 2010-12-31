@@ -68,18 +68,13 @@ void proxy_clone_end() {
 /**
  * Wait for new clones to become live on the coordinator.
  *
- * @param nclones Number of clones to wait for.
- *
  * @return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_clone_wait(int nclones) {
+my_bool proxy_clone_wait() {
     struct timespec wait_time;
     struct timeval tp;
     int wait_errno = 0;
     my_bool error = FALSE;
-
-    req_clones = nclones;
-    new_clones = 0;
 
     /* Initialize locking */
     proxy_cond_init(&new_cv);
@@ -142,6 +137,24 @@ void proxy_clone_notify() {
 }
 
 /**
+ * Prepare to execute a cloning operation.
+ *
+ * @param nclones Number of clones which will be created.
+ *
+ * @return TRUE if ready to clone, FALSE otherwise.
+ **/
+my_bool proxy_clone_prepare(int nclones) {
+    if (req_clones) {
+        proxy_log(LOG_ERROR, "Previous cloning operation not yet complete");
+        return FALSE;
+    }
+
+    req_clones = nclones;
+    new_clones = 0;
+    return TRUE;
+}
+
+/**
  * Execute a cloning operation.
  *
  * @param nclones  Number of clones to create.
@@ -158,17 +171,12 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     char ticket[SF_TICKET_SIZE+1], oldip[INET6_ADDRSTRLEN+1];
     int vmid = -1;
 
-    if (req_clones) {
-        proxy_log(LOG_ERROR, "Previous cloning operation not yet complete");
+    if (!proxy_clone_prepare(nclones))
         return -1;
-    }
 
     /* Wait until any outstanding queries have committed */
     while (committing) { usleep(SYNC_SLEEP); }
-
     cloning = 1;
-    if (options.coordinator)
-        req_clones = nclones;
 
     /* Get a clone ticket and check its validity */
     proxy_log(LOG_INFO, "Requesting ticket for %d clones", nclones);
