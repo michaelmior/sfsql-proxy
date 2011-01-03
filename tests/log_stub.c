@@ -20,6 +20,7 @@
  *
  */
 
+#define my_bool int
 #include "../src/proxy_logging.h"
 
 void __wrap__proxy_log(

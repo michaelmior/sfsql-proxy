@@ -256,6 +256,10 @@ int main(int argc, char *argv[]) {
         goto out_free;
     }
 
+    /* Open the log file */
+    if (proxy_log_open())
+        goto out_free;
+
     /* Daemonize if necessary */
     if (options.daemonize) {
         if (daemon(1, 0)) {
@@ -264,9 +268,6 @@ int main(int argc, char *argv[]) {
             goto out_free;
         }
     }
-
-    /* Open the log file */
-    proxy_log_open();
 
     /* Write PID file */
     pid = getpid();

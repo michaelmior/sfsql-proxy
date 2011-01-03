@@ -25,15 +25,18 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-/** File object corresponding to log file descriptor */
-FILE *log_file = NULL;
+/** File object corresponding to info log file descriptor */
+static FILE *info_log = NULL;
+/** File object corresponding to error log file descriptor */
+static FILE *err_log  = NULL;
+
 /** Maximum level of messages to log */
 log_level_t log_level;
 
 /**
  * Open the log file.
  **/
-void proxy_log_open() {
+my_bool proxy_log_open() {
     /* Save the log level */
 #ifdef DEBUG
     log_level = LOG_DEBUG;
@@ -42,11 +45,22 @@ void proxy_log_open() {
 #endif
 
     /* Set the log file */
-    if (options.daemonize)
-        log_file = fopen(LOG_FILE, "w");
+    if (options.daemonize) {
+        info_log = fopen(LOG_FILE, "w");
+        err_log  = info_log;
 
-    if (!log_file)
-        log_file = stderr;
+        if (!info_log) {
+            fprintf(stderr, "Error opening log file %s\n", LOG_FILE);
+            return TRUE;
+        }
+    }
+
+    if (!info_log) {
+        info_log = stdout;
+        err_log  = stderr;
+    }
+
+    return FALSE;
 }
 
 /**
@@ -57,6 +71,7 @@ void proxy_log_open() {
  **/
 void _proxy_log(log_level_t level, const char *fmt, ...) {
     va_list arg;
+    FILE *log_file = (level == LOG_ERROR) ? err_log : info_log;
 
     /* Check if the message should be logged */
     if (level > log_level)
@@ -77,9 +92,16 @@ void _proxy_log(log_level_t level, const char *fmt, ...) {
  * Close the log file.
  **/
 void proxy_log_close() {
-    if (log_file) {
-        fflush(log_file);
-        fsync(fileno(log_file));
-        fclose(log_file);
+    /* Close both log files */
+#define CLOSE_LOG(log_file) \
+    if (log_file) { \
+        fflush(log_file); \
+        fsync(fileno(log_file)); \
+        fclose(log_file); \
     }
+
+    CLOSE_LOG(info_log);
+    CLOSE_LOG(err_log);
+
+#undef CLOSE_LOG
 }
