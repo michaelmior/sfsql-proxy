@@ -137,7 +137,7 @@ my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int th
 
         /* If a DB was specified, read it */
         if (db) {
-            db_buff[copy_and_convert(user_buff, sizeof(user_buff)-1,
+            db_buff[copy_and_convert(db_buff, sizeof(db_buff)-1,
                     system_charset_info, db, db_len, charset, &dummy_errors)] = '\0';
             db = db_buff;
         }
