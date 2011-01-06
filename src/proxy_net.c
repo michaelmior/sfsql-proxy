@@ -347,7 +347,7 @@ void* proxy_net_new_thread(void *ptr) {
 
         /* Update global statistics */
         (void) __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_sent);
-        (void) __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_recv);
+        (void) __sync_fetch_and_add(&global_status.bytes_recv, thread->status->bytes_recv);
         (void) __sync_fetch_and_add(&global_status.queries, thread->status->queries);
         thread->status->bytes_sent = 0;
         thread->status->bytes_recv = 0;
