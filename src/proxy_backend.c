@@ -1499,7 +1499,6 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             mysql_real_query(mysql, "ROLLBACK", 8);
         }
 
-        proxy_net_flush(proxy);
         return error;
     }
 
