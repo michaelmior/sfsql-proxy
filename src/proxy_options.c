@@ -286,8 +286,8 @@ int proxy_options_parse(int argc, char *argv[]) {
             return EX_NOINPUT;
         }
 
-        options.backend_threads = BACKEND_THREADS;
-        options.num_conns = NUM_CONNS;
+        options.backend_threads = options.backend_threads > 0 ? options.backend_threads : BACKEND_THREADS;
+        options.num_conns = options.num_conns > 0 ? options.num_conns : NUM_CONNS;
     } else {
         if ((options.backend_threads > 0 || options.num_conns > 0) && !options.coordinator) {
             fprintf(stderr, "Can't specify backend threads or connections with only one backend\n");
