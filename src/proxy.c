@@ -331,8 +331,7 @@ int main(int argc, char *argv[]) {
     global_status.queries = 0;
 
     /* Prepare monitoring */
-    if (options.coordinator)
-        proxy_monitor_init();
+    proxy_monitor_init();
 
     /* Set up transaction and cloning data */
     proxy_trans_init();

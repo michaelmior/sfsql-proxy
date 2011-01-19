@@ -37,12 +37,46 @@ extern volatile sig_atomic_t run;
  * @return NULL.
  **/
 static void* monitor_thread_start(__attribute__((unused)) void *ptr) {
+    FILE *stat_file;
+    struct timeval tv;
+
     /* Wait for the server to be started */
     while (!run) { usleep(SYNC_SLEEP); }
 
     /* Connect to the master */
-    monitor_master_connect();
+    if (options.coordinator)
+        monitor_master_connect();
 
+    /* Check if we are dumping QPS statistics and
+     * try to open the statistics file */
+    if (!options.stat_file)
+        goto out;
+
+    stat_file = fopen(options.stat_file, "w");
+    if (!stat_file) {
+        proxy_log(LOG_ERROR, "Error opening statistics file");
+        goto out;
+    }
+    proxy_log(LOG_INFO, "Statistics file %s opened for output", options.stat_file);
+
+    /* Loop while the proxy is running and dump
+     * total number of executed queries */
+    /* XXX: global_status is currently updated
+     *      only when a connection is killed,
+     *      so statistics will be stale if
+     *      connections are long-lived */
+    while (run) {
+        gettimeofday(&tv, NULL);
+        fprintf(stat_file, "%ld.%06ld,%ld\n", tv.tv_sec, tv.tv_usec, global_status.queries);
+#ifdef DEBUG
+        fflush(stat_file);
+        fsync(fileno(stat_file));
+#endif
+        sleep(1);
+    }
+    fclose(stat_file);
+
+out:
     mysql_thread_end();
     pthread_exit(NULL);
 }

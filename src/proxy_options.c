@@ -45,7 +45,8 @@ static void usage() {
 #endif
             "\t--daemonize,        -d\tDaemonize\n"
             "\t--coordinator,      -C\tProxy should act as coordinator\n"
-            "\t--cloneable,        -c\tProxy should execute cloning when signalled\n\n"
+            "\t--cloneable,        -c\tProxy should execute cloning when signalled\n"
+            "\t--stat-file         -q\tFile where statistics on queries per second should be dumped\n\n"
 
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
@@ -113,6 +114,7 @@ static void set_option_defaults() {
     options.daemonize       = FALSE;
     options.coordinator     = FALSE;
     options.cloneable       = FALSE;
+    options.stat_file       = NULL;
 
     options.num_conns       = -1;
     options.add_ids         = FALSE;
@@ -149,6 +151,7 @@ int proxy_options_parse(int argc, char *argv[]) {
         {"daemonize",       no_argument,       0, 'd'},
         {"coordinator",     no_argument,       0, 'C'},
         {"cloneable",       no_argument,       0, 'c'},
+        {"stat-file",       required_argument, 0, 'q'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
         {"bypass-port",     required_argument, 0, 'y'},
@@ -173,7 +176,7 @@ int proxy_options_parse(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?vdCch:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?vdCcq:h:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 usage();
@@ -189,6 +192,9 @@ int proxy_options_parse(int argc, char *argv[]) {
                 break;
             case 'c':
                 options.cloneable = TRUE;
+                break;
+            case 'q':
+                options.stat_file = optarg;
                 break;
             case 'h':
                 options.backend.host = optarg;

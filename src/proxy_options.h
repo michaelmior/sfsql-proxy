@@ -51,6 +51,8 @@ struct {
     my_bool coordinator;
     /** TRUE if this proxy is cloneable. */
     my_bool cloneable;
+    /** File name where query statistics are written. */
+    char *stat_file;
 
     /** Backend address info. */
     proxy_host_t backend;

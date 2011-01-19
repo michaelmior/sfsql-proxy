@@ -24,6 +24,7 @@
 
 #include <check.h>
 
+#define TEST_STAT_FILE       "qps.out"
 #define TEST_HOST            "127.0.0.2"
 #define TEST_PORT            "3307"
 #define TEST_BYPASS_PORT     "3306"
@@ -64,6 +65,7 @@ START_TEST (test_options_short) {
         "-d",
         "-C",
         "-c",
+        "-q" TEST_STAT_FILE,
         "-h" TEST_HOST,
         "-P" TEST_PORT,
         "-y" TEST_BYPASS_PORT,
@@ -85,6 +87,7 @@ START_TEST (test_options_short) {
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
+    fail_unless(strcmp(options.stat_file, TEST_STAT_FILE) == 0);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
@@ -108,6 +111,7 @@ START_TEST (test_options_long) {
         "--daemonize",
         "--coordinator",
         "--cloneable",
+        "--stat-file="       TEST_STAT_FILE,
         "--backend-host="    TEST_HOST,
         "--backend-port="    TEST_PORT,
         "--bypass-port="     TEST_BYPASS_PORT,
@@ -128,6 +132,7 @@ START_TEST (test_options_long) {
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
+    fail_unless(strcmp(options.stat_file, TEST_STAT_FILE) == 0);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
