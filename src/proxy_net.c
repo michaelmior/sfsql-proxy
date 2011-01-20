@@ -198,7 +198,7 @@ my_bool check_user(
         __attribute__((unused)) char *db,
         __attribute__((unused)) uint db_len) {
     /* XXX: Not doing auth. see sql/sql_connect.cc:check_user */
-    proxy_debug("Authentication request from user %s on database %s", user, db);
+    proxy_vdebug("Authentication request from user %s on database %s", user, db);
     return TRUE;
 }
 
@@ -261,7 +261,7 @@ MYSQL* client_init(int clientfd) {
 void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
 
-    proxy_debug("Called client_destroy on thread %d", thread->id);
+    proxy_vdebug("Called client_destroy on thread %d", thread->id);
 
     /* Clean up connection if still live */
     if (thread->data.work.proxy) {
@@ -333,7 +333,7 @@ void* proxy_net_new_thread(void *ptr) {
             proxy_cond_wait(&(thread->cv), &(thread->lock));
         proxy_mutex_unlock(&(thread->lock));
 
-        proxy_debug("Client thread %d signaled", thread->id);
+        proxy_vdebug("Client thread %d signaled", thread->id);
 
         /* Check if we have been signalled to exit */
         if (thread->exit)
@@ -463,8 +463,8 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
 
     /* Check if the connection is gone */
     if (polls[0].revents & POLLRDHUP) {
-        proxy_log(LOG_ERROR, "Lost connection to client");
-        return ERROR_CLIENT;
+        proxy_vdebug("Lost connection to client");
+        return ERROR_CLOSE;
     }
 
     if ((pkt_len = my_net_read(net)) == packet_error) {
