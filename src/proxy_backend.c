@@ -179,7 +179,11 @@ static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict 
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status) {
     uchar *cp;
     uint field;
-    ulong pkt_len = 8, len, total_len=0;
+    ulong pkt_len, len, total_len=0;
+
+    pkt_len = backend_read_to_proxy(backend, proxy, status);
+    if (pkt_len == packet_error)
+        return TRUE;
 
     /* Read until EOF (254) marker reached */
     while (*(cp = backend->net.read_pos) != 254 || pkt_len >= 8) {
@@ -189,6 +193,10 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, stat
             /* skip over size of field */
             if (len != NULL_LENGTH)
                 cp += len;
+
+            /* Malformed packet check */
+            if (len > pkt_len-1)
+                return TRUE;
         }
 
         /* Read and forward the row to the proxy */
