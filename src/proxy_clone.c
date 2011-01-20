@@ -170,6 +170,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     sf_result *result;
     char ticket[SF_TICKET_SIZE+1], oldip[INET6_ADDRSTRLEN+1];
     int vmid = -1;
+    time_t start, end;
 
     if (!proxy_clone_prepare(nclones))
         return -1;
@@ -177,6 +178,8 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     /* Wait until any outstanding queries have committed */
     while (committing) { usleep(SYNC_SLEEP); }
     cloning = 1;
+
+    time(&start);
 
     /* Get a clone ticket and check its validity */
     proxy_log(LOG_INFO, "Requesting ticket for %d clones", nclones);
@@ -217,9 +220,14 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             snprintf(*err, errlen, "Cloning produced zero clones");
             vmid = -1;
         } else {
+            time(&end);
+
             if (vmid == 0) {
                 (void) __sync_fetch_and_add(&clone_generation, 1);
-                proxy_log(LOG_INFO, "%d clones successfully created", result->rc.number_clones);
+
+                proxy_log(LOG_INFO, "%d clones successfully created in %.2fs",
+                    result->rc.number_clones,
+                    difftime(end, start));
             } else {
                 server_id = vmid;
                 proxy_log(LOG_INFO, "I am clone %d", vmid);
