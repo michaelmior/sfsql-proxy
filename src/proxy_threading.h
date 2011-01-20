@@ -68,6 +68,7 @@ pthread_key_t thread_buf_key;
 #define errstr strerror_r(errno, pthread_getspecific(thread_buf_key), BUFSIZ) ?: ""
 
 void proxy_threading_init();
+void proxy_threading_name(char *name);
 void proxy_threading_mask();
 void proxy_threading_end();
 void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);

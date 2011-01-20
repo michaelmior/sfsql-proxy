@@ -944,8 +944,12 @@ void proxy_backends_update() {
 void* proxy_backend_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     proxy_backend_query_t *query = &thread->data.backend.query;
+    char name[16];
 
     proxy_debug("Starting thread %d for backend %d", thread->id, thread->data.backend.bi);
+
+    snprintf(name, 16, "BE%d-%d", thread->id, thread->data.backend.bi);
+    proxy_threading_name(name);
 
     proxy_threading_mask();
     proxy_mutex_lock(&thread->lock);

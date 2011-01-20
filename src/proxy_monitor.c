@@ -40,6 +40,8 @@ static void* monitor_thread_start(__attribute__((unused)) void *ptr) {
     FILE *stat_file;
     struct timeval tv;
 
+    proxy_threading_name("Monitor");
+
     /* Wait for the server to be started */
     while (!run) { usleep(SYNC_SLEEP); }
 

@@ -311,12 +311,16 @@ void net_thread_destroy(void *ptr) {
 void* proxy_net_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     commitdata_t commit;
+    char name[16];
 
     /* Initialize status information for the connection */
     thread->status = (status_t*) malloc(sizeof(status_t));
     thread->status->bytes_sent = 0;
     thread->status->bytes_recv = 0;
     thread->status->queries = 0;
+
+    snprintf(name, 16, "Client%d", thread->id);
+    proxy_threading_name(name);
 
     proxy_threading_mask();
     pthread_cleanup_push(net_thread_destroy, ptr);

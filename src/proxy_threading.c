@@ -23,6 +23,7 @@
 #include "proxy.h"
 
 #include <signal.h>
+#include <sys/prctl.h>
 
 /** Signals which should be handled by the proxy */
 static int handle_sigs[] = { SIGINT, SIGUSR1, SIGUSR2 };
@@ -47,6 +48,15 @@ void proxy_threading_init() {
     pthread_mutexattr_init(&__proxy_mutexattr);
     pthread_mutexattr_settype(&__proxy_mutexattr, PTHREAD_MUTEX_ERRORCHECK);
 #endif
+}
+
+/**
+ * Give a name to a thread.
+ *
+ * @param name Name for the thread.
+ */
+void proxy_threading_name(char *name) {
+    prctl(PR_SET_NAME, name, NULL, NULL, NULL);
 }
 
 /*
