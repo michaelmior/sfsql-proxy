@@ -1084,16 +1084,16 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
 
                 proxy_mutex_lock(&(thread->lock));
 
-                bquery = &(thread->data.backend.query);
-                bquery->query = query;
+                bquery         = &(thread->data.backend.query);
+                bquery->query  = query;
                 bquery->length = &length;
-                bquery->proxy = (i == 0) ? proxy : NULL;
+                bquery->proxy  = (i == 0) ? proxy : NULL;
 
                 /* Set up commit data */
-                commit->backends = backend_num;
-                commit->results = &results;
-                commit->barrier = &query_barrier;
-                thread->commit = commit;
+                commit->backends  = backend_num;
+                commit->results   = &results;
+                commit->barrier   = &query_barrier;
+                thread->commit    = commit;
 
                 proxy_cond_signal(&thread->cv);
                 proxy_mutex_unlock(&thread->lock);
@@ -1104,6 +1104,10 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
 
             /* Free synchronization primitives */
             pthread_barrier_destroy(&query_barrier);
+
+            /* Wait for the final commit to be performed */
+            pthread_spin_lock(&commit->committed);
+            pthread_spin_unlock(&commit->committed);
 
             /* XXX: should do better at handling failures */
             for (i=0; i<backend_num; i++)
@@ -1478,6 +1482,11 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
     /* If this query is replicated, check if needs to be committed */
     if (replicated && options.two_pc && (!options.cloneable || server_id != 0)) {
+        /* Before we signal that we are done, if we are the
+         * one sending results, take the committed lock */
+        if (proxy && commit)
+            pthread_spin_lock(&commit->committed);
+
         if (backend_check_commit(&needs_commit, start_server_id, start_generation,
                 mysql, query, &success, bi, commit))
             return TRUE;
@@ -1510,6 +1519,10 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             proxy_vdebug("Rolling back on backend %d", bi);
             mysql_real_query(mysql, "ROLLBACK", 8);
         }
+
+        /* Specify that we have committed */
+        if (commit)
+            pthread_spin_unlock(&commit->committed);
 
         return error;
     }

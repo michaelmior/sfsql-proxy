@@ -296,6 +296,9 @@ void net_thread_destroy(void *ptr) {
     client_destroy(thread);
 
     /* Free any remaining resources */
+    pthread_spin_destroy(&thread->commit->committed);
+    thread->commit = NULL;
+
     mysql_thread_end();
     free(thread->status);
 }
@@ -312,6 +315,10 @@ void* proxy_net_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
     commitdata_t commit;
     char name[16];
+
+    /* Initialize commit data for this thread */
+    thread->commit = &commit;
+    pthread_spin_init(&commit.committed, PTHREAD_PROCESS_SHARED);
 
     /* Initialize status information for the connection */
     thread->status = (status_t*) malloc(sizeof(status_t));

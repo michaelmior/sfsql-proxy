@@ -48,6 +48,9 @@ typedef struct {
     int backends;
     /** Success array from various backends. */
     ulonglong *results;
+    /** Specifies when final results are committed
+     *  and the proxy can be released */
+    pthread_spinlock_t committed;
 } commitdata_t;
 
 /**
