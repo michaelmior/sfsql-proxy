@@ -42,6 +42,7 @@ void __wrap_proxy_threading_cleanup(
     __attribute__((unused)) int num,
     __attribute__((unused)) pool_t *pool) {}
 void __wrap_proxy_threading_mask() {}
+void __wrap_proxy_threading_name(__attribute__((unused)) char *name) {}
 
 /* Dummy network functions */
 my_bool __wrap_proxy_net_send_ok(

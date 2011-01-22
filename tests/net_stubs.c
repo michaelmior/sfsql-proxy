@@ -64,8 +64,9 @@ my_bool __wrap_proxy_backend_query(__attribute__((unused)) MYSQL *proxy, const c
 /* Don't need to touch the pool here */
 void __wrap_proxy_pool_return(__attribute__((unused)) pool_t *pool, __attribute__((unused)) int idx) {}
 
-/* No need for thread masking in tests */
+/* No need for threading in tests */
 void __wrap_proxy_threading_mask() {}
+void __wrap_proxy_threading_name(__attribute__((unused)) char *name) {}
 
 /* Use a fixed seed for tests */
 void __wrap_randominit(struct rand_struct *rand_st, __attribute__((unused)) ulong seed1, __attribute__((unused)) ulong seed2) {

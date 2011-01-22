@@ -20,6 +20,7 @@ check_net_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,proxy_pool_return \
     -Wl,--wrap,randominit \
 	-Wl,--wrap,proxy_threading_mask \
+	-Wl,--wrap,proxy_threading_name \
 	-Wl,--wrap,proxy_do_clone \
 	-Wl,--wrap,list_tickets \
 	-Wl,--wrap,read_ticket_info \
@@ -33,6 +34,7 @@ check_backend_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,proxy_threading_cancel \
 	-Wl,--wrap,proxy_threading_cleanup \
 	-Wl,--wrap,proxy_threading_mask \
+	-Wl,--wrap,proxy_threading_name \
 	-Wl,--wrap,proxy_net_send_ok \
 	-Wl,--wrap,proxy_net_send_error
 
