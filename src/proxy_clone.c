@@ -221,6 +221,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             vmid = -1;
         } else {
             time(&end);
+            new_clones = result->rc.number_clones;
 
             if (vmid == 0) {
                 (void) __sync_fetch_and_add(&clone_generation, 1);
@@ -261,5 +262,7 @@ int proxy_do_clone(
  * actions are complete and querying can now continue .
  **/
 void proxy_clone_complete() {
+    req_clones = 0;
+    new_clones = 0;
     cloning = 0;
 }
