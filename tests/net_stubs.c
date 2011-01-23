@@ -81,3 +81,4 @@ my_bool __wrap_proxy_cmd(
         __attribute__((unused)) char *query,
         __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) { return FALSE; }
+void __wrap_proxy_options_update_host() {}

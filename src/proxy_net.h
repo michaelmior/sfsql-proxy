@@ -57,6 +57,14 @@ typedef enum {
     ERROR_OTHER
 } conn_error_t;
 
+/** Union used to avoid aliasing warnings. */
+union sockaddr_union {
+    /** Standard socket structure. */
+    struct sockaddr sa;
+    /** Incoming socket structure. */
+    struct sockaddr_in sin;
+};
+
 /** Total number of connections. */
 long global_connections;
 /** Globally accumulated status. */
@@ -64,6 +72,7 @@ status_t global_status;
 /** Start time of the proxy server. */
 time_t proxy_start_time;
 
+int proxy_net_bind_new_socket(char *host, int port);
 my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
 conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status);

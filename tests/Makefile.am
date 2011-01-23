@@ -24,7 +24,8 @@ check_net_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,proxy_do_clone \
 	-Wl,--wrap,list_tickets \
 	-Wl,--wrap,read_ticket_info \
-	-Wl,--wrap,proxy_cmd
+	-Wl,--wrap,proxy_cmd \
+	-Wl,--wrap,proxy_options_update_host
 check_net_DEPENDENCIES = $(SRC_DIR)/proxy_net.c $(SRC_DIR)/proxy_net.h
 
 check_backend_SOURCES = check_backend.c $(SRC_DIR)/proxy_pool.c log_stub.c

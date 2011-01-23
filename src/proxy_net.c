@@ -26,6 +26,10 @@
 
 /** Minimum size of a handshake from a client (from sql/sql_connect.cc) */
 #define MIN_HANDSHAKE_SIZE 6
+/** Number of client connections waiting in
+ *  queue to be accepted when client threads
+ *  are all occupied. */
+#define QUEUE_LENGTH  10
 
 /** Exposes the default charset in the client library */
 extern CHARSET_INFO *default_charset_info;
@@ -39,6 +43,59 @@ void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
 static inline MYSQL* client_init(int clientfd);
 static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
+
+int proxy_net_bind_new_socket(char *host, int port) {
+    int serverfd;
+    union sockaddr_union serveraddr;
+    struct hostent *hostinfo;
+
+    serverfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    /* If we're debugging, allow reuse of the socket */
+#ifdef DEBUG
+    {
+        int optval = 1;
+        setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &optval, sizeof(int));
+    }
+#endif
+
+    /* Intialize the server address */
+    memset(&serveraddr, 0, sizeof(serveraddr));
+    serveraddr.sin.sin_family = AF_INET;
+
+    /* Set the binding address */
+    if (host) {
+        hostinfo = gethostbyname(host);
+        if (!hostinfo) {
+            proxy_log(LOG_ERROR, "Invalid binding address %s\n", host);
+            return -1;
+        } else {
+            serveraddr.sin.sin_addr = *(struct in_addr*) hostinfo->h_addr;
+        }
+    } else {
+        serveraddr.sin.sin_addr.s_addr = htonl(INADDR_ANY);
+    }
+
+    serveraddr.sin.sin_port = htons((unsigned short) port);
+
+    /* Bind the socket and start accepting connections */
+    if (bind(serverfd, &serveraddr.sa, sizeof(serveraddr)) < 0) {
+        proxy_log(LOG_ERROR, "Error binding server socket on port %d", port);
+        return -1;
+    }
+
+    /* Update the host address again if we are the
+     * master so it will contain the master's IP */
+    if (options.cloneable)
+        proxy_options_update_host();
+
+    if (listen(serverfd, QUEUE_LENGTH) < 0) {
+        proxy_log(LOG_ERROR, "Error listening on server socket: %s", errstr);
+        return -1;
+    }
+
+    return serverfd;
+}
 
 /**
  * Perform client authentication.

@@ -40,24 +40,12 @@
 
 #include "proxy.h"
 
-/** Number of client connections waiting in
- *  queue to be accepted when client threads
- *  are all occupied. */
-#define QUEUE_LENGTH  10
 /** File to store PID of proxy process */
 #define PID_FILE      "/var/run/sfsql-proxy.pid"
 
 volatile sig_atomic_t run = 0;
 /** PID of process which signaled to start cloning */
 pid_t signaller = -1;
-
-/** Union used to avoid aliasing warnings. */
-union sockaddr_union {
-    /** Standard socket structure. */
-    struct sockaddr sa;
-    /** Incoming socket structure. */
-    struct sockaddr_in sin;
-};
 
 static void server_run(char *host, int port);
 static inline void client_threads_start();
@@ -72,54 +60,12 @@ static void server_run(char *host, int port) {
     int serverfd, clientfd;
     fd_set fds;
     unsigned int clientlen;
-    union sockaddr_union serveraddr, clientaddr;
-    struct hostent *hostinfo;
+    union sockaddr_union clientaddr;
     proxy_thread_t *thread;
 
-    serverfd = socket(AF_INET, SOCK_STREAM, 0);
-
-    /* If we're debugging, allow reuse of the socket */
-#ifdef DEBUG
-    {
-        int optval = 1;
-        setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &optval, sizeof(int));
-    }
-#endif
-
-    /* Intialize the server address */
-    memset(&serveraddr, 0, sizeof(serveraddr));
-    serveraddr.sin.sin_family = AF_INET;
-
-    /* Set the binding address */
-    if (host) {
-        hostinfo = gethostbyname(host);
-        if (!hostinfo) {
-            proxy_log(LOG_ERROR, "Invalid binding address %s\n", host);
-            return;
-        } else {
-            serveraddr.sin.sin_addr = *(struct in_addr*) hostinfo->h_addr;
-        }
-    } else {
-        serveraddr.sin.sin_addr.s_addr = htonl(INADDR_ANY);
-    }
-
-    serveraddr.sin.sin_port = htons((unsigned short) port);
-
-    /* Bind the socket and start accepting connections */
-    if (bind(serverfd, &serveraddr.sa, sizeof(serveraddr)) < 0) {
-        proxy_log(LOG_ERROR, "Error binding server socket on port %d", port);
+    /* Create and bind a new socket */
+    if ((serverfd = proxy_net_bind_new_socket(host, port)) < 0)
         return;
-    }
-
-    /* Update the host address again if we are the
-     * master so it will contain the master's IP */
-    if (options.cloneable)
-        proxy_options_update_host();
-
-    if (listen(serverfd, QUEUE_LENGTH) < 0) {
-        proxy_log(LOG_ERROR, "Error listening on server socket: %s", errstr);
-        return;
-    }
 
     /* Server event loop */
     proxy_start_time = time(NULL);
