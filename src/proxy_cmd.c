@@ -772,3 +772,72 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
     /* No valid command was found */
     return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Unrecognized proxy command");
 }
+
+void* cmd_admin_new_thread(void *ptr) {
+    proxy_thread_t *thread = (proxy_thread_t*) ptr;
+
+    /* XXX: nothing is currently done with this status,
+     *      i.e. it is never merged into global_status.
+     *      Perhaps there should be separate admin stats */
+    status_t status;
+
+    proxy_net_client_do_work(&thread->data.work, thread->id, NULL, &status, TRUE);
+
+    free(thread);
+    pthread_exit(NULL);
+}
+
+void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
+    int serverfd, clientfd;
+    fd_set fds;
+    unsigned int clientlen;
+    union sockaddr_union clientaddr;
+    extern int run;
+    pthread_attr_t attr;
+    proxy_thread_t *thread;
+    int thread_id = 0;
+
+    proxy_threading_name("Admin");
+    proxy_threading_mask();
+
+    /* Bind the admin socket */
+    proxy_log(LOG_INFO, "Opening admin socket on 0.0.0.0:%d", options.admin_port);
+    if ((serverfd = proxy_net_bind_new_socket(NULL, options.admin_port)) < 0)
+        goto out;
+
+    /* Initialize thread attributes */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    /* Wait for the server to start */
+    while (!run) { usleep(SYNC_SLEEP); }
+
+    /* Admin connections event loop */
+    while (run) {
+        FD_ZERO(&fds);
+        FD_SET(serverfd, &fds);
+
+        if (select(FD_SETSIZE, &fds, NULL, NULL, NULL) != 1)
+            continue;
+
+        clientfd = accept(serverfd, &clientaddr.sa, &clientlen);
+        if (clientfd < 0) {
+            if (errno != EINTR)
+                proxy_log(LOG_ERROR, "Error accepting admin connection: %s", errstr);
+            continue;
+        }
+
+        /* Set up thread data and create the thread */
+        thread = (proxy_thread_t*) malloc(sizeof(proxy_thread_t));
+        thread->exit = 0;
+        thread->data.work.clientfd = clientfd;
+        thread->data.work.addr = &clientaddr.sin;
+        thread->data.work.proxy = NULL;
+        thread->id = thread_id++;
+
+        pthread_create(&thread->thread, &attr, cmd_admin_new_thread, (void*) thread);
+    }
+
+out:
+    pthread_exit(NULL);
+}

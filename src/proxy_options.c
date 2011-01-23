@@ -46,7 +46,8 @@ static void usage() {
             "\t--daemonize,        -d\tDaemonize\n"
             "\t--coordinator,      -C\tProxy should act as coordinator\n"
             "\t--cloneable,        -c\tProxy should execute cloning when signalled\n"
-            "\t--stat-file         -q\tFile where statistics on queries per second should be dumped\n\n"
+            "\t--stat-file,        -q\tFile where statistics on queries per second should be dumped\n"
+            "\t--admin-port,       -A\tBinding port for admin connections which can only execute PROXY commands\n\n"
 
             "Backend options:\n"
             "\t--backend-host,    -h\tHost to forward queries to (default: 127.0.0.1)\n"
@@ -115,6 +116,7 @@ static void set_option_defaults() {
     options.coordinator     = FALSE;
     options.cloneable       = FALSE;
     options.stat_file       = NULL;
+    options.admin_port      = ADMIN_PORT;
 
     options.num_conns       = -1;
     options.add_ids         = FALSE;
@@ -152,6 +154,7 @@ int proxy_options_parse(int argc, char *argv[]) {
         {"coordinator",     no_argument,       0, 'C'},
         {"cloneable",       no_argument,       0, 'c'},
         {"stat-file",       required_argument, 0, 'q'},
+        {"admin-port",      required_argument, 0, 'A'},
         {"backend-host",    required_argument, 0, 'h'},
         {"backend-port",    required_argument, 0, 'P'},
         {"bypass-port",     required_argument, 0, 'y'},
@@ -176,7 +179,7 @@ int proxy_options_parse(int argc, char *argv[]) {
     set_option_defaults();
 
     /* Parse command-line options */
-    while((c = getopt_long(argc, argv, "?vdCcq:h:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
+    while((c = getopt_long(argc, argv, "?vdCcq:A:h:P:y:s::n:D:u:p:f:N:i2aAb:I:L:m:t:T:", long_options, &opt)) != -1) {
         switch(c) {
             case '?':
                 usage();
@@ -195,6 +198,9 @@ int proxy_options_parse(int argc, char *argv[]) {
                 break;
             case 'q':
                 options.stat_file = optarg;
+                break;
+            case 'A':
+                options.admin_port = atoi(optarg);
                 break;
             case 'h':
                 options.backend.host = optarg;

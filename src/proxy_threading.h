@@ -17,19 +17,6 @@
 #include "proxy.h"
 
 /**
- * All information needed by threads
- * to connect to clients and begin working.
- **/
-typedef struct {
-    /** Socket descriptor of client. */
-    int clientfd;
-    /** Address of client endpoint. */
-    struct sockaddr_in *addr;
-    /** MySQL object initialized for client. */
-    MYSQL *proxy;
-} proxy_work_t;
-
-/**
  * Data structures needed for thread pool
  * implementation and signaling of new work.
  **/

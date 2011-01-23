@@ -124,8 +124,8 @@ my_bool monitor_master_connect() {
         }
 
         /* Construct and send our hostname to the master */
-        proxy_log(LOG_INFO, "Setting coordinator host to %s:%d on master", options.phost, options.pport);
-        snprintf(buff, BUFSIZ, "PROXY COORDINATOR %s:%d;", options.phost, options.pport);
+        proxy_log(LOG_INFO, "Setting coordinator host to %s:%d on master", options.phost, options.admin_port);
+        snprintf(buff, BUFSIZ, "PROXY COORDINATOR %s:%d;", options.phost, options.admin_port);
         if (mysql_query(master, buff)) {
             proxy_log(LOG_ERROR, "Couldn't set coordinator on master host: %s", mysql_error(master));
             return TRUE;

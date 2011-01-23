@@ -189,6 +189,8 @@ int main(int argc, char *argv[]) {
     pid_t pid;
     my_bool wrote_pid = FALSE;
     char *buf;
+    pthread_attr_t attr;
+    pthread_t admin_thread;
 
     /* Parse command-lne options */
     ret = proxy_options_parse(argc, argv);
@@ -282,6 +284,11 @@ int main(int argc, char *argv[]) {
     /* Set up transaction and cloning data */
     proxy_trans_init();
     proxy_clone_init();
+
+    /* Start admin thread */
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_create(&admin_thread, &attr, proxy_cmd_admin_start, NULL);
 
     /* Start proxying */
     proxy_log(LOG_INFO, "Starting proxy on %s:%d",

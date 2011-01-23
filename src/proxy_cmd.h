@@ -13,5 +13,6 @@
 #define _proxy_cmd_h
 
 my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status);
+void* proxy_cmd_admin_start(void *ptr);
 
 #endif /* _proxy_cmd_h */

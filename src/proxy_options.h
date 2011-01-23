@@ -35,6 +35,8 @@
 #define PROXY_IFACE     "eth0"
 /** Default port to listen on for incoming connections. */
 #define PROXY_PORT      4040
+/** Default port to listen on for admin connections. */
+#define ADMIN_PORT      4041
 /** Default number of threads started to do client work. */
 #define CLIENT_THREADS  10
 /** Default seconds to wait before disconnecting client. */
@@ -53,6 +55,8 @@ struct {
     my_bool cloneable;
     /** File name where query statistics are written. */
     char *stat_file;
+    /** Admin port to listen on. */
+    int admin_port;
 
     /** Backend address info. */
     proxy_host_t backend;

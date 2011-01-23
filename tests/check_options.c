@@ -35,7 +35,8 @@
 #define TEST_NUM_CONNS       "5"
 #define TEST_PROXY_IFACE     "lo"
 #define TEST_PROXY_HOST      "127.0.0.3"
-#define TEST_PROXY_PORT      "4041"
+#define TEST_PROXY_PORT      "3040"
+#define TEST_ADMIN_PORT      "3041"
 #define TEST_MAPPER          "dummy"
 #define TEST_CLIENT_THREADS  "5"
 #define TEST_CLIENT_TIMEOUT  "600"
@@ -52,6 +53,7 @@ START_TEST (test_options_test) {
     fail_unless(atoi(TEST_NUM_CONNS) != NUM_CONNS);
     fail_unless(TEST_PROXY_HOST != NULL);
     fail_unless(atoi(TEST_PROXY_PORT) != PROXY_PORT);
+    fail_unless(atoi(TEST_ADMIN_PORT) != ADMIN_PORT);
     fail_unless(atoi(TEST_CLIENT_TIMEOUT) != CLIENT_TIMEOUT);
     fail_unless(TEST_MAPPER != NULL);
     fail_unless(atoi(TEST_CLIENT_THREADS) != CLIENT_THREADS);
@@ -66,6 +68,7 @@ START_TEST (test_options_short) {
         "-C",
         "-c",
         "-q" TEST_STAT_FILE,
+        "-A" TEST_ADMIN_PORT,
         "-h" TEST_HOST,
         "-P" TEST_PORT,
         "-y" TEST_BYPASS_PORT,
@@ -88,6 +91,7 @@ START_TEST (test_options_short) {
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
     fail_unless(strcmp(options.stat_file, TEST_STAT_FILE) == 0);
+    fail_unless(options.admin_port == atoi(TEST_ADMIN_PORT));
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
@@ -112,6 +116,7 @@ START_TEST (test_options_long) {
         "--coordinator",
         "--cloneable",
         "--stat-file="       TEST_STAT_FILE,
+        "--admin-port="      TEST_ADMIN_PORT,
         "--backend-host="    TEST_HOST,
         "--backend-port="    TEST_PORT,
         "--bypass-port="     TEST_BYPASS_PORT,
@@ -133,6 +138,7 @@ START_TEST (test_options_long) {
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
     fail_unless(strcmp(options.stat_file, TEST_STAT_FILE) == 0);
+    fail_unless(options.admin_port == atoi(TEST_ADMIN_PORT));
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
@@ -158,6 +164,7 @@ START_TEST (test_options_defaults) {
     fail_unless(!options.daemonize);
     fail_unless(!options.coordinator);
     fail_unless(!options.cloneable);
+    fail_unless(options.admin_port == ADMIN_PORT);
     fail_unless(!options.add_ids);
     fail_unless(!options.two_pc);
     fail_unless(options.autocommit);

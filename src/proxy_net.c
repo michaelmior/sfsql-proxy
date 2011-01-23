@@ -38,7 +38,6 @@ CHARSET_INFO *system_charset_info = &my_charset_utf8_general_ci;
 ulong transaction_id = 1;
 
 /* Definitions of functions to deal with client connections */
-void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status);
 void client_destroy(proxy_thread_t *thread);
 void net_thread_destroy(void *ptr);
 static inline MYSQL* client_init(int clientfd);
@@ -409,7 +408,7 @@ void* proxy_net_new_thread(void *ptr) {
 
         /* Handle client requests */
         (void) __sync_fetch_and_add(&global_connections, 1);
-        client_do_work(&thread->data.work, thread->id, &commit, thread->status);
+        proxy_net_client_do_work(&thread->data.work, thread->id, &commit, thread->status, FALSE);
         client_destroy(thread);
         thread->data.work.addr = NULL;
 
@@ -439,9 +438,11 @@ void* proxy_net_new_thread(void *ptr) {
  *                          the request.
  * @param commit            Information required to commit which is
  *                          passed to the backend.
+ * @param proxy_only        TRUE if only PROXY commands are allowed
+ *                          on this connection, FALSE otherwise.
  * @param[in,out] status    Status information for the connection.
  **/
-void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status) {
+void proxy_net_client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only) {
     int error;
 
     if (unlikely(!work))
@@ -456,8 +457,12 @@ void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, sta
         return;
 
     /* from sql/sql_connect.cc:handle_one_connection */
-    while (!work->proxy->net.error && work->proxy->net.vio != 0 && !net_threads[thread_id].exit) {
-        error = proxy_net_read_query(work->proxy, thread_id, commit, status);
+    /* XXX: Removing this check now that this function
+     *      also handle admin threads. We need to properly
+     *      check for thread exit in both cases and reinsert
+     *      this condition: !net_threads[thread_id].exit */
+    while (!work->proxy->net.error && work->proxy->net.vio != 0) {
+        error = proxy_net_read_query(work->proxy, thread_id, commit, status, proxy_only);
 
         /* One more flush the write buffer to make
          * sure client has everything */
@@ -496,12 +501,14 @@ void client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, sta
  *                       issuing the query.
  * @param commit         Information required to commit 
  *                       which is passed to the backend.
+ * @param proxy_only        TRUE if only PROXY commands are allowed
+ *                          on this connection, FALSE otherwise.
  * @param[in,out] status Status information for the connection.
  *
  * @return Positive to disconnect without error, negative
  *         for errors, 0 to keep going.
  **/
-conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status) {
+conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only) {
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -569,8 +576,12 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
             status->queries++;
 
             if (strncasecmp(packet, PROXY_CMD, sizeof(PROXY_CMD)-1)) {
-                /* pass the query to the backend */
-                return proxy_backend_query(mysql, thread_id, packet, pkt_len, FALSE, commit, status) ? ERROR_BACKEND : ERROR_OK;
+                if (proxy_only) {
+                    return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only PROXY commands may be executed on this connection");
+                } else {
+                    /* pass the query to the backend */
+                    return proxy_backend_query(mysql, thread_id, packet, pkt_len, FALSE, commit, status) ? ERROR_BACKEND : ERROR_OK;
+                }
             } else {
                 /* Execute the proxy command */
                 return proxy_cmd(mysql, packet + sizeof(PROXY_CMD)-1, pkt_len-sizeof(PROXY_CMD)+1, status) ? ERROR_CLIENT : ERROR_OK;

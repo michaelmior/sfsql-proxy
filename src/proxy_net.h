@@ -42,6 +42,19 @@ MYSQL *master;
 #define COM_PROXY_QUERY COM_END+1
 
 /**
+ * All information needed by threads
+ * to connect to clients and begin working.
+ **/
+typedef struct {
+    /** Socket descriptor of client. */
+    int clientfd;
+    /** Address of client endpoint. */
+    struct sockaddr_in *addr;
+    /** MySQL object initialized for client. */
+    MYSQL *proxy;
+} proxy_work_t;
+
+/**
  * Type of error on connection.
  **/
 typedef enum {
@@ -72,10 +85,11 @@ status_t global_status;
 /** Start time of the proxy server. */
 time_t proxy_start_time;
 
+void proxy_net_client_do_work(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only);
 int proxy_net_bind_new_socket(char *host, int port);
 my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
-conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status);
+conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only);
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
 void proxy_net_send_eof(MYSQL *mysql, status_t *status);
