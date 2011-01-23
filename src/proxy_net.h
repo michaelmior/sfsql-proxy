@@ -32,7 +32,9 @@
 /** Current transaction identifier */
 extern ulong transaction_id;
 /** Host which coordinates transactions between clones */
-volatile MYSQL *coordinator;
+MYSQL *coordinator;
+/** Spinlock for synchronizing access to the coordinator */
+pthread_spinlock_t coordinator_lock;
 /** Master hosts which handles cloning */
 MYSQL *master;
 

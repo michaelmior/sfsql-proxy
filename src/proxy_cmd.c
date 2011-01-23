@@ -472,11 +472,16 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
         } else {
             proxy_log(LOG_INFO, "Coordinator successfully changed to %s:%d", host ?: ip, port);
 
+            pthread_spin_lock(&coordinator_lock);
+
             /* Swap to the new coordinator */
             old_coordinator = (MYSQL*) coordinator;
             coordinator = new_coordinator;
             if (old_coordinator)
                 mysql_close(old_coordinator);
+
+            pthread_spin_unlock(&coordinator_lock);
+
             return proxy_net_send_ok(mysql, 0, 0, 0);
         }
     } else {

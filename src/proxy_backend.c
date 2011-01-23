@@ -56,9 +56,6 @@ volatile sig_atomic_t querying   = 0;
 /** Signify that a backend is currently in commit phase */
 volatile sig_atomic_t committing = 0;
 
-volatile MYSQL *coordinator = NULL;
-MYSQL *master = NULL;
-
 static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, status_t *status);
 static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict proxy, ulong pkt_len, status_t *status);
 static ulong backend_read_to_proxy(MYSQL* __restrict backend, MYSQL* __restrict proxy, status_t *status);
@@ -225,6 +222,11 @@ static my_bool backend_read_rows(MYSQL *backend, MYSQL *proxy, uint fields, stat
  **/
 my_bool proxy_backend_init() {
     char buf[BUFSIZ], *err;
+
+    /* Initialize admin connection objects */
+    pthread_spin_init(&coordinator_lock, PTHREAD_PROCESS_PRIVATE);
+    coordinator = NULL;
+    master = NULL;
 
     /* Load the query mapper */
     if (options.mapper != NULL) {
@@ -1237,6 +1239,8 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
         return;
     }
 
+    pthread_spin_lock(&coordinator_lock);
+
     snprintf(buff, BUFSIZ, "PROXY %s %d %lu;", success ? "SUCCESS" : "FAILURE", server_id, clone_trans_id);
     proxy_debug("Sending status message %s to coordinator", buff);
     mysql_query((MYSQL*) coordinator, buff);
@@ -1245,6 +1249,9 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
     if ((sql_errno = mysql_errno((MYSQL*) coordinator)))
         proxy_log(LOG_ERROR, "Error notifying coordinator about status of transaction %lu: %s",
                 clone_trans_id, mysql_error((MYSQL*) coordinator));
+
+    pthread_spin_unlock(&coordinator_lock);
+
     if (sql_errno) {
         mysql_real_query(mysql, "ROLLBACK", 8);
         return;
