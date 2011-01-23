@@ -245,7 +245,7 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             for (i=0; i<5; i++) {
                 error = FALSE;
 
-                proxy_debug("Attempt %d at reconnecting to coordinator", i);
+                proxy_log(LOG_INFO, "Attempt %d at reconnecting to coordinator", i);
                 if (!mysql_real_connect(new_coordinator, coordinator->host,
                         options.user, options.pass,
                         NULL, coordinator->port, NULL, 0)) {
@@ -288,6 +288,8 @@ static my_bool net_clone(MYSQL *mysql, char *query,
             return TRUE;
         }
     } else if (options.coordinator) {
+        proxy_log(LOG_INFO, "Received clone command, waiting for queries in commit phase");
+
         /* Wait until we can clone */
         cloning = 1;
         while (committing) { usleep(SYNC_SLEEP); }
