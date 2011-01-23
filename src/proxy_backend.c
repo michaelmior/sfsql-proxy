@@ -1476,8 +1476,8 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     /* Signify that we are in commit phase and wait
      * for any outstanding cloning operations */
     if (replicated) {
-        (void) __sync_fetch_and_add(&committing, 1);
         while (cloning) { usleep(SYNC_SLEEP); }
+        (void) __sync_fetch_and_add(&committing, 1);
     }
 
     /* If this query is replicated, check if needs to be committed */

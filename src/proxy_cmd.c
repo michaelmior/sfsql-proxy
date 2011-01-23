@@ -289,8 +289,8 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         }
     } else if (options.coordinator) {
         /* Wait until we can clone */
-        while (committing) { usleep(SYNC_SLEEP); }
         cloning = 1;
+        while (committing) { usleep(SYNC_SLEEP); }
 
         /* Get ready and make sure no one else is cloning */
         if (!proxy_clone_prepare(1))

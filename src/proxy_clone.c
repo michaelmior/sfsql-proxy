@@ -176,8 +176,8 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
         return -1;
 
     /* Wait until any outstanding queries have committed */
-    while (committing) { usleep(SYNC_SLEEP); }
     cloning = 1;
+    while (committing) { usleep(SYNC_SLEEP); }
 
     time(&start);
 
