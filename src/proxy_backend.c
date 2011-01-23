@@ -1432,7 +1432,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     if (unlikely(!mysql)) {
         proxy_log(LOG_ERROR, "Query with uninitialized MySQL object");
         error = TRUE;
-        goto out;
+        goto out_pre;
     }
 
     /* Send the query to the backend */
@@ -1467,14 +1467,18 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
         if (commit && commit->barrier)
             pthread_barrier_wait(commit->barrier);
 
-        goto out;
+        goto out_pre;
     }
 
     /* Check the success of the transaction */
     success = (mysql->net.read_pos[0] != 0xFF) ? TRUE : FALSE;
 
     /* Signify that we are in commit phase and wait
-     * for any outstanding cloning operations */
+     * for any outstanding cloning operations.
+     * We must be careful that any exit from the function
+     * after this point does not return without first
+     * decrementing committing or else we won't be able
+     * to clone later. */
     if (replicated) {
         while (cloning) { usleep(SYNC_SLEEP); }
         (void) __sync_fetch_and_add(&committing, 1);
@@ -1488,8 +1492,10 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
             pthread_spin_lock(&commit->committed);
 
         if (backend_check_commit(&needs_commit, start_server_id, start_generation,
-                mysql, query, &success, bi, commit))
-            return TRUE;
+                mysql, query, &success, bi, commit)) {
+            error = TRUE;
+            goto out;
+        }
     } else {
         /* Check if we have been cloned, if so
          * then we can discard query results */
@@ -1524,16 +1530,12 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
         if (commit)
             pthread_spin_unlock(&commit->committed);
 
-        return error;
+        goto out;
     }
 
     /* Flush the write buffer */
     error = backend_proxy_write(mysql, proxy, pkt_len, status);
     proxy_net_flush(proxy);
-
-    /* Signify that we are done committing, and another clone operation may happen */
-    if (replicated)
-        (void) __sync_fetch_and_sub(&committing, 1);
 
     /* If query has zero results, then we can stop here */
     if (!success || net_field_length(&mysql->net.read_pos) == 0)
@@ -1559,6 +1561,11 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
 out:
+    /* Signify that we are done committing, and another clone operation may happen */
+    if (replicated)
+        (void) __sync_fetch_and_sub(&committing, 1);
+
+out_pre:
     /* Free connection resources if necessary */
     if (conn->freed)
         conn_free(conn);
