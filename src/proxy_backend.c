@@ -1684,8 +1684,12 @@ void proxy_backend_close() {
     /* Close any open administrative connections */
     if (master)
         mysql_close(master);
+
+    pthread_spin_lock(&coordinator_lock);
     if (coordinator)
         mysql_close((MYSQL*) coordinator);
+    pthread_spin_unlock(&coordinator_lock);
+    pthread_spin_destroy(&coordinator_lock);
 
     /* Destroy add mutex */
     proxy_mutex_destroy(&add_mutex);

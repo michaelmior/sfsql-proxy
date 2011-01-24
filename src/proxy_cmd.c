@@ -262,6 +262,8 @@ static my_bool net_clone(MYSQL *mysql, char *query,
 
             /* Switch coordinators and construct the query */
             if (!error) {
+                pthread_spin_lock(&coordinator_lock);
+
                 old_coordinator = (MYSQL*) coordinator;
                 coordinator = new_coordinator;
                 mysql_close(old_coordinator);
@@ -269,14 +271,13 @@ static my_bool net_clone(MYSQL *mysql, char *query,
                 snprintf(buff, BUFSIZ, "PROXY ADD %d %s:%d;", server_id, options.phost, options.pport);
                 proxy_log(LOG_INFO, "Sending add query %s to coordinator", buff);
                 mysql_query((MYSQL*) coordinator, buff);
+
+                pthread_spin_unlock(&coordinator_lock);
             } else {
                 proxy_log(LOG_ERROR, "Error reconnecting to coordinator: %s",
                     mysql_error(new_coordinator));
 
-                /* Close the old coordinator and signify that the new
-                 * coordinator could not be contacted */
-                mysql_close((MYSQL*) coordinator);
-                coordinator = NULL;
+                /* The old coordinator may not be any good any more, but we keep it around */
 
                 return TRUE;
             }
@@ -496,7 +497,10 @@ static my_bool net_proxy_coordinator(MYSQL *mysql, char *t, status_t *status) {
 
         /* Send the coordinator name */
         pos = buff1;
+
+        pthread_spin_lock(&coordinator_lock);
         size = snprintf((char*) buff2, BUFSIZ, "%s:%d", coordinator->host, coordinator->port);
+        pthread_spin_unlock(&coordinator_lock);
 
         /* Check that the name has been successfully stored and send */
         if (size <= 0)
