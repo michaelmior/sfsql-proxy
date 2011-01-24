@@ -57,6 +57,8 @@ struct {
     char *stat_file;
     /** Admin port to listen on. */
     int admin_port;
+    /** Wait for all replicated queries before cloning. */
+    my_bool query_wait;
 
     /** Backend address info. */
     proxy_host_t backend;

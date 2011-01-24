@@ -69,6 +69,7 @@ START_TEST (test_options_short) {
         "-c",
         "-q" TEST_STAT_FILE,
         "-A" TEST_ADMIN_PORT,
+        "-w",
         "-h" TEST_HOST,
         "-P" TEST_PORT,
         "-y" TEST_BYPASS_PORT,
@@ -92,6 +93,7 @@ START_TEST (test_options_short) {
     fail_unless(options.cloneable);
     fail_unless(strcmp(options.stat_file, TEST_STAT_FILE) == 0);
     fail_unless(options.admin_port == atoi(TEST_ADMIN_PORT));
+    fail_unless(options.query_wait);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
@@ -117,6 +119,7 @@ START_TEST (test_options_long) {
         "--cloneable",
         "--stat-file="       TEST_STAT_FILE,
         "--admin-port="      TEST_ADMIN_PORT,
+        "--query-wait",
         "--backend-host="    TEST_HOST,
         "--backend-port="    TEST_PORT,
         "--bypass-port="     TEST_BYPASS_PORT,
@@ -139,6 +142,7 @@ START_TEST (test_options_long) {
     fail_unless(options.cloneable);
     fail_unless(strcmp(options.stat_file, TEST_STAT_FILE) == 0);
     fail_unless(options.admin_port == atoi(TEST_ADMIN_PORT));
+    fail_unless(options.query_wait);
     fail_unless(strcmp(options.backend.host, TEST_HOST) == 0);
     fail_unless(options.backend.port == atoi(TEST_PORT));
     fail_unless(options.bypass_port == atoi(TEST_BYPASS_PORT));
@@ -165,6 +169,7 @@ START_TEST (test_options_defaults) {
     fail_unless(!options.coordinator);
     fail_unless(!options.cloneable);
     fail_unless(options.admin_port == ADMIN_PORT);
+    fail_unless(!options.query_wait);
     fail_unless(!options.add_ids);
     fail_unless(!options.two_pc);
     fail_unless(options.autocommit);

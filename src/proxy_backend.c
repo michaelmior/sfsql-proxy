@@ -972,14 +972,10 @@ void* proxy_backend_new_thread(void *ptr) {
             break;
         }
 
-        (void) __sync_fetch_and_add(&querying, 1);
-
         /* Send the query to the backend server */
         backend_query(thread->data.backend.conn, query->proxy,
                       query->query, *(query->length), TRUE,
                       thread->data.backend.bi, thread->commit, thread->status);
-
-        (void) __sync_fetch_and_sub(&querying, 1);
 
         /* Signify thread availability */
         query->query = NULL;
@@ -1074,6 +1070,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
 
         case QUERY_MAP_ALL:
             /* Send a query to the other backends and keep only the first result */
+            (void) __sync_fetch_and_add(&querying, 1);
 
             /* Set up synchronization */
             pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
@@ -1123,6 +1120,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
                     /* XXX should print a message if failure is not a malformed query */
                     //proxy_log(LOG_ERROR, "Failure for query on backend %d\n", i);
                 }
+
+            (void) __sync_fetch_and_sub(&querying, 1);
 
             break;
 

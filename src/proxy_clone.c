@@ -180,6 +180,10 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     __sync_synchronize();
     while (committing) { usleep(SYNC_SLEEP); }
 
+    /* If we need to wait for queries to complete, do so */
+    if (options.query_wait)
+        while (querying) { usleep(SYNC_SLEEP); }
+
     time(&start);
 
     /* Get a clone ticket and check its validity */
