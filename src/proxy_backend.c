@@ -1494,10 +1494,22 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     if (replicated) {
         /* If some other backend has already started to commit,
          * we need to go ahead as well to avoid deadlock */
-        if (commit && __sync_lock_test_and_set(&commit->committing, 1))
+        if (commit && !commit->committing)
             while (cloning) { usleep(SYNC_SLEEP); }
 
+        __sync_synchronize();
         (void) __sync_fetch_and_add(&committing, 1);
+
+        /* XXX: This is a hack, but ensures that if
+         *      cloning managed to sneak by the above
+         *      op, then we won't go ahead and commit
+         *      just yet. */
+        while (cloning) { usleep(SYNC_SLEEP); }
+
+        if (commit) {
+            __sync_synchronize();
+            commit->committing = 1;
+        }
     }
 
     /* If this query is replicated, check if needs to be committed */
