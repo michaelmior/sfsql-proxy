@@ -1033,12 +1033,16 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
     /* Spin until query can proceed */
     if (backend_pools)
         while (!backend_pools[0]) { usleep(SYNC_SLEEP); } /* XXX: should maybe lock here */
-    while (cloning) { usleep(SYNC_SLEEP); }               /* Wait until cloning is done */
 
     /* Add an identifier to the query if necessary */
-    if (map == QUERY_MAP_ALL && options.add_ids)
-        length += sprintf(query + length, "-- %lu",
-            __sync_fetch_and_add(&transaction_id, 1));
+    if (map == QUERY_MAP_ALL) {
+        /* Wait until cloning is done */
+        while (cloning) { usleep(SYNC_SLEEP); }
+
+        if (options.add_ids)
+            length += sprintf(query + length, "-- %lu",
+                __sync_fetch_and_add(&transaction_id, 1));
+    }
 
     /* If we are coordinating, base replication status
      * on the query mapper */
