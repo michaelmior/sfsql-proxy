@@ -1092,10 +1092,11 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
                 bquery->proxy  = (i == 0) ? proxy : NULL;
 
                 /* Set up commit data */
-                commit->backends  = backend_num;
-                commit->results   = &results;
-                commit->barrier   = &query_barrier;
-                thread->commit    = commit;
+                commit->backends   = backend_num;
+                commit->results    = &results;
+                commit->barrier    = &query_barrier;
+                commit->committing = 0;
+                thread->commit     = commit;
 
                 proxy_cond_signal(&thread->cv);
                 proxy_mutex_unlock(&thread->lock);
@@ -1487,7 +1488,11 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
      * decrementing committing or else we won't be able
      * to clone later. */
     if (replicated) {
-        while (cloning) { usleep(SYNC_SLEEP); }
+        /* If some other backend has already started to commit,
+         * we need to go ahead as well to avoid deadlock */
+        if (commit && __sync_lock_test_and_set(&commit->committing, 1))
+            while (cloning) { usleep(SYNC_SLEEP); }
+
         (void) __sync_fetch_and_add(&committing, 1);
     }
 

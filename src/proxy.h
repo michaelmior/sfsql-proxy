@@ -51,6 +51,9 @@ typedef struct {
     /** Specifies when final results are committed
      *  and the proxy can be released */
     pthread_spinlock_t committed;
+    /** Signifies that at least one backend
+     *  has begun to commit this transaction. */
+    volatile sig_atomic_t committing;
 } commitdata_t;
 
 /**
