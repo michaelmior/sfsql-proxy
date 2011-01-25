@@ -169,7 +169,7 @@ my_bool proxy_clone_prepare(int nclones) {
 int proxy_do_clone(int nclones, char **err, int errlen) {
     sf_result *result;
     char ticket[SF_TICKET_SIZE+1], oldip[INET6_ADDRSTRLEN+1];
-    int vmid = -1;
+    int vmid = -1, i;
     time_t start, end;
 
     if (!proxy_clone_prepare(nclones))
@@ -237,6 +237,11 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             } else {
                 server_id = vmid;
                 proxy_log(LOG_INFO, "I am clone %d", vmid);
+
+                /* Force a return from poll so old connections
+                 * with the load balancer will drop */
+                for (i=0; i<options.client_threads; i++)
+                    pthread_kill(net_threads[i].thread, SIGPOLL);
 
                 /* Wait for IP reconfig */
                 do {
