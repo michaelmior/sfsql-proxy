@@ -643,7 +643,8 @@ static inline void backends_new_connect(proxy_backend_conn_t ***conns, pool_t **
  * @param bi    Index of backend to connect to.
  **/
 static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, int bi) {
-    int ci;
+    int ci, i;
+    my_bool error;
 
     if (!conns[bi]) {
         proxy_log(LOG_INFO, "Connecting to new backend %d\n", bi);
@@ -651,7 +652,18 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
 
         for (ci=0; ci<options.num_conns; ci++) {
             conns[bi][ci] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
-            backend_connect(backends[bi], conns[bi][ci], TRUE);
+
+            /* Try a few times to connect */
+            for (i=0; i<10; i++) {
+                proxy_debug("Connection attempt %d on backend %d", i, bi);
+                if (!(error = backend_connect(backends[bi], conns[bi][ci], TRUE)))
+                    break;
+
+                usleep(SYNC_SLEEP);
+            }
+
+            if (error)
+                proxy_log(LOG_ERROR, "Failed to connect to new backend %d", bi);
         }
     }
 
@@ -753,6 +765,7 @@ my_bool proxy_backend_clone_complete(int *clone_ids, int nclones, ulong clone_tr
 
                 proxy_debug("Found matching backend %d, sending query %s on connection %d",
                     bi, query, ci);
+                while (!mysql) { usleep(SYNC_SLEEP); }
                 mysql_real_query(mysql, query, query_len);
 
                 if (mysql_errno(mysql))
