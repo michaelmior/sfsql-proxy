@@ -782,7 +782,14 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
     return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Unrecognized proxy command");
 }
 
-void* cmd_admin_new_thread(void *ptr) {
+/**
+ * Start a thread to handle clients which are connected
+ * to the administrative port.
+ *
+ * @param ptr :proxy_thread_t object for this thread.
+ * @return NULL.
+ **/
+static void* cmd_admin_new_thread(void *ptr) {
     proxy_thread_t *thread = (proxy_thread_t*) ptr;
 
     /* XXX: nothing is currently done with this status,
@@ -793,9 +800,18 @@ void* cmd_admin_new_thread(void *ptr) {
     proxy_net_client_do_work(&thread->data.work, thread->id, NULL, &status, TRUE);
 
     free(thread);
+    mysql_thread_end();
     pthread_exit(NULL);
 }
 
+/**
+ * Start a thread for handling administrative connections
+ * which can only execute PROXY commands.
+ *
+ * @param ptr Ignored.
+ *
+ * @return NULL.
+ **/
 void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
     int serverfd, clientfd;
     fd_set fds;
@@ -815,8 +831,11 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
         goto out;
 
     /* Initialize thread attributes */
+    /* XXX: We currently leave these threads detached. We really
+     *      should save the thread IDs so we can be sure that
+     *      they are killed when we shut down. */
     pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
     /* Wait for the server to start */
     while (!run) { usleep(SYNC_SLEEP); }
