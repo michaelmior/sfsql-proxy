@@ -93,6 +93,10 @@ void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool) {
     int i;
 
     for (i=0; i<num; i++) {
+        /* We've already shut down this thread */
+        if (threads[i].exit)
+            continue;
+
         threads[i].exit = 1;
 
         /* Make sure worker threads release their mutex */
@@ -122,15 +126,15 @@ void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool) {
     int i;
 
     /* Join all threads */
-    for (i=0; i<num; i++) {
-        pthread_join(threads[i].thread, NULL);
-
-        proxy_cond_destroy(&threads[i].cv);
-        proxy_mutex_destroy(&threads[i].lock);
-    }
-
-    /* Free extra memory */
     if (threads) {
+        for (i=0; i<num; i++) {
+            pthread_join(threads[i].thread, NULL);
+
+            proxy_cond_destroy(&threads[i].cv);
+            proxy_mutex_destroy(&threads[i].lock);
+        }
+
+        /* Free extra memory */
         free(threads);
         threads = NULL;
     }

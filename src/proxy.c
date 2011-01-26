@@ -117,7 +117,6 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
             /* Cancel running threads */
             for (i=0; i<options.client_threads; i++)
                 pthread_kill(net_threads[i].thread, SIGPOLL);
-            proxy_threading_cancel(net_threads, options.client_threads, thread_pool);
 
             break;
 
