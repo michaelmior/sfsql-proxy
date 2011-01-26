@@ -37,7 +37,7 @@ static void add_row(MYSQL *mysql, uchar *buff, char *name, long value, status_t 
 static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *status);
 
 /** Mutex for locking transaction results so we can safely make insertions into the hashtable */
-static pthread_mutex_t result_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t result_mutex;
 
 /* taken from sql/protocol.cc */
 static uchar *net_store_data(uchar *to, const uchar *from, size_t length) {
@@ -821,6 +821,11 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
     pthread_attr_t attr;
     proxy_thread_t *thread;
     int thread_id = 0;
+
+    /* Initialize the result mutex. Since it isn't
+     * used until after cloning, this should be a
+     * safe place to do this. */
+    proxy_mutex_init(&result_mutex);
 
     proxy_threading_name("Admin");
     proxy_threading_mask();
