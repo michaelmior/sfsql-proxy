@@ -294,6 +294,11 @@ int main(int argc, char *argv[]) {
         options.phost[0] != '\0' ? options.phost : "0.0.0.0", options.pport);
     server_run(options.phost[0] != '\0' ? options.phost : NULL, options.pport);
 
+    /* Kill the admin thread */
+    pthread_kill(admin_thread, SIGPOLL);
+    pthread_join(admin_thread, NULL);
+    pthread_attr_destroy(&attr);
+
     /* Shutdown */
 out:
     proxy_log(LOG_INFO, "Shutting down...");
@@ -305,6 +310,7 @@ out:
     proxy_backend_close();
     proxy_trans_end();
     proxy_clone_end();
+    proxy_monitor_end();
     mysql_library_end();
     proxy_threading_end();
 

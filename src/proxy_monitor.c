@@ -29,6 +29,9 @@ static void *monitor_thread_start(void *ptr);
 
 extern volatile sig_atomic_t run;
 
+/** Thread identifier of the monitor thread */
+static pthread_t monitor_thread;
+
 /**
  * Monitor thread function.
  *
@@ -89,10 +92,17 @@ out:
  * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_monitor_init() {
-    pthread_t monitor_thread;
     pthread_create(&monitor_thread, NULL, monitor_thread_start, NULL);
 
     return FALSE;
+}
+
+/**
+ * Shutdown monitoring.
+ **/
+void proxy_monitor_end() {
+    /* Wait for the monitor thread to exit */
+    pthread_join(monitor_thread, NULL);
 }
 
 /**

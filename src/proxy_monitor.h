@@ -15,5 +15,6 @@
 #define _proxy_monitor_h
 
 my_bool proxy_monitor_init();
+void proxy_monitor_end();
 
 #endif /* _proxy_monitor_h */

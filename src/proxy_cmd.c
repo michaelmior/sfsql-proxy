@@ -871,6 +871,7 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
         pthread_create(&thread->thread, &attr, cmd_admin_new_thread, (void*) thread);
     }
 
+    pthread_attr_destroy(&attr);
 out:
     pthread_exit(NULL);
 }
