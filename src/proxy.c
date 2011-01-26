@@ -59,7 +59,7 @@ static inline void client_threads_start();
 static void server_run(char *host, int port) {
     int serverfd, clientfd;
     fd_set fds;
-    unsigned int clientlen;
+    socklen_t clientlen;
     union sockaddr_union clientaddr;
     proxy_thread_t *thread;
 

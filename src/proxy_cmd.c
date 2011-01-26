@@ -815,8 +815,8 @@ static void* cmd_admin_new_thread(void *ptr) {
 void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
     int serverfd, clientfd;
     fd_set fds;
-    unsigned int clientlen;
     union sockaddr_union clientaddr;
+    socklen_t clientlen = sizeof(clientaddr);
     extern int run;
     pthread_attr_t attr;
     proxy_thread_t *thread;
