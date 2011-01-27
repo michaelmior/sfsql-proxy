@@ -423,6 +423,7 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
     if (!ret) {
         proxy_log(LOG_ERROR, "Failed to connect to MySQL backend: %s",
                 mysql_error(mysql));
+        mysql_close(mysql);
         return TRUE;
     }
 
