@@ -95,7 +95,7 @@ out:
  * @return TRUE on error, FALSE otherwise.
  **/
 my_bool proxy_monitor_init() {
-    if (!pthread_create(&monitor_thread, NULL, monitor_thread_start, NULL))
+    if (!proxy_threading_create(&monitor_thread, NULL, monitor_thread_start, NULL))
         monitor_started = TRUE;
 
     return !monitor_started;

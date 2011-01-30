@@ -868,7 +868,7 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
         thread->data.work.proxy = NULL;
         thread->id = thread_id++;
 
-        pthread_create(&thread->thread, &attr, cmd_admin_new_thread, (void*) thread);
+        proxy_threading_create(&thread->thread, &attr, cmd_admin_new_thread, (void*) thread);
     }
 
     pthread_attr_destroy(&attr);

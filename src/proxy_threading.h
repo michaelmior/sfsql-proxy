@@ -16,6 +16,8 @@
 
 #include "proxy.h"
 
+#define STACK_SIZE 65536
+
 /**
  * Data structures needed for thread pool
  * implementation and signaling of new work.
@@ -60,6 +62,24 @@ void proxy_threading_mask();
 void proxy_threading_end();
 void proxy_threading_cancel(proxy_thread_t *threads, int num, pool_t *pool);
 void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);
+
+/**
+ * Wrapper for pthread_create so we can set any additional thread attributes.
+ *
+ * @param[out] thread   Location to store pthreads thread ID.
+ * @param attr          Thread-specific attributes.
+ * @param start_routine Function to execute in the new thread.
+ * @param arg           Parameter passed to start_routine.
+ *
+ * @return int          Same as pthread_create.
+ **/
+inline int proxy_threading_create(pthread_t *restrict thread, pthread_attr_t *restrict attr,
+        void *(*start_routine)(void*), void *restrict arg) {
+    if (attr)
+        pthread_attr_setstacksize(attr, STACK_SIZE);
+
+    return pthread_create(thread, attr, start_routine, arg);
+}
 
 /* Debugging macros for catching errors on mutexes and condition variables*/
 

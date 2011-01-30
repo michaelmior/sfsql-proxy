@@ -177,7 +177,7 @@ static inline void client_threads_start() {
         net_threads[i].data.work.addr = NULL;
         net_threads[i].data.work.proxy = NULL;
 
-        pthread_create(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
+        proxy_threading_create(&net_threads[i].thread, &attr, proxy_net_new_thread, (void*) &net_threads[i]);
     }
 }
 
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
     /* Start admin thread */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-    pthread_create(&admin_thread, &attr, proxy_cmd_admin_start, NULL);
+    proxy_threading_create(&admin_thread, &attr, proxy_cmd_admin_start, NULL);
 
     /* Start proxying */
     proxy_log(LOG_INFO, "Starting proxy on %s:%d",
