@@ -264,7 +264,8 @@ START_TEST (test_options_coordinator) {
     char *argv[] = { "./sfsql-proxy",
         "-C",
         "-N" TEST_NUM_CONNS,
-        "-T" TEST_BACKEND_THREADS };
+        "-T" TEST_BACKEND_THREADS,
+        "-m" TEST_MAPPER };
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 } END_TEST;
@@ -274,7 +275,8 @@ START_TEST (test_options_file_short) {
     char *argv[] = { "./sfsql-proxy",
         "-f" TESTS_DIR "backend/backends.txt",
         "-N" TEST_NUM_CONNS,
-        "-T" TEST_BACKEND_THREADS };
+        "-T" TEST_BACKEND_THREADS,
+        "-m" TEST_MAPPER };
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
@@ -287,7 +289,8 @@ START_TEST (test_options_file_long) {
     char *argv[] = { "./sfsql-proxy",
         "-f" TESTS_DIR "backend/backends.txt",
         "--num-conns="       TEST_NUM_CONNS,
-        "--backend-threads=" TEST_BACKEND_THREADS };
+        "--backend-threads=" TEST_BACKEND_THREADS,
+        "-m" TEST_MAPPER };
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
@@ -297,7 +300,9 @@ START_TEST (test_options_file_long) {
 
 /** @test Default parameters only valid when file specified */
 START_TEST (test_options_file_default) {
-    char *argv[] = { "./sfsql-proxy", "-f" TESTS_DIR "backend/backends.txt" };
+    char *argv[] = { "./sfsql-proxy",
+        "-f" TESTS_DIR "backend/backends.txt",
+        "-m" TEST_MAPPER };
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 

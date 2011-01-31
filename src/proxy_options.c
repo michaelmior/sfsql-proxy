@@ -294,6 +294,11 @@ int proxy_options_parse(int argc, char *argv[]) {
     options.pass = options.pass ?: BACKEND_PASS;
     options.db   = options.db   ?: BACKEND_DB;
 
+    if (!options.mapper && options.backend_threads > 0) {
+        fprintf(stderr, "Cannot specify number of backend threads with no query mapper\n");
+        return EX_USAGE;
+    }
+
     /* If a file was specified, make sure no other host options were used */
     if (options.backend_file) {
         if (options.backend.host || options.backend.port || options.socket_file) {

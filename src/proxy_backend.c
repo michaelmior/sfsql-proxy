@@ -324,6 +324,12 @@ static my_bool backends_alloc(int num_backends)  {
     for (i=0; i<num_backends; i++)
         backend_pools[i] = proxy_pool_new(options.num_conns);
 
+    /* If we have no mapper, we have no need for
+     * backend threads and assume we can send
+     * data anywhere */
+    if (!options.mapper)
+        return FALSE;
+
     /* Create a thread pool */
     if (!backend_thread_pool) {
         backend_thread_pool = (pool_t**) calloc(backend_num, sizeof(pool_t*));
@@ -592,6 +598,10 @@ my_bool proxy_backends_connect() {
             if (backend_connect(backends[i], backend_conns[i][j], TRUE))
                 return TRUE;
         }
+
+        /* Skip backend thread connections */
+        if (!options.mapper)
+            continue;
 
         for (j=0; j<options.backend_threads; j++) {
             if (backend_connect(backends[i], backend_threads[i][j].data.backend.conn, FALSE))
