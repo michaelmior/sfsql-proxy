@@ -593,7 +593,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
             return proxy_net_send_ok(mysql, 0, 0, 0) ? ERROR_CLIENT : ERROR_OK;
         case COM_INIT_DB:
             /* XXX: using a single DB for now */
-            proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only a single database is supported by " PACKAGE_NAME);
+            return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only a single database is supported by " PACKAGE_NAME);
 
         /* Commands below not implemented */
         case COM_REGISTER_SLAVE:
