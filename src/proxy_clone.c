@@ -72,7 +72,8 @@ void proxy_clone_end() {
  **/
 my_bool proxy_clone_wait() {
     struct timespec wait_time;
-    struct timeval tp;
+    struct timeval start, end;
+    double time;
     int wait_errno = 0;
     my_bool error = FALSE;
 
@@ -81,9 +82,9 @@ my_bool proxy_clone_wait() {
     proxy_mutex_init(&new_mutex);
 
     /* Prepare time for waiting */
-    gettimeofday(&tp, NULL);
-    wait_time.tv_sec  = tp.tv_sec + CLONE_TIMEOUT;
-    wait_time.tv_nsec = tp.tv_usec * 1000;
+    gettimeofday(&start, NULL);
+    wait_time.tv_sec  = start.tv_sec + CLONE_TIMEOUT;
+    wait_time.tv_nsec = start.tv_usec * 1000;
 
     /* Wait for the clones */
     proxy_log(LOG_INFO, "Waiting %ds for %d new clones", CLONE_TIMEOUT, req_clones);
@@ -91,7 +92,9 @@ my_bool proxy_clone_wait() {
     while (new_clones < req_clones && !wait_errno)
         wait_errno = pthread_cond_timedwait(&new_cv, &new_mutex, &wait_time);
 
-    proxy_debug("After waiting for clones, got %d/%d", new_clones, req_clones);
+    gettimeofday(&end, NULL);
+    time = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0f;
+    proxy_debug("After waiting %.3fs for clones, got %d/%d", time, new_clones, req_clones);
 
     /* Check if we timed out waiting */
     if (wait_errno == ETIMEDOUT) {
@@ -170,7 +173,8 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     sf_result *result;
     char ticket[SF_TICKET_SIZE+1], oldip[INET6_ADDRSTRLEN+1];
     int vmid = -1, i;
-    time_t start, end;
+    struct timeval start, end;
+    double time;
 
     if (!proxy_clone_prepare(nclones))
         return -1;
@@ -184,7 +188,7 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
     if (options.query_wait)
         while (querying) { usleep(SYNC_SLEEP); }
 
-    time(&start);
+    gettimeofday(&start, NULL);
 
     /* Get a clone ticket and check its validity */
     proxy_log(LOG_INFO, "Requesting ticket for %d clones", nclones);
@@ -225,15 +229,16 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
             snprintf(*err, errlen, "Cloning produced zero clones");
             vmid = -1;
         } else {
-            time(&end);
+            gettimeofday(&end, NULL);
             new_clones = result->rc.number_clones;
 
             if (vmid == 0) {
                 (void) __sync_fetch_and_add(&clone_generation, 1);
 
-                proxy_log(LOG_INFO, "%d clones successfully created in %.2fs",
+                time = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0f;
+                proxy_log(LOG_INFO, "%d clones successfully created in %.3fs",
                     result->rc.number_clones,
-                    difftime(end, start));
+                    time);
             } else {
                 server_id = vmid;
                 proxy_log(LOG_INFO, "I am clone %d", vmid);
