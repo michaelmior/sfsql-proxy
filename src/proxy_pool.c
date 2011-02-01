@@ -39,6 +39,8 @@ pool_t* proxy_pool_new(int size) {
     if (size <= 0)
         return NULL;
 
+    srand(time(NULL));
+
     new_pool = (pool_t *) malloc(sizeof(pool_t));
 
     /* Allocate memory for the lock pool */
@@ -157,16 +159,19 @@ void proxy_pool_remove(pool_t *pool, int idx) {
  * @return Index of an available item, or negative if no items are available.
  **/
 static int pool_try_locks(pool_t *pool) {
-    int i;
+    int i, pi;
 
     pthread_mutex_lock(&pool->lock);
 
     /* Check availability of items in the pool */
+    pi = rand() % pool->size;
     for (i=0; i<pool->size; i++) {
-        if (pool->avail[i]) {
-            pool->avail[i] = FALSE;
+        pi = (pi + 1) % pool->size;
+
+        if (pool->avail[pi]) {
+            pool->avail[pi] = FALSE;
             pthread_mutex_unlock(&pool->lock);
-            return i;
+            return pi;
         }
     }
 
