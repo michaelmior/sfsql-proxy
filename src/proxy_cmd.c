@@ -170,16 +170,12 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
         send_status = status;
     } else {
         /* Start with global data */
-        total_status.bytes_recv = global_status.bytes_recv;
-        total_status.bytes_sent = global_status.bytes_sent;
-        total_status.queries = global_status.queries;
+        proxy_status_reset(&total_status);
+        proxy_status_add(&global_status, &total_status);
 
         /* Accumulate data from client threads */
-        for (i=0; i<options.client_threads; i++) {
-            total_status.bytes_recv += net_threads[i].status->bytes_recv;
-            total_status.bytes_sent += net_threads[i].status->bytes_sent;
-            total_status.queries += net_threads[i].status->queries;
-        }
+        for (i=0; i<options.client_threads; i++)
+            proxy_status_add(net_threads[i].status, &total_status);
 
         send_status = &total_status;
     }
@@ -190,6 +186,8 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
     add_row(mysql, buff, "Bytes_Received", send_status->bytes_recv, status);
     add_row(mysql, buff, "Bytes_sent",     send_status->bytes_sent, status);
     add_row(mysql, buff, "Queries",        send_status->queries, status);
+    add_row(mysql, buff, "Queries_any",        send_status->queries_any, status);
+    add_row(mysql, buff, "Queries_all",        send_status->queries_all, status);
     add_row(mysql, buff, "Uptime",         (long) (time(NULL) - proxy_start_time), status);
 
     proxy_net_send_eof(mysql, status);
@@ -751,6 +749,7 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
 
     status->bytes_recv += query_len;
 
+    last_tok = strrchr(query, ' ')+1;
     tok = strtok_r(query, " ", &t);
 
     if (tok) {
@@ -773,7 +772,6 @@ my_bool proxy_cmd(MYSQL *mysql, char *query, ulong query_len, status_t *status) 
             return net_commit(mysql, t, FALSE, status);
         }
 
-        last_tok = strrchr(query, ' ')+1;
         if (strprefix(last_tok, "STATUS", query_len))
             return net_status(mysql, query, query_len, status);
     }

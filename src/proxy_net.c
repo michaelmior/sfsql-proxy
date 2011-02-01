@@ -378,9 +378,7 @@ void* proxy_net_new_thread(void *ptr) {
 
     /* Initialize status information for the connection */
     thread->status = (status_t*) malloc(sizeof(status_t));
-    thread->status->bytes_sent = 0;
-    thread->status->bytes_recv = 0;
-    thread->status->queries = 0;
+    proxy_status_reset(thread->status);
 
     snprintf(name, 16, "Client%d", thread->id);
     proxy_threading_name(name);
@@ -413,12 +411,8 @@ void* proxy_net_new_thread(void *ptr) {
         thread->data.work.addr = NULL;
 
         /* Update global statistics */
-        (void) __sync_fetch_and_add(&global_status.bytes_sent, thread->status->bytes_sent);
-        (void) __sync_fetch_and_add(&global_status.bytes_recv, thread->status->bytes_recv);
-        (void) __sync_fetch_and_add(&global_status.queries, thread->status->queries);
-        thread->status->bytes_sent = 0;
-        thread->status->bytes_recv = 0;
-        thread->status->queries = 0;
+        proxy_status_add(thread->status, &global_status);
+        proxy_status_reset(thread->status);
 
         /* Signify that we are available for work again */
         proxy_pool_return(thread_pool, thread->id);

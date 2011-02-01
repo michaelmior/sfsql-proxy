@@ -272,10 +272,7 @@ int main(int argc, char *argv[]) {
     }
 
     /* Initialize global status */
-    global_connections = 0;
-    global_status.bytes_recv = 0;
-    global_status.bytes_sent = 0;
-    global_status.queries = 0;
+    proxy_status_reset(&global_status);
 
     /* Prepare monitoring */
     proxy_monitor_init();

@@ -1076,6 +1076,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
 
     switch (map) {
         case QUERY_MAP_ANY:
+            status->queries_any++;
+
             /* Pick a random backend and get a connection.
              * We check for an unallocated pool in case
              * backends are in the process of changing */
@@ -1093,6 +1095,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
             break;
 
         case QUERY_MAP_ALL:
+            status->queries_all++;
+
             /* Send a query to the other backends and keep only the first result */
             (void) __sync_fetch_and_add(&querying, 1);
 

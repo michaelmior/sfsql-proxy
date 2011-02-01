@@ -62,12 +62,43 @@ typedef struct {
  **/
 typedef struct {
     /** Bytes received from clients by proxy. */
-    long bytes_recv;
+    ulong bytes_recv;
     /** Bytes sent by proxy to client. */
-    long bytes_sent;
+    ulong bytes_sent;
     /** Number of queries received by proxy. */
-    long queries;
+    ulong queries;
+    /** Number of non-replicated queries. */
+    ulong queries_any;
+    /** Number of replicated queries. */
+    ulong queries_all;
 } status_t;
+
+/**
+ * Reset a :status_t struct to it's default values.
+ *
+ * @param status Status to be reset.
+ **/
+static inline void proxy_status_reset(status_t *status) {
+    status->bytes_sent = 0;
+    status->bytes_recv = 0;
+    status->queries = 0;
+    status->queries_any = 0;
+    status->queries_all = 0;
+}
+
+/**
+ * Add the contents of one status variable to another.
+ *
+ * @param src         Status variable to add.
+ * @param[in,out] dst Status variable to be added to.
+ **/
+static inline void proxy_status_add(status_t *src, status_t *dst) {
+    (void) __sync_fetch_and_add(&dst->bytes_sent, src->bytes_sent);
+    (void) __sync_fetch_and_add(&dst->bytes_recv, src->bytes_recv);
+    (void) __sync_fetch_and_add(&dst->queries, src->queries);
+    (void) __sync_fetch_and_add(&dst->queries_any, src->queries_any);
+    (void) __sync_fetch_and_add(&dst->queries_all, src->queries_all);
+}
 
 #include "proxy_logging.h"
 #include "proxy_net.h"
