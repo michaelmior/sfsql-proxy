@@ -41,6 +41,7 @@ START_TEST (test_pool_new) {
     fail_unless(pool != NULL);
     fail_unless(pool->__alloc >= 1);
     fail_unless(pool->size == 1);
+    fail_unless(pool->locked == 0);
     fail_unless(pool->avail[0] == TRUE);
 } END_TEST
 
@@ -102,6 +103,7 @@ START_TEST (test_pool_get) {
     i = proxy_pool_get(pool);
 
     fail_unless(i == 0);
+    fail_unless(pool->locked == 1);
     fail_unless(pool->avail[0] == FALSE);
 } END_TEST
 
@@ -138,6 +140,7 @@ START_TEST (test_pool_return) {
     i = proxy_pool_get(pool);
     proxy_pool_return(pool, i);
 
+    fail_unless(pool->locked == 0);
     fail_unless(pool->avail[i] == TRUE);
 } END_TEST
 

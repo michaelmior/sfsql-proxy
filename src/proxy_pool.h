@@ -22,6 +22,8 @@ typedef struct {
     int size;
     /** Currently allocated size of the pool. */
     int __alloc;
+    /** Number of items currently locked in the pool. */
+    int locked;
     /** List of availabilities of items in the pool. */
     my_bool *avail;
     /** Lock to block pool access. */

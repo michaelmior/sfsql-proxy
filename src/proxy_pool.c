@@ -45,6 +45,7 @@ pool_t* proxy_pool_new(int size) {
 
     /* Allocate memory for the lock pool */
     new_pool->size = size;
+    new_pool->locked = 0;
 
     /* Find the nearest power of two */
     while (alloc < size)
@@ -170,6 +171,7 @@ static int pool_try_locks(pool_t *pool) {
 
         if (pool->avail[pi]) {
             pool->avail[pi] = FALSE;
+            pool->locked++;
             pthread_mutex_unlock(&pool->lock);
             return pi;
         }
@@ -263,10 +265,12 @@ int proxy_pool_get_locked(pool_t *pool) {
 void proxy_pool_return(pool_t *pool, int idx) {
     /* Update the item availability */
     pthread_mutex_lock(&pool->lock);
-    if (pool->avail[idx])
+    if (pool->avail[idx]) {
         proxy_log(LOG_ERROR, "Trying to free lock from already free pool");
-    else
+    } else {
+        pool->locked--;
         pool->avail[idx] = TRUE;
+    }
     pthread_mutex_unlock(&pool->lock);
 
     /* Signify availability in case someone is waiting */
