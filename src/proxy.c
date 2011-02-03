@@ -273,6 +273,8 @@ int main(int argc, char *argv[]) {
 
     /* Initialize global status */
     proxy_status_reset(&global_status);
+    global_connections = 0;
+    global_running = 0;
 
     /* Prepare monitoring */
     proxy_monitor_init();

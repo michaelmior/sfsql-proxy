@@ -189,6 +189,7 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
     add_row(mysql, buff, "Queries_any",       send_status->queries_any, status);
     add_row(mysql, buff, "Queries_all",       send_status->queries_all, status);
     add_row(mysql, buff, "Threads_connected", thread_pool->locked, status);
+    add_row(mysql, buff, "Threads_running",   global_running, status);
     add_row(mysql, buff, "Uptime",         (long) (time(NULL) - proxy_start_time), status);
 
     proxy_net_send_eof(mysql, status);

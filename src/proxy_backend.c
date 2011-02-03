@@ -1036,6 +1036,8 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
     proxy_thread_t *thread;
     ulonglong results=0;
 
+    (void) __sync_fetch_and_add(&global_running, 1);
+
     /* Get the query map and modified query
      * if a mapper was specified */
     if (backend_mapper) {
@@ -1160,6 +1162,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
     }
 
 out:
+    (void) __sync_fetch_and_sub(&global_running, 1);
     /* XXX: error reporting should be more verbose */
     return FALSE;
 }

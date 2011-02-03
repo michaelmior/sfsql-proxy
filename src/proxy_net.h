@@ -82,6 +82,7 @@ union sockaddr_union {
 
 /** Total number of connections. */
 long global_connections;
+int global_running;
 /** Globally accumulated status. */
 status_t global_status;
 /** Start time of the proxy server. */
