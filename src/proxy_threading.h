@@ -73,7 +73,7 @@ void proxy_threading_cleanup(proxy_thread_t *threads, int num, pool_t *pool);
  *
  * @return int          Same as pthread_create.
  **/
-inline int proxy_threading_create(pthread_t *restrict thread, pthread_attr_t *restrict attr,
+static inline int proxy_threading_create(pthread_t *restrict thread, pthread_attr_t *restrict attr,
         void *(*start_routine)(void*), void *restrict arg) {
     if (attr)
         pthread_attr_setstacksize(attr, STACK_SIZE);
