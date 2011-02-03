@@ -183,7 +183,7 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
     /* Send status info to client */
     pos = buff;
     add_row(mysql, buff, "Connections",       global_connections, status);
-    add_row(mysql, buff, "Bytes_Received",    send_status->bytes_recv, status);
+    add_row(mysql, buff, "Bytes_received",    send_status->bytes_recv, status);
     add_row(mysql, buff, "Bytes_sent",        send_status->bytes_sent, status);
     add_row(mysql, buff, "Queries",           send_status->queries, status);
     add_row(mysql, buff, "Queries_any",       send_status->queries_any, status);
