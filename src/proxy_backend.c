@@ -106,11 +106,11 @@ static my_bool backend_proxy_write(MYSQL* __restrict backend, MYSQL* __restrict 
 
         /* Read from the backend and forward to the proxy connection */
         if (my_net_write(&(proxy->net), net->read_pos, (size_t) pkt_len)) {
-            status->bytes_sent += pkt_len;
             proxy_log(LOG_ERROR, "Couldn't forward backend packet to proxy");
             return TRUE;
         }
 
+        status->bytes_sent += pkt_len;
         return FALSE;
 }
 
