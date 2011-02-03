@@ -64,7 +64,6 @@ int proxy_backend_num();
 my_bool proxy_backend_init();
 my_bool proxy_backend_connect();
 my_bool proxy_backends_connect();
-void proxy_backends_update();
 my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_bool replicated, commitdata_t *commit, status_t *status);
 void* proxy_backend_new_thread(void *ptr);
 my_bool proxy_backend_clone_complete(int *clone_ids, int nclones, ulong clone_trans_id, my_bool commit);

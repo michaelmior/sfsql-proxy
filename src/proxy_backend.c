@@ -67,7 +67,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 static void conn_free(proxy_backend_conn_t *conn);
 static void backend_free(proxy_host_t *backend);
 static void backends_free(proxy_host_t **backends, int num);
-static void backend_conns_free(int bi);
+//static void backend_conns_free(int bi); /* see comment before function body */
 static my_bool backends_alloc(int num_backends);
 
 static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn, my_bool bypass);
@@ -460,8 +460,6 @@ static proxy_host_t** backend_read_file(char *filename, int *num) {
 
     *num = -1;
 
-    /* This case might happen when user sends SIGUSR1
-     * without previously specifying a backend file */
     if (!filename) {
         proxy_log(LOG_ERROR, "No filename specified when reading backends");
         return NULL;
@@ -709,6 +707,14 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
     proxy_log(LOG_INFO, "Connected to new backend %d", bi);
 }
 
+#if 0
+/*
+ * This is currently being commented out during dead code
+ * removal for old signal-based cloning. However, we leave
+ * this here since it may be useful in the future when
+ * merging clones.
+ */
+
 /**
  * Free a backend and asociated connections.
  *
@@ -740,6 +746,7 @@ static void backend_conns_free(int bi) {
     proxy_threading_cancel(backend_threads[bi], options.backend_threads, backend_thread_pool[bi]);
     proxy_threading_cleanup(backend_threads[bi], options.backend_threads, backend_thread_pool[bi]);
 }
+#endif
 
 /**
  * Complete a transaction on clone backends.
@@ -893,74 +900,6 @@ static my_bool backend_resize(int num, my_bool before) {
 }
 
 /**
- * Update the list of backends from the previously loaded file.
- **/
-void proxy_backends_update() {
-    int num, i, j, keep[backend_num];
-    my_bool changed = FALSE;
-    proxy_host_t **new_backends = backend_read_file(options.backend_file, &num);
-
-    proxy_debug("Updating backends from file");
-
-    /* Block others from getting backends */
-    for (i=0; i<backend_num; i++) {
-        proxy_pool_lock(backend_pools[i]);
-        proxy_pool_lock(backend_thread_pool[i]);
-    }
-
-    /* Compare the current backends with the new ones to
-     * see if there are any which can be reused */
-    for (i=0; i<backend_num; i++) {
-        keep[i] = -1;
-
-        for (j=0; j<num; j++) {
-            /* Check for backends already connected */
-            if (strcmp(backends[i]->host, new_backends[j]->host) == 0
-                    && backends[i]->port == new_backends[j]->port) {
-                keep[i] = j;
-                break;
-            }
-        }
-
-        if (keep[i] < 0)
-            changed = TRUE;
-    }
-
-    /* Reallocate data structures if necessary */
-    if (backend_num != num || changed) {
-        if (backend_resize(num, TRUE)) {
-            backends_free(new_backends, num);
-            return;
-        }
-    } else {
-        backends_free(new_backends, num);
-        proxy_log(LOG_INFO, "No backends changed. Done.");
-        return;
-    }
-
-    /* Clean up old backends */
-    for (i=0; i<backend_num; i++) {
-        if (keep[i] < 0) {
-            proxy_log(LOG_INFO, "Disconnecting backend %d", i);
-            backend_conns_free(i);
-        } else {
-            /* Save existing data */
-            backend_pools[i] = backend_pools[keep[i]];
-            backend_conns[i] = backend_conns[keep[i]];
-            backend_thread_pool[i] = backend_thread_pool[keep[i]];
-            backend_threads[i] = backend_threads[keep[i]];
-        }
-    }
-
-    /* Finish resizing */
-    backend_resize(num, FALSE);
-
-    /* Switch to the new set of backends */
-    backends_switch(num, new_backends);
-    backends_new_connect(backend_conns, backend_pools);
-}
-
-/**
  * Start a new backend thread.
  *
  * @param ptr Pointer to a thread object.
@@ -1052,10 +991,6 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
         proxy_vdebug("Query %s mapped to %d", query, (int) map);
     }
 
-    /* Spin until query can proceed */
-    if (backend_pools)
-        while (!backend_pools[0]) { usleep(SYNC_SLEEP); } /* XXX: should maybe lock here */
-
     /* Add an identifier to the query if necessary */
     if (map == QUERY_MAP_ALL) {
         /* Wait until cloning is done */
@@ -1084,11 +1019,6 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
              * We check for an unallocated pool in case
              * backends are in the process of changing */
             bi = rand() % backend_num;
-
-            /* This guards against the unlikely case that we
-             * get here while backends are being updated */
-            if (backend_num > 1)
-                while (!backend_pools || !backend_pools[bi]) { bi = rand() % backend_num; }
 
             if (backend_query_idx(bi, ci, proxy, query, length, replicated, status)) {
                 error = TRUE;

@@ -119,35 +119,6 @@ static void catch_sig(int sig, __attribute__((unused)) siginfo_t *info, __attrib
                 pthread_kill(net_threads[i].thread, SIGPOLL);
 
             break;
-
-        /* Prepare to clone */
-        case SIGUSR1:
-            cloning = 1;
-
-            if (signaller > 0)
-                proxy_log(LOG_ERROR, "Received second cloning signal before clone complete");
-
-            signaller = info->si_pid;
-
-            /* Wait for queries to finish */
-            while (querying) { usleep(1000); }
-
-            /* Signal the process to clone */
-            proxy_log(LOG_INFO, "Signaling back %d", signaller);
-            kill(signaller, SIGUSR1);
-
-            break;
-
-        /* Update backends with new clone */
-        case SIGUSR2:
-            proxy_backends_update();
-            cloning = 0;
-            proxy_log(LOG_INFO, "Resuming queries after clone completion");
-
-            if (info->si_pid != signaller)
-                proxy_log(LOG_ERROR, "Different process sent cloning completion signal");
-            signaller = -1;
-            break;
     }
 }
 
@@ -244,8 +215,6 @@ int main(int argc, char *argv[]) {
     /* Set up signal handlers */
     HANDLE_SIG(SIGTERM);
     HANDLE_SIG(SIGINT);
-    HANDLE_SIG(SIGUSR1);
-    HANDLE_SIG(SIGUSR2);
     HANDLE_SIG(SIGPOLL);
 
     /* Initialize libmysql */
