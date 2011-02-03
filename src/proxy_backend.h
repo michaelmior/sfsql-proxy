@@ -15,6 +15,15 @@
 #define _proxy_backend_h
 
 /**
+ * Connection indices used during the
+ * lifetime of a client connection.
+ **/
+typedef struct {
+    int bi;
+    int ci;
+} proxy_conn_idx_t;
+
+/**
  * Connection information for backends.
  **/
 typedef struct {
@@ -64,10 +73,12 @@ int proxy_backend_num();
 my_bool proxy_backend_init();
 my_bool proxy_backend_connect();
 my_bool proxy_backends_connect();
-my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_bool replicated, commitdata_t *commit, status_t *status);
+my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *query, ulong length, my_bool replicated, commitdata_t *commit, status_t *status);
 void* proxy_backend_new_thread(void *ptr);
 my_bool proxy_backend_clone_complete(int *clone_ids, int nclones, ulong clone_trans_id, my_bool commit);
 my_bool proxy_backend_add(char *host, int port);
+void proxy_backend_get_connection(proxy_conn_idx_t *conn_idx, int thread_id);
+void proxy_backend_release_connection(proxy_conn_idx_t *conn_idx);
 void proxy_backend_close();
 
 extern volatile sig_atomic_t querying;

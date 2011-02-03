@@ -82,3 +82,5 @@ my_bool __wrap_proxy_cmd(
         __attribute__((unused)) ulong query_len,
         __attribute__((unused)) status_t *status) { return FALSE; }
 void __wrap_proxy_options_update_host() {}
+void __wrap_proxy_backend_get_connection(__attribute__((unused)) proxy_conn_idx_t *conn_idx, __attribute__((unused)) int thread_id) {};
+void __wrap_proxy_backend_release_connection(__attribute__((unused)) proxy_conn_idx_t *conn_idx) {};

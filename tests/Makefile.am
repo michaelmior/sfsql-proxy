@@ -17,6 +17,8 @@ check_net_LDADD = $(MYSQL_LIBS) @CHECK_LIBS@
 check_net_LDFLAGS = $(AM_LDFLAGS) \
 	-Wl,--wrap,my_net_init \
 	-Wl,--wrap,proxy_backend_query \
+	-Wl,--wrap,proxy_backend_get_connection \
+	-Wl,--wrap,proxy_backend_release_connection \
 	-Wl,--wrap,proxy_pool_return \
     -Wl,--wrap,randominit \
 	-Wl,--wrap,proxy_threading_mask \

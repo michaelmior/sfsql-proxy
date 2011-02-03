@@ -406,7 +406,11 @@ void* proxy_net_new_thread(void *ptr) {
 
         /* Handle client requests */
         (void) __sync_fetch_and_add(&global_connections, 1);
+
+        proxy_backend_get_connection(&thread->data.work.conn_idx, thread->id);
         proxy_net_client_do_work(&thread->data.work, thread->id, &commit, thread->status, FALSE);
+        proxy_backend_release_connection(&thread->data.work.conn_idx);
+
         client_destroy(thread);
         thread->data.work.addr = NULL;
 
@@ -456,7 +460,7 @@ void proxy_net_client_do_work(proxy_work_t *work, int thread_id, commitdata_t *c
      *      check for thread exit in both cases and reinsert
      *      this condition: !net_threads[thread_id].exit */
     while (!work->proxy->net.error && work->proxy->net.vio != 0) {
-        error = proxy_net_read_query(work->proxy, thread_id, commit, status, proxy_only);
+        error = proxy_net_read_query(work, thread_id, commit, status, proxy_only);
 
         /* One more flush the write buffer to make
          * sure client has everything */
@@ -489,20 +493,20 @@ void proxy_net_client_do_work(proxy_work_t *work, int thread_id, commitdata_t *c
  *
  * @callgraph
  *
- * @param mysql          A MySQL object for a client which
- *                       a query should be read from.
+ * @param work           Work data associated with this client.
  * @param thread_id      Identifier of the client thread
  *                       issuing the query.
  * @param commit         Information required to commit 
  *                       which is passed to the backend.
- * @param proxy_only        TRUE if only PROXY commands are allowed
- *                          on this connection, FALSE otherwise.
+ * @param proxy_only     TRUE if only PROXY commands are allowed
+ *                       on this connection, FALSE otherwise.
  * @param[in,out] status Status information for the connection.
  *
  * @return Positive to disconnect without error, negative
  *         for errors, 0 to keep going.
  **/
-conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only) {
+conn_error_t proxy_net_read_query(proxy_work_t *work, __attribute__((unused)) int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only) {
+    MYSQL *mysql = work->proxy;
     NET *net = &(mysql->net);
     ulong pkt_len;
     char *packet = 0;
@@ -565,7 +569,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
             /* Here we skip parsing of proxy queries and also
              * specify that this query has been replicated */
             status->queries++;
-            return proxy_backend_query(mysql, thread_id, packet, pkt_len, TRUE, commit, status) ? ERROR_BACKEND : ERROR_OK;
+            return proxy_backend_query(mysql, &work->conn_idx, packet, pkt_len, TRUE, commit, status) ? ERROR_BACKEND : ERROR_OK;
         case COM_QUERY:
             status->queries++;
 
@@ -574,7 +578,7 @@ conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *com
                     return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only PROXY commands may be executed on this connection");
                 } else {
                     /* pass the query to the backend */
-                    return proxy_backend_query(mysql, thread_id, packet, pkt_len, FALSE, commit, status) ? ERROR_BACKEND : ERROR_OK;
+                    return proxy_backend_query(mysql, &work->conn_idx, packet, pkt_len, FALSE, commit, status) ? ERROR_BACKEND : ERROR_OK;
                 }
             } else {
                 /* Execute the proxy command */

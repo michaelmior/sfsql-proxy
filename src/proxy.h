@@ -101,8 +101,8 @@ static inline void proxy_status_add(status_t *src, status_t *dst) {
 }
 
 #include "proxy_logging.h"
-#include "proxy_net.h"
 #include "proxy_backend.h"
+#include "proxy_net.h"
 #include "proxy_pool.h"
 #include "proxy_threading.h"
 #include "proxy_clone.h"

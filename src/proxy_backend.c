@@ -950,11 +950,42 @@ void* proxy_backend_new_thread(void *ptr) {
 }
 
 /**
+ * Request a set of connection identifiers which can be passed in
+ * when making future queries to the backend for a connection.
+ *
+ * @param[out] conn_idx Storage for connection identifiers.
+ * @param thread_id     Identifier of the thread requesting the connection.
+ **/
+void proxy_backend_get_connection(proxy_conn_idx_t *conn_idx, int thread_id) {
+    conn_idx->bi = rand() % backend_num;
+    conn_idx->ci = backend_pools ?
+        proxy_pool_get(backend_pools[conn_idx->bi]) : thread_id;
+
+    proxy_vdebug("Assigning thread %d connection %d on backend %d",
+        thread_id, conn_idx->ci, conn_idx->bi);
+}
+
+/**
+ * Release a connection for further use by other backends.
+ *
+ * @param conn_idx Pointer to the connection to be released.
+ **/
+void proxy_backend_release_connection(proxy_conn_idx_t *conn_idx) {
+    proxy_vdebug("Releasing connection %d on backend %d",
+        conn_idx->ci, conn_idx->bi);
+
+    if (backend_pools)
+        proxy_pool_return(backend_pools[conn_idx->bi], conn_idx->ci);
+    conn_idx->bi = -1;
+    conn_idx->ci = -1;
+}
+
+/**
  * Send a query to the backend and return the results to the client.
  *
  * @param proxy          MySQL object corresponding to the client connection.
- * @param ci             Index of a connection to use in the case of a
- *                       single backend.
+ * @param conn_idx       Connection to use for this query if we need a single
+ *                       backend.
  * @param query          A query string received from the client.
  * @param length         Length of the query string.
  * @param replicated     TRUE if the query is replicated across servers,
@@ -965,7 +996,7 @@ void* proxy_backend_new_thread(void *ptr) {
  *
  * @return TRUE on error, FALSE otherwise.
  **/
-my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_bool replicated, commitdata_t *commit, status_t *status) {
+my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *query, ulong length, my_bool replicated, commitdata_t *commit, status_t *status) {
     int bi = -1, i, ti;
     proxy_query_map_t map = QUERY_MAP_ANY;
     my_bool error = FALSE;
@@ -1015,12 +1046,7 @@ my_bool proxy_backend_query(MYSQL *proxy, int ci, char *query, ulong length, my_
         case QUERY_MAP_ANY:
             status->queries_any++;
 
-            /* Pick a random backend and get a connection.
-             * We check for an unallocated pool in case
-             * backends are in the process of changing */
-            bi = rand() % backend_num;
-
-            if (backend_query_idx(bi, ci, proxy, query, length, replicated, status)) {
+            if (backend_query_idx(conn_idx->bi, conn_idx->ci, proxy, query, length, replicated, status)) {
                 error = TRUE;
                 goto out;
             }
@@ -1117,16 +1143,12 @@ static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char
     my_bool error;
 
     /* Get a backend to use */
-    ci = backend_pools ? proxy_pool_get(backend_pools[bi]) : ci;
     conn = backend_conns[bi][ci];
 
     proxy_vdebug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
 
     /*Send the query */
     error = backend_query(conn, proxy, query, length, replicated, bi, NULL, status);
-
-    if (!conn->freed && backend_pools)
-        proxy_pool_return(backend_pools[bi], ci);
 
     return error;
 }

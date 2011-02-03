@@ -54,6 +54,8 @@ typedef struct {
     struct sockaddr_in *addr;
     /** MySQL object initialized for client. */
     MYSQL *proxy;
+    /** Indices for the connection used by this client. */
+    proxy_conn_idx_t conn_idx;
 } proxy_work_t;
 
 /**
@@ -92,7 +94,7 @@ void proxy_net_client_do_work(proxy_work_t *work, int thread_id, commitdata_t *c
 int proxy_net_bind_new_socket(char *host, int port);
 my_bool proxy_net_handshake(MYSQL *mysql, struct sockaddr_in *clientaddr, int thread_id);
 void* proxy_net_new_thread(void *ptr);
-conn_error_t proxy_net_read_query(MYSQL *mysql, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only);
+conn_error_t proxy_net_read_query(proxy_work_t *work, int thread_id, commitdata_t *commit, status_t *status, my_bool proxy_only);
 my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulonglong last_insert_id);
 my_bool proxy_net_send_error(MYSQL *mysql, int sql_errno, const char *err);
 void proxy_net_send_eof(MYSQL *mysql, status_t *status);
