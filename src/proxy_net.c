@@ -316,6 +316,7 @@ MYSQL* client_init(int clientfd) {
  **/
 void client_destroy(proxy_thread_t *thread) {
     MYSQL *mysql;
+    int ret;
 
     proxy_vdebug("Called client_destroy on thread %d", thread->id);
 
@@ -324,7 +325,8 @@ void client_destroy(proxy_thread_t *thread) {
         if ((mysql = thread->data.work.proxy)) {
             /* XXX: may need to send error before closing connection */
             /* derived from sql/sql_mysqld.cc:close_connection */
-            if (vio_close(mysql->net.vio) < 0)
+            ret = vio_close(mysql->net.vio);
+            if (ret < 0 && ret != ENOTCONN)
                 proxy_log(LOG_ERROR, "Error closing client connection: %s", errstr);
 
             /* Clean up data structures */
