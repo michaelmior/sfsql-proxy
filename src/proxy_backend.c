@@ -1528,7 +1528,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
         }
 
         /* Specify that we have committed */
-        if (commit)
+        if (proxy && commit)
             pthread_spin_unlock(&commit->committed);
 
         goto out;
