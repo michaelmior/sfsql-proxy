@@ -46,7 +46,7 @@ static lt_dlhandle backend_mapper_handle = NULL;
 /** Thread data structures for backend query threads */
 static proxy_thread_t **backend_threads = NULL;
 /** Pool for locking access to backend threads */
-static pool_t **backend_thread_pool = NULL;
+static pool_t *backend_thread_pool = NULL;
 
 /** Mutex for protecting addition of new backends */
 static pthread_mutex_t add_mutex;
@@ -331,11 +331,8 @@ static my_bool backends_alloc(int num_backends)  {
         return FALSE;
 
     /* Create a thread pool */
-    if (!backend_thread_pool) {
-        backend_thread_pool = (pool_t**) calloc(backend_num, sizeof(pool_t*));
-        for (i=0; i<backend_num; i++)
-            backend_thread_pool[i] = proxy_pool_new(options.backend_threads);
-    }
+    if (!backend_thread_pool)
+        backend_thread_pool = proxy_pool_new(options.backend_threads);
 
     /* Create backend threads */
     if (!backend_threads) {
@@ -685,13 +682,9 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
     }
 
     /* Start new backend threads */
-    if (!backend_threads[bi])
+    if (!backend_threads[bi]) {
         backend_new_threads(bi);
-    proxy_debug("Threads started for backend %d", bi);
-
-    /* Create a new thread pool for this backend */
-    if (!backend_thread_pool[bi]) {
-        backend_thread_pool[bi] = proxy_pool_new(options.backend_threads);
+        proxy_debug("Threads started for backend %d", bi);
 
         /* Open the MySQL connections for each backend thread */
         proxy_debug("Opening connections for backend %d", bi);
@@ -700,8 +693,6 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
             if (!backend_threads[bi][ci].data.backend.conn->mysql)
                 backend_connect(backends[bi], backend_threads[bi][ci].data.backend.conn, FALSE);
         }
-    } else {
-        proxy_pool_unlock(backend_thread_pool[bi]);
     }
 
     proxy_log(LOG_INFO, "Connected to new backend %d", bi);
@@ -864,7 +855,7 @@ static my_bool backend_resize(int num, my_bool before) {
     proxy_debug("Resizing backends from %d to %d", backend_num, num);
 
     /* Reallocate memory */
-    if ((before && num > backend_num) || (!before && num < backend_num)) {
+    if ((before && num > backend_num) || (!before && (uint) num < (uint) backend_num)) {
         /* XXX: A little ugly below, but it ensures the proxy
          *      can continue without new backends if realloc fails.
          *      We should probably allocate more memory in advance. */
@@ -881,7 +872,6 @@ static my_bool backend_resize(int num, my_bool before) {
         SAFE_REALLOC(backend_pools, sizeof(pool_t*));
         SAFE_REALLOC(backend_conns, sizeof(proxy_backend_conn_t**));
         SAFE_REALLOC(backend_threads, sizeof(proxy_thread_t*));
-        SAFE_REALLOC(backend_thread_pool, sizeof(pool_t*));
 
 #undef SAFE_REALLOC
     }
@@ -892,7 +882,6 @@ static my_bool backend_resize(int num, my_bool before) {
             backend_pools[i] = NULL;
             backend_conns[i] = NULL;
             backend_threads[i] = NULL;
-            backend_thread_pool[i] = NULL;
         }
     }
 
@@ -942,7 +931,6 @@ void* proxy_backend_new_thread(void *ptr) {
 
         /* Signify thread availability */
         query->query = NULL;
-        proxy_pool_return(backend_thread_pool[thread->data.backend.bi], thread->id);
     }
 
     proxy_debug("Exiting loop on backend %d, thead %d", thread->data.backend.bi, thread->id);
@@ -1062,12 +1050,12 @@ my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *quer
             pthread_barrier_init(&query_barrier, NULL, backend_num + 1);
 
             bi = rand() % backend_num;
+            ti = proxy_pool_get(backend_thread_pool);
             for (i=0; i<backend_num; i++) {
                 /* Get the next backend */
                 bi = (bi + 1) % backend_num;
 
                 /* Dispatch threads for backend queries */
-                ti = proxy_pool_get(backend_thread_pool[bi]);
                 thread = &(backend_threads[bi][ti]);
                 thread->status = status;
 
@@ -1098,6 +1086,9 @@ my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *quer
             /* Wait for the final commit to be performed */
             pthread_spin_lock(&commit->committed);
             pthread_spin_unlock(&commit->committed);
+
+            /* Release the backend threads */
+            proxy_pool_return(backend_thread_pool, ti);
 
             /* XXX: should do better at handling failures */
             for (i=0; i<backend_num; i++)
@@ -1671,8 +1662,8 @@ void proxy_backend_close() {
 
             /* Shut down threads */
             proxy_log(LOG_INFO, "Cancelling backend threads...");
-            proxy_threading_cancel(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
-            proxy_threading_cleanup(backend_threads[i], options.backend_threads, backend_thread_pool[i]);
+            proxy_threading_cancel(backend_threads[i], options.backend_threads, backend_thread_pool);
+            proxy_threading_cleanup(backend_threads[i], options.backend_threads, backend_thread_pool);
         }
 
         free(backend_threads);
