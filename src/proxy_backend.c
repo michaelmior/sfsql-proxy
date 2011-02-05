@@ -1667,7 +1667,6 @@ void proxy_backend_close() {
         }
 
         free(backend_threads);
-        free(backend_thread_pool);
     }
 
     /* Close any open administrative connections */
