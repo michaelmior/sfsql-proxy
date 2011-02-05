@@ -83,11 +83,6 @@ int proxy_net_bind_new_socket(char *host, int port) {
         return -1;
     }
 
-    /* Update the host address again if we are the
-     * master so it will contain the master's IP */
-    if (options.cloneable)
-        proxy_options_update_host();
-
     if (listen(serverfd, QUEUE_LENGTH) < 0) {
         proxy_log(LOG_ERROR, "Error listening on server socket: %s", errstr);
         return -1;

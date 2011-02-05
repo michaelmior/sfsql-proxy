@@ -830,10 +830,18 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
     proxy_threading_name("Admin");
     proxy_threading_mask();
 
+    /* Wait for the server to start */
+    while (!run) { usleep(SYNC_SLEEP); }
+
     /* Bind the admin socket */
     proxy_log(LOG_INFO, "Opening admin socket on 0.0.0.0:%d", options.admin_port);
     if ((serverfd = proxy_net_bind_new_socket(NULL, options.admin_port)) < 0)
         goto out;
+
+    /* Update the host address again if we are the
+     * master so it will contain the master's IP */
+    if (options.cloneable)
+        proxy_options_update_host();
 
     /* Initialize thread attributes */
     /* XXX: We currently leave these threads detached. We really
@@ -841,9 +849,6 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
      *      they are killed when we shut down. */
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-
-    /* Wait for the server to start */
-    while (!run) { usleep(SYNC_SLEEP); }
 
     /* Admin connections event loop */
     while (run) {
