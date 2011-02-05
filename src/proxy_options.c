@@ -325,9 +325,9 @@ int proxy_options_parse(int argc, char *argv[]) {
         options.backend.host = options.backend.host ?: BACKEND_HOST;
         options.backend.port = options.backend.port ?: BACKEND_PORT;
 
-        if (options.coordinator && options.backend_threads < 0)
-            options.backend_threads = BACKEND_THREADS;
-        options.num_conns = options.client_threads;
+        options.backend_threads = options.backend_threads > 0 ? options.backend_threads : BACKEND_THREADS;
+        options.num_conns = options.num_conns > 0 ? options.num_conns :
+            (options.coordinator ? NUM_CONNS : options.client_threads);
     }
     
     return EXIT_SUCCESS;
