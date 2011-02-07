@@ -1007,7 +1007,7 @@ my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *quer
             free(query);
             query = newq;
         }
-        proxy_vdebug("Query %s mapped to %d", query, (int) map);
+        proxy_vvdebug("Query %s mapped to %d", query, (int) map);
     }
 
     /* Add an identifier to the query if necessary */
@@ -1136,7 +1136,7 @@ static inline my_bool backend_query_idx(int bi, int ci, MYSQL *proxy, const char
     /* Get a backend to use */
     conn = backend_conns[bi][ci];
 
-    proxy_vdebug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
+    proxy_vvdebug("Sending read-only query %s to backend %d, connection %d", query, bi, ci);
 
     /*Send the query */
     error = backend_query(conn, proxy, query, length, replicated, bi, NULL, status);
@@ -1421,7 +1421,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
     }
 
     /* Send the query to the backend */
-    proxy_vdebug("Sending query %s to backend %d", query, bi);
+    proxy_vvdebug("Sending query %s to backend %d", query, bi);
 
     /* If this is a replicated command and we are the coordinator,
      * send the query with the COM_PROXY_QUERY command */

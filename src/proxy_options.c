@@ -42,6 +42,7 @@ static void usage() {
             "\t--help,             -?\tShow this message\n"
 #ifdef DEBUG
             "\t--verbose,          -v\tEnable verbose debugging\n"
+            "\t                      \t (specify multiple times for increased verbosity)\n"
 #endif
             "\t--daemonize,        -d\tDaemonize\n"
             "\t--coordinator,      -C\tProxy should act as coordinator\n"
@@ -112,7 +113,7 @@ void proxy_options_update_host() {
  **/
 static void set_option_defaults() {
     /* Set options to default values */
-    options.verbose         = FALSE;
+    options.verbose         = 0;
     options.daemonize       = FALSE;
     options.coordinator     = FALSE;
     options.cloneable       = FALSE;
@@ -188,7 +189,7 @@ int proxy_options_parse(int argc, char *argv[]) {
                 usage();
                 return EX_USAGE;
             case 'v':
-                options.verbose = TRUE;
+                options.verbose++;
                 break;
             case 'd':
                 options.daemonize = TRUE;

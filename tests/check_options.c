@@ -87,7 +87,7 @@ START_TEST (test_options_short) {
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
-    fail_unless(options.verbose);
+    fail_unless(options.verbose == 1);
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
@@ -136,7 +136,7 @@ START_TEST (test_options_long) {
 
     fail_unless(proxy_options_parse(sizeof(argv)/sizeof(*argv), argv) == EXIT_SUCCESS);
 
-    fail_unless(options.verbose);
+    fail_unless(options.verbose == 1);
     fail_unless(options.daemonize);
     fail_unless(options.coordinator);
     fail_unless(options.cloneable);
@@ -164,7 +164,7 @@ START_TEST (test_options_defaults) {
     fail_unless(proxy_options_parse(0, NULL) == EXIT_SUCCESS);
 
     /* Check that all options have their correct values */
-    fail_unless(!options.verbose);
+    fail_unless(options.verbose == 0);
     fail_unless(!options.daemonize);
     fail_unless(!options.coordinator);
     fail_unless(!options.cloneable);

@@ -395,7 +395,7 @@ void* proxy_net_new_thread(void *ptr) {
             proxy_cond_wait(&(thread->cv), &(thread->lock));
         proxy_mutex_unlock(&(thread->lock));
 
-        proxy_vdebug("Client thread %d signaled", thread->id);
+        proxy_vvdebug("Client thread %d signaled", thread->id);
 
         /* Check if we have been signalled to exit */
         if (thread->exit)
@@ -542,7 +542,7 @@ conn_error_t proxy_net_read_query(proxy_work_t *work, __attribute__((unused)) in
         return ERROR_CLIENT;
     }
 
-    proxy_vdebug("Read %lu byte packet from client", pkt_len);
+    proxy_vvdebug("Read %lu byte packet from client", pkt_len);
     status->bytes_recv += pkt_len;
 
     packet = (char*) net->read_pos;
@@ -559,7 +559,7 @@ conn_error_t proxy_net_read_query(proxy_work_t *work, __attribute__((unused)) in
     /* Reset server status flags */
     mysql->server_status &= ~SERVER_STATUS_CLEAR_SET;
 
-    proxy_vdebug("Got command %d for connection on thread %d", command, thread_id);
+    proxy_vvdebug("Got command %d for connection on thread %d", command, thread_id);
 
     switch (command) {
         case COM_PROXY_QUERY:
