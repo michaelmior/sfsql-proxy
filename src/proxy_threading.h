@@ -83,11 +83,11 @@ static inline int proxy_threading_create(pthread_t *restrict thread, pthread_att
 
 /* Debugging macros for catching errors on mutexes and condition variables*/
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 #define __proxy_error(loc, str) proxy_log(LOG_DEBUG, str " at :%s", loc)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 pthread_mutexattr_t __proxy_mutexattr;
 
 static inline int __proxy_mutex_init(pthread_mutex_t *m, char *loc) {
@@ -112,7 +112,7 @@ static inline int __proxy_mutex_init(pthread_mutex_t *m, char *loc) {
 #define proxy_mutex_init(m) pthread_mutex_init(m, NULL)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_mutex_destroy(pthread_mutex_t *m, char *loc) {
     int ret = pthread_mutex_destroy(m);
     switch (ret) {
@@ -132,7 +132,7 @@ static inline int __proxy_mutex_destroy(pthread_mutex_t *m, char *loc) {
 #define proxy_mutex_destroy(m) pthread_mutex_destroy(m)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_get_mutex(pthread_mutex_t *m, int(*func)(pthread_mutex_t*), char *loc) {
     int ret = func(m);
     switch (ret) {
@@ -162,7 +162,7 @@ static inline int __proxy_get_mutex(pthread_mutex_t *m, int(*func)(pthread_mutex
 #endif
 
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_mutex_unlock(pthread_mutex_t *m, char *loc) {
     int ret = pthread_mutex_unlock(m);
     switch (ret) {
@@ -185,7 +185,7 @@ static inline int __proxy_mutex_unlock(pthread_mutex_t *m, char *loc) {
 #define proxy_mutex_unlock(m) pthread_mutex_unlock(m)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_cond_init(pthread_cond_t *cv, char *loc) {
     int ret = pthread_cond_init(cv, NULL);
     switch (ret) {
@@ -211,7 +211,7 @@ static inline int __proxy_cond_init(pthread_cond_t *cv, char *loc) {
 #define proxy_cond_init(cv) pthread_cond_init(cv, NULL)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_cond_destroy(pthread_cond_t *cv, char *loc) {
     int ret = pthread_cond_destroy(cv);
     switch (ret) {
@@ -231,7 +231,7 @@ static inline int __proxy_cond_destroy(pthread_cond_t *cv, char *loc) {
 #define proxy_cond_destroy(cv) pthread_cond_destroy(cv)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_cond_signal(pthread_cond_t *cv, int(*func)(pthread_cond_t*), char *loc) {
     int ret = func(cv);
     switch (ret) {
@@ -250,7 +250,7 @@ static inline int __proxy_cond_signal(pthread_cond_t *cv, int(*func)(pthread_con
 #define proxy_cond_broadcast(cv) pthread_cond_broadcast(cv)
 #endif
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
 static inline int __proxy_cond_wait(pthread_cond_t *cv, pthread_mutex_t *m, int(*func)(pthread_cond_t*, pthread_mutex_t*), char *loc) {
     int ret = func(cv, m);
     switch (ret) {

@@ -157,5 +157,11 @@ else
   CFLAGS="$CFLAGS -O3"
 fi
 
+AC_ARG_ENABLE(threading-debug,
+  [AS_HELP_STRING([--enable-threading-debug], [enable pthreads debugging])])
+if test "$enable_threading_debug" = "yes"; then
+  CFLAGS="$CFLAGS -DTHREADING_DEBUG"
+fi
+
 AC_CONFIG_FILES([Makefile libltdl/Makefile src/Makefile map/Makefile tests/Makefile])
 AC_OUTPUT

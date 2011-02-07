@@ -44,7 +44,7 @@ void proxy_threading_init() {
     /* Initialize thread-specific data */
     pthread_key_create(&thread_buf_key, &free);
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
     pthread_mutexattr_init(&__proxy_mutexattr);
     pthread_mutexattr_settype(&__proxy_mutexattr, PTHREAD_MUTEX_ERRORCHECK);
 #endif
@@ -75,7 +75,7 @@ void proxy_threading_end() {
     /* Delete thread-specific data keys */
     pthread_key_delete(thread_buf_key);
 
-#ifdef DEBUG
+#ifdef THREADING_DEBUG
     pthread_mutexattr_destroy(&__proxy_mutexattr);
 #endif
 }
