@@ -434,6 +434,7 @@ static my_bool backend_connect(proxy_host_t *backend, proxy_backend_conn_t *conn
     mysql_autocommit(mysql, options.autocommit && !options.two_pc);
 
     conn->mysql = mysql;
+    conn->freed = FALSE;
 
     return FALSE;
 }
