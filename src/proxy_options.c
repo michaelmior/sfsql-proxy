@@ -75,7 +75,7 @@ static void usage() {
             "\t                     \tnegative to wait forever (default: 5)\n\n"
 
             "Mapper options:\n"   
-            "\t--mapper,          -m\tMapper to use for mapping queryies to backends\n"
+            "\t--mapper,          -m\tMapper to use for mapping queries to backends\n"
             "\t                     \t(default is first available)\n\n"
 
             "Thread options:\n"

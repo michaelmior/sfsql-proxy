@@ -26,12 +26,12 @@
 struct hashtable *trans_table = NULL;
 
 void proxy_trans_init() {
-    /* Initialize the transaction hashtable */
+    /* Initialize the transaction hash table */
     if (options.two_pc &&
             ((options.coordinator && options.add_ids) || options.cloneable))
         trans_table = create_hashtable(16);
     else
-        proxy_log(LOG_INFO, "Skipping transaction hashtable initialization");
+        proxy_log(LOG_INFO, "Skipping transaction hash table initialization");
 }
 
 void proxy_trans_end() {

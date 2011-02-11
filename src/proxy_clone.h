@@ -43,7 +43,7 @@ DEFINE_HASHTABLE_REMOVE(_proxy_clone_remove, proxy_host_t);
  * Insert a new transaction in the transaction hashtable.
  *
  * @param clone_id Clone ID to use as key.
- * @param ip       IP address of the clone.
+ * @param host     Hostname and IP of the clone.
  *
  * @return Zero on success, anything else on failure.
  **/

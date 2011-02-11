@@ -44,7 +44,7 @@ typedef struct {
         before sending results. */
     pthread_barrier_t *barrier;
     /** Number of active backends when the
-     *  transacation was issued. */
+     *  transaction was issued. */
     int backends;
     /** Success array from various backends. */
     ulonglong *results;

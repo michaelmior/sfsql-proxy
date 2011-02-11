@@ -550,7 +550,7 @@ static my_bool net_add_clone(MYSQL *mysql, char *t,
     if (port < 0)
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone port number");
 
-    /* Save the clone's IP in the hashtable */
+    /* Save the clone's IP in the hash table */
     store_host = (proxy_host_t*) malloc(sizeof(proxy_host_t));
     store_host->host = malloc(HOST_NAME_MAX+1);
     strncpy(store_host->host, host, HOST_NAME_MAX+1);
@@ -608,15 +608,15 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
     /* Message received, clone */
     error = proxy_net_send_ok(mysql, 0, 0, 0);
 
-    /* We lock around this next section so only one message can mess with the hashtable */
+    /* We lock around this next section so only one message can mess with the hash table */
     proxy_mutex_lock(&result_mutex);
     proxy_debug("Result of transaction %lu on clone %d is %d", transaction_id, clone_id, success);
 
     /* Check if we have already received some message about this transaction */
     if (!(trans = proxy_trans_search(transaction_id))) {
-        proxy_debug("Creating new hashtable entry for transaction %lu", transaction_id);
+        proxy_debug("Creating new hash table entry for transaction %lu", transaction_id);
 
-        /* Create a new entry in the transaction hashtable */
+        /* Create a new entry in the transaction hash table */
         trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
         trans->total = 1; /* XXX: need to get actual number of clones */
         trans->num = 0;
@@ -662,7 +662,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
         while (trans->done < (proxy_backend_num()-trans->total)) { pthread_cond_wait(&trans->cv, &trans->cv_mutex); }
 
         if (proxy_trans_remove(transaction_id) != trans)
-            proxy_log(LOG_ERROR, "Transaction %lu changed when removed from hashtable",
+            proxy_log(LOG_ERROR, "Transaction %lu changed when removed from hash table",
                 transaction_id);
 
         proxy_mutex_unlock(&trans->cv_mutex);
@@ -709,10 +709,10 @@ my_bool net_commit(MYSQL *mysql, char *t, my_bool success,
     proxy_debug("Received %s message for transaction %lu",
         success ? "commit" : "rollback", commit_trans_id);
 
-    /* Grab the transaction data from the hashtable, waiting if necessary */
+    /* Grab the transaction data from the hash table, waiting if necessary */
     while (!(trans = proxy_trans_search(commit_trans_id))) { usleep(SYNC_SLEEP); }
 
-    proxy_debug("Found transaction %lu in hashtable for completion",
+    proxy_debug("Found transaction %lu in hash table for completion",
         commit_trans_id);
 
     /* Tell the waiting thread to proceed with commit/rollback */

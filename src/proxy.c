@@ -162,7 +162,7 @@ int main(int argc, char *argv[]) {
     pthread_attr_t attr;
     pthread_t admin_thread;
 
-    /* Parse command-lne options */
+    /* Parse command-line options */
     ret = proxy_options_parse(argc, argv);
     if (ret != EX_OK)
         goto out_free;

@@ -58,7 +58,7 @@ int proxy_net_bind_new_socket(char *host, int port) {
     }
 #endif
 
-    /* Intialize the server address */
+    /* Initialize the server address */
     memset(&serveraddr, 0, sizeof(serveraddr));
     serveraddr.sin.sin_family = AF_INET;
 
@@ -272,7 +272,7 @@ MYSQL* client_init(int clientfd) {
     vio_fastsend(vio_tmp);
     vio_blocking(vio_tmp, FALSE, &old_mode);
 
-    /* Enable TCP keepalive which equivalent to
+    /* Enable TCP keepalive, which is equivalent to
      * to vio_keepalive(vio_tmp, TRUE) plus setting
      *   tcp_keepalive_probes = 4
      *   tcp_keepalive_time   = 60
@@ -340,8 +340,6 @@ void client_destroy(proxy_thread_t *thread) {
 /**
  * Destroy all data structures associated with the thread
  * and additional shut down the MySQL library for the thread.
- *
- * thread->status = (status_t*) malloc(sizeof(status_t));
  *
  * @param ptr A pointer to a #proxy_thread_t struct
  *            corresponding to the thread to be destroyed.
@@ -628,7 +626,7 @@ conn_error_t proxy_net_read_query(proxy_work_t *work, __attribute__((unused)) in
  *
  * This code is derived from sql/protocol.cc:net_send_ok.
  *
- * @param mysql          MySQL object the ok should be sent to.
+ * @param mysql          MySQL object the OK should be sent to.
  * @param warnings       Number of warnings produced by the previous command.
  * @param affected_rows  Number of rows affected by the previous command.
  * @param last_insert_id ID of the last row to be inserted by the previous command.
@@ -657,7 +655,7 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
         pos = net_store_data(pos, (uchar*), message, strlen(message));
     */
 
-    /* Send an ok back to the client */
+    /* Send an OK back to the client */
     if (my_net_write(net, buff, (size_t) (pos - buff))) {
         proxy_log(LOG_ERROR, "Error writing OK to client");
         return TRUE;
@@ -667,7 +665,7 @@ my_bool proxy_net_send_ok(MYSQL *mysql, uint warnings, ulong affected_rows, ulon
 }
 
 /**
- * Send an an error message to a connected client.
+ * Send an error message to a connected client.
  *
  * @param mysql     MYSQL object where the error should be sent.
  * @param sql_errno MySQL error code.

@@ -390,7 +390,7 @@ static void backend_new_threads(int bi) {
  * Connect to a backend server with the given address.
  *
  * @param backend Address information of the backend.
- * @param conn    Connection whre MySQL object should be stored.
+ * @param conn    Connection where MySQL object should be stored.
  * @param bypass  TRUE to use the bypass port if specified,
  *                FALSE otherwise.
  *
@@ -844,7 +844,7 @@ out:
 }
 
 /**
- * Reize the backend pool and connection data structures on update.
+ * Resize the backend pool and connection data structures on update.
  *
  * @param num    Number of backends to allocate in new structure.
  * @param before TRUE if allocation is before reshuffling, FALSE otherwise.
@@ -936,7 +936,7 @@ void* proxy_backend_new_thread(void *ptr) {
         query->query = NULL;
     }
 
-    proxy_debug("Exiting loop on backend %d, thead %d", thread->data.backend.bi, thread->id);
+    proxy_debug("Exiting loop on backend %d, thread %d", thread->data.backend.bi, thread->id);
     pthread_exit(NULL);
 }
 
@@ -1238,10 +1238,10 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
         return;
     }
 
-    proxy_debug("Successfully notified coordinator about status of transaction %lu, adding to hashtable",
+    proxy_debug("Successfully notified coordinator about status of transaction %lu, adding to hash table",
             clone_trans_id);
 
-    /* Initialize transaction commit data and insert into hashtable */
+    /* Initialize transaction commit data and insert into hash table */
     proxy_cond_init(&trans.cv);
     proxy_mutex_init(&trans.cv_mutex);
     trans.num = 0;
@@ -1268,7 +1268,7 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
         proxy_log(LOG_ERROR, "Error completing transaction %lu on clone: %s",
             clone_trans_id, mysql_error(mysql));
 
-    /* Destroy synchronization primitives and remove from hashtable */
+    /* Destroy synchronization primitives and remove from hash table */
     proxy_mutex_unlock(&trans.cv_mutex);
     proxy_mutex_destroy(&trans.cv_mutex);
     proxy_cond_destroy(&trans.cv);
@@ -1284,10 +1284,10 @@ static void backend_clone_query_wait(my_bool success, char *query, MYSQL *mysql)
  *                              possible need to commit.
  * @param start_server_id       Server ID at the start of query execution.
  * @param start_generation      Clone generation ID at the start of query execution.
- * @param conn                  Connection where the query should be sent.
+ * @param mysql                 MySQL object corresponding to the connection
+ *                              where the query should be sent.
  * @param query                 Query string to execute.
  * @param[in,out] success       TRUE if the query was successful, FALSE otherwise.
- * @param length                Length of the query.
  * @param bi                    Index of the backend executing the query.
  * @param commit                Data required for synchronization
  *                              and two-phase commit.
@@ -1310,17 +1310,17 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
 
     /* Check if all transactions succeeded and commit or rollback accordingly */
     if (clone_generation != start_generation) {
-        /* Get the query ID and wait for it to be available in the transaction hashtable */
+        /* Get the query ID and wait for it to be available in the transaction hash table */
         query_trans_id = id_from_query(query);
 
         proxy_debug("Cloning happened during query %lu, waiting", query_trans_id);
 
         /* If we are a clone, insert a new transaction into
-         * the hashtable. Otherwise, we are the coordinator and
+         * the hash table. Otherwise, we are the coordinator and
          * we wait until a transaction result command inserts
          * the transaction. */
         if (options.cloneable) {
-            proxy_debug("Inserting new transaction %lu into hashtable on master",
+            proxy_debug("Inserting new transaction %lu into hash table on master",
                 query_trans_id);
 
             trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
@@ -1336,7 +1336,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
 
             proxy_trans_insert(query_trans_id, trans);
         } else {
-            proxy_debug("Waiting for transaction %lu to appear in hashtable", query_trans_id);
+            proxy_debug("Waiting for transaction %lu to appear in hash table", query_trans_id);
             while (!(trans = proxy_trans_search(query_trans_id))
                 && clone_generation != start_generation) { usleep(SYNC_SLEEP); }
         }
@@ -1356,7 +1356,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
 
             /* If we are the last thread to commit on the coordinator,
              * we signal the thread handling the last result message
-             * that it can free the transaction from the hashtable */
+             * that it can free the transaction from the hash table */
             if (options.coordinator) {
                 trans->done++;
                 if (trans->done >= backend_num-trans->total)
@@ -1369,7 +1369,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
         }
 
         /* If we are a clone, then we added the transaction
-         * to the hashtable and must free it */
+         * to the hash table and must free it */
         if (options.cloneable) {
             proxy_mutex_destroy(&trans->cv_mutex);
             proxy_cond_destroy(&trans->cv);
