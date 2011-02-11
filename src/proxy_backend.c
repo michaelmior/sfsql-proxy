@@ -785,6 +785,8 @@ my_bool proxy_backend_clone_complete(int *clone_ids, int nclones, ulong clone_tr
                     proxy_debug("Completed transaction %lu on clone %d",
                         clone_trans_id, clone_ids[i]);
 
+                proxy_pool_return(backend_pools[bi], ci);
+
                 found = TRUE;
                 break;
             }
