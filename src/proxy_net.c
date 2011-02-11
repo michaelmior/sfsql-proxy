@@ -265,10 +265,12 @@ MYSQL* client_init(int clientfd) {
     int optval;
     MYSQL *mysql;
     NET *net;
+    my_bool old_mode;
 
     /* derived from sql/mysqld.cc:handle_connections_sockets */
     vio_tmp = vio_new(clientfd, VIO_TYPE_TCPIP, 0);
     vio_fastsend(vio_tmp);
+    vio_blocking(vio_tmp, FALSE, &old_mode);
 
     /* Enable TCP keepalive which equivalent to
      * to vio_keepalive(vio_tmp, TRUE) plus setting
