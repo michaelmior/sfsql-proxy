@@ -1467,25 +1467,28 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
      * after this point does not return without first
      * decrementing committing or else we won't be able
      * to clone later. */
-    if (replicated) {
+    if (replicated && commit) {
+        my_bool cont = FALSE;
+
         /* If some other backend has already started to commit,
          * we need to go ahead as well to avoid deadlock */
-        if (commit && !commit->committing)
-            while (cloning) { usleep(SYNC_SLEEP); }
+        if (!commit->committing) {
+            while (cloning && !cont) {
+                /* Check if we need to stop waiting and go ahead */
+                while (committing) {
+                    if (commit->committing) {
+                        cont = TRUE;
+                        break;
+                    }
+                    usleep(SYNC_SLEEP);
+                }
 
-        __sync_synchronize();
-        (void) __sync_fetch_and_add(&committing, 1);
-
-        /* XXX: This is a hack, but ensures that if
-         *      cloning managed to sneak by the above
-         *      op, then we won't go ahead and commit
-         *      just yet. */
-        while (cloning) { usleep(SYNC_SLEEP); }
-
-        if (commit) {
-            __sync_synchronize();
-            commit->committing = 1;
+                usleep(SYNC_SLEEP);
+            }
         }
+
+        (void) __sync_fetch_and_add(&committing, 1);
+        commit->committing = 1;
     }
 
     /* If this query is replicated, check if needs to be committed */
@@ -1566,7 +1569,7 @@ static my_bool backend_query(proxy_backend_conn_t *conn, MYSQL *proxy, const cha
 
 out:
     /* Signify that we are done committing, and another clone operation may happen */
-    if (replicated)
+    if (replicated && commit)
         (void) __sync_fetch_and_sub(&committing, 1);
 
 out_pre:
