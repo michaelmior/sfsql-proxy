@@ -28,7 +28,7 @@
 #include <time.h>
 
 /** Maximum amount of time to wait for new clones */
-#define CLONE_TIMEOUT 30
+#define CLONE_TIMEOUT 60
 
 volatile sig_atomic_t server_id = 0;
 volatile sig_atomic_t cloning  = 0;
@@ -46,23 +46,64 @@ static pthread_mutex_t new_mutex;
 
 /** Hashtable for storing ID-to-IP mappings for clones */
 struct hashtable *clone_table = NULL;
+/** Hashtable for storing number of clones per generation */
+static struct hashtable *clone_num_table = NULL;
+DEFINE_HASHTABLE_INSERT(clone_num_insert, int);
+DEFINE_HASHTABLE_SEARCH(clone_num_search, int);
+DEFINE_HASHTABLE_REMOVE(clone_num_remove, int);
+void clone_set_num(int clone_generation, int num);
 
 /**
  * Initialize data structures required for cloning.
  **/
 void proxy_clone_init() {
-    /* Create the clone hashtable */
+    /* Create the clone hashtables */
     if (options.coordinator)
         clone_table = create_hashtable(16);
+    if (options.cloneable || options.coordinator)
+        clone_num_table = create_hashtable(16);
 }
 
 /**
  * Destroy data structures required for cloning.
  **/
 void proxy_clone_end() {
-    /* Destroy the hashtable */
+    /* Destroy the hashtables */
     if (clone_table)
         hashtable_destroy(clone_table, 1);
+    if (clone_num_table)
+        hashtable_destroy(clone_num_table, 1);
+}
+
+/**
+ * Retrieve the number of clones which were created in a particular generation.
+ *
+ * @param clone_generation Generation number to retrieve clone count for.
+ *
+ * @return Number of clones in the given generation.
+ **/
+int proxy_clone_get_num(int clone_generation) {
+    int *num = clone_num_search(clone_num_table, clone_generation);
+
+    if (!num)
+        return -1;
+    else
+        return *num;
+}
+
+/**
+ * Save the number of created clones in a generation so
+ * they can be retrieved later when committing.
+ *
+ * @param clone_generation Generation of clones.
+ * @param num              Number of clones created.
+ **/
+void clone_set_num(int clone_generation, int num) {
+    int *nump = (int*) malloc(sizeof(num));
+    *nump = num;
+    clone_num_insert(clone_num_table, clone_generation, nump);
+
+    proxy_debug("Set %d clones for generation %d", num, clone_generation);
 }
 
 /**
@@ -76,6 +117,9 @@ my_bool proxy_clone_wait() {
     double time;
     int wait_errno = 0;
     my_bool error = FALSE;
+
+    /* Store the number of clones for later use */
+    clone_set_num(clone_generation, new_clones);
 
     /* Initialize locking */
     proxy_cond_init(&new_cv);
@@ -234,6 +278,9 @@ int proxy_do_clone(int nclones, char **err, int errlen) {
 
             if (vmid == 0) {
                 (void) __sync_fetch_and_add(&clone_generation, 1);
+
+                /* Store the number of clones for later use */
+                clone_set_num(clone_generation, result->rc.number_clones);
 
                 time = end.tv_sec - start.tv_sec + (end.tv_usec - start.tv_usec) / 1000000.0f;
                 proxy_log(LOG_INFO, "%d clones successfully created in %.3fs",

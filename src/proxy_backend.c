@@ -1324,9 +1324,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
                 query_trans_id);
 
             trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
-            /* XXX: need to get real number of clones,
-             * See also proxy_cmd.c:net_trans_result */
-            trans->total = 1;
+            trans->total = proxy_clone_get_num(clone_generation);
             trans->num = 0;
             trans->done = 0;
             trans->success = *success;

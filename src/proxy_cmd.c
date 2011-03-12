@@ -213,17 +213,17 @@ static my_bool net_clone(MYSQL *mysql, char *query,
     int nclones = 1, ret, sql_errno, i;
     my_bool error = FALSE;
 
+    /* Get the number of clones to create */
+    tok = strtok_r(query, " ", &t);
+    if (tok) {
+        errno = 0;
+        nclones = strtol(tok, NULL, 10);
+        if (errno || nclones <= 0)
+            return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid number of clones");
+    }
+
     /* Check if we think we can clone */
     if (options.cloneable) {
-        /* Get the number of clones to create */
-        tok = strtok_r(query, " ", &t);
-        if (tok) {
-            errno = 0;
-            nclones = strtol(tok, NULL, 10);
-            if (errno || nclones <= 0)
-                return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid number of clones");
-        }
-
         /* Perform the clone and return the result */
         ret = proxy_do_clone(nclones, &buff, BUFSIZ);
 
@@ -296,12 +296,13 @@ static my_bool net_clone(MYSQL *mysql, char *query,
         while (committing) { usleep(SYNC_SLEEP); }
 
         /* Get ready and make sure no one else is cloning */
-        if (!proxy_clone_prepare(1))
+        if (!proxy_clone_prepare(nclones))
             return proxy_net_send_error(mysql, ER_CANT_LOCK, "Previous cloning operation not complete");
 
         /* Contact the master to perform cloning */
-        proxy_log(LOG_INFO, "Requesting clone from master");
-        mysql_query((MYSQL*) master, "PROXY CLONE;");
+        proxy_log(LOG_INFO, "Requesting %d clone(s) from master", nclones);
+        snprintf(buff, BUFSIZ, "PROXY CLONE %d;", nclones);
+        mysql_query((MYSQL*) master, buff);
 
         if ((sql_errno = mysql_errno((MYSQL*) master))) {
             return proxy_net_send_error(mysql, sql_errno, mysql_error((MYSQL*) master));
@@ -618,7 +619,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
 
         /* Create a new entry in the transaction hash table */
         trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
-        trans->total = 1; /* XXX: need to get actual number of clones */
+        trans->total = proxy_clone_get_num(clone_generation);
         trans->num = 0;
         trans->done = 0;
         trans->success = TRUE;

@@ -29,6 +29,7 @@ void proxy_clone_init();
 void proxy_clone_end();
 my_bool proxy_clone_prepare(int nclones);
 int proxy_do_clone(int nclones, char **err, int errlen);
+int proxy_clone_get_num(int clone_generation);
 void proxy_clone_complete();
 my_bool proxy_clone_wait();
 void proxy_clone_notify();
