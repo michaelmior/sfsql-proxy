@@ -588,7 +588,7 @@ conn_error_t proxy_net_read_query(proxy_work_t *work, __attribute__((unused)) in
             return proxy_net_send_ok(mysql, 0, 0, 0) ? ERROR_CLIENT : ERROR_OK;
         case COM_INIT_DB:
             /* XXX: using a single DB for now */
-            return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only a single database is supported by " PACKAGE_NAME);
+            return proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Only a single database is supported by sfsql-proxy");
 
         /* Commands below not implemented */
         case COM_REGISTER_SLAVE:
@@ -616,7 +616,7 @@ conn_error_t proxy_net_read_query(proxy_work_t *work, __attribute__((unused)) in
         case COM_DELAYED_INSERT:
         case COM_END:
         default:
-            proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Command currently not supported by " PACKAGE_NAME);
+            proxy_net_send_error(mysql, ER_NOT_ALLOWED_COMMAND, "Command currently not supported by sfsql-proxy");
             return ERROR_OK;
     }
 }

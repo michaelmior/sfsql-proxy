@@ -21,7 +21,6 @@
 #undef PACKAGE_STRING
 #undef PACKAGE_TARNAME
 #undef PACKAGE_VERSION
-#include "config.h"
 
 #include <my_sys.h>
 #include <m_string.h>

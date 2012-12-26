@@ -228,6 +228,7 @@ my_bool proxy_backend_init() {
     coordinator = NULL;
     master = NULL;
 
+#if 0
     /* Load the query mapper */
     if (options.mapper != NULL) {
         /* Initialize ltdl */
@@ -257,6 +258,7 @@ my_bool proxy_backend_init() {
             return TRUE;
         }
     }
+#endif
 
     /* Seed the RNG for later use */
     srand(time(NULL));
