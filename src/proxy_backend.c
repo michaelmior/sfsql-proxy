@@ -339,7 +339,7 @@ static my_bool backends_alloc(int num_backends)  {
     /* Create backend threads */
     if (!backend_threads) {
         /* Start backend threads */
-        backend_threads = calloc(backend_num, sizeof(proxy_thread_t));
+        backend_threads = calloc(backend_num, sizeof(proxy_thread_t*));
 
         for (i=0; i<backend_num; i++)
             backend_new_threads(i);
