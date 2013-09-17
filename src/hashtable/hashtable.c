@@ -36,7 +36,7 @@ const float max_load_factor = 0.65;
                        +(uint32_t)(((const uint8_t *)(d))[0]) )
 #endif
 
-__attribute__((always_inline)) uint32_t SuperFastHash (const char * data, int len) {
+inline __attribute__((always_inline)) uint32_t SuperFastHash (const char * data, int len) {
     uint32_t hash = len, tmp;
     int rem;
 
