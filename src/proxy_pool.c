@@ -41,7 +41,7 @@ pool_t* proxy_pool_new(int size) {
 
     srand(time(NULL));
 
-    new_pool = (pool_t *) malloc(sizeof(pool_t));
+    new_pool = malloc(sizeof(pool_t));
 
     /* Allocate memory for the lock pool */
     new_pool->size = size;

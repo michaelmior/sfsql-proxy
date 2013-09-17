@@ -200,7 +200,7 @@ int main(int argc, char *argv[]) {
 
     /* Initialization */
     proxy_threading_init();
-    buf = (char*) malloc(BUFSIZ);
+    buf = malloc(BUFSIZ);
     pthread_setspecific(thread_buf_key, buf);
 
     /* Install signal handler */

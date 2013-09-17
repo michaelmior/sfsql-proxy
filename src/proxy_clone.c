@@ -99,7 +99,7 @@ int proxy_clone_get_num(int clone_generation) {
  * @param num              Number of clones created.
  **/
 void clone_set_num(int clone_generation, int num) {
-    int *nump = (int*) malloc(sizeof(num));
+    int *nump = malloc(sizeof(num));
     *nump = num;
     clone_num_insert(clone_num_table, clone_generation, nump);
 

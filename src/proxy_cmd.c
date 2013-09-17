@@ -552,7 +552,7 @@ static my_bool net_add_clone(MYSQL *mysql, char *t,
         return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "Invalid clone port number");
 
     /* Save the clone's IP in the hash table */
-    store_host = (proxy_host_t*) malloc(sizeof(proxy_host_t));
+    store_host = malloc(sizeof(proxy_host_t));
     store_host->host = malloc(HOST_NAME_MAX+1);
     strncpy(store_host->host, host, HOST_NAME_MAX+1);
     store_host->port = port;
@@ -618,7 +618,7 @@ static my_bool net_trans_result(MYSQL *mysql, char *t, my_bool success,
         proxy_debug("Creating new hash table entry for transaction %lu", transaction_id);
 
         /* Create a new entry in the transaction hash table */
-        trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
+        trans = malloc(sizeof(proxy_trans_t));
         trans->total = proxy_clone_get_num(clone_generation);
         trans->num = 0;
         trans->done = 0;
@@ -867,7 +867,7 @@ void* proxy_cmd_admin_start(__attribute__((unused)) void *ptr) {
         }
 
         /* Set up thread data and create the thread */
-        thread = (proxy_thread_t*) malloc(sizeof(proxy_thread_t));
+        thread = malloc(sizeof(proxy_thread_t));
         thread->exit = 0;
         thread->data.work.clientfd = clientfd;
         thread->data.work.addr = &clientaddr.sin;

@@ -300,7 +300,7 @@ static my_bool backends_alloc(int num_backends)  {
                     goto error;
 
                 for (j=0; j<options.num_conns; j++) {
-                    backend_conns[i][j] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+                    backend_conns[i][j] = malloc(sizeof(proxy_backend_conn_t));
                     if (!backend_conns[i][j])
                         goto error;
 
@@ -377,7 +377,7 @@ static void backend_new_threads(int bi) {
         proxy_mutex_init(&thread->lock);
         thread->data.backend.bi = bi;
 
-        thread->data.backend.conn = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+        thread->data.backend.conn = malloc(sizeof(proxy_backend_conn_t));
         thread->data.backend.conn->freed = FALSE;
         thread->data.backend.conn->mysql = NULL;
 
@@ -478,7 +478,7 @@ static proxy_host_t** backend_read_file(char *filename, int *num) {
     fseek(f, 0, SEEK_SET);
 
     /* Read the entire file */
-    buf = (char*) malloc(pos+1);
+    buf = malloc(pos+1);
     if (fread(buf, 1, pos, f) != pos) {
         if (ferror(f))
             proxy_log(LOG_ERROR, "Error reading from backend file %s:%s", filename, errstr);
@@ -519,7 +519,7 @@ static proxy_host_t** backend_read_file(char *filename, int *num) {
     i = 0;
     pch = strtok(buf, " \r\n\t");
     while (pch != NULL && (int)i<*num) {
-        new_backends[i] = (proxy_host_t*) malloc(sizeof(proxy_host_t));
+        new_backends[i] = malloc(sizeof(proxy_host_t));
 
         /* If we have a colon, then a port number must have been specified */
         if ((buf2 = strchr(pch, ':'))) {
@@ -549,7 +549,7 @@ my_bool proxy_backend_connect() {
     if (backends_alloc(1))
         return TRUE;
 
-    backends[0] = (proxy_host_t*) malloc(sizeof(proxy_host_t));
+    backends[0] = malloc(sizeof(proxy_host_t));
     backends[0]->host = strdup(options.backend.host);
     backends[0]->port = options.backend.port;
 
@@ -660,7 +660,7 @@ static void backend_new_connect(proxy_backend_conn_t ***conns, pool_t **pools, i
         conns[bi] = (proxy_backend_conn_t**) calloc(options.num_conns, sizeof(proxy_backend_conn_t*));
 
         for (ci=0; ci<options.num_conns; ci++) {
-            conns[bi][ci] = (proxy_backend_conn_t*) malloc(sizeof(proxy_backend_conn_t));
+            conns[bi][ci] = malloc(sizeof(proxy_backend_conn_t));
 
             /* Try a few times to connect */
             for (i=0; i<10; i++) {
@@ -828,7 +828,7 @@ my_bool proxy_backend_add(char *host, int port) {
     }
 
     /* Add then new host information */
-    backends[backend_num] = (proxy_host_t*) malloc(sizeof(proxy_host_t*));
+    backends[backend_num] = malloc(sizeof(proxy_host_t*));
     backends[backend_num]->host = strdup(host);
     backends[backend_num]->port = port;
 
@@ -1325,7 +1325,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
             proxy_debug("Inserting new transaction %lu into hash table on master",
                 query_trans_id);
 
-            trans = (proxy_trans_t*) malloc(sizeof(proxy_trans_t));
+            trans = malloc(sizeof(proxy_trans_t));
             trans->total = proxy_clone_get_num(clone_generation);
             trans->num = 0;
             trans->done = 0;
