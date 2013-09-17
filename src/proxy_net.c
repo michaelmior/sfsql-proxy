@@ -44,17 +44,26 @@ static inline MYSQL* client_init(int clientfd);
 static my_bool check_user(char *user, uint user_len, char *passwd, uint passwd_len, char *db, uint db_len);
 
 int proxy_net_bind_new_socket(char *host, int port) {
-    int serverfd;
+    int serverfd, rc;
     union sockaddr_union serveraddr;
     struct hostent *hostinfo;
 
     serverfd = socket(AF_INET, SOCK_STREAM, 0);
 
+    if (serverfd == -1) {
+        proxy_log(LOG_ERROR, "Unable to create socket");
+        return -1;
+    }
+
     /* If we're debugging, allow reuse of the socket */
 #ifdef DEBUG
     {
         int optval = 1;
-        setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &optval, sizeof(int));
+        rc = setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, (const void*) &optval, sizeof(int));
+        if (rc == -1) {
+            proxy_log(LOG_ERROR, "Failed to enable socket reuse");
+            return -1;
+        }
     }
 #endif
 
@@ -264,7 +273,7 @@ my_bool check_user(
  **/
 MYSQL* client_init(int clientfd) {
     Vio *vio_tmp;
-    int optval;
+    int optval, rc;
     MYSQL *mysql;
     NET *net;
     my_bool old_mode;

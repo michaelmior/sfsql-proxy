@@ -87,8 +87,8 @@ static void usage() {
 /**
  * Update ::options.phost with the IP address from the selected interface.
  **/
-void proxy_options_update_host() {
-    int fd = socket(AF_INET, SOCK_STREAM, 0);
+int proxy_options_update_host() {
+    int fd, rc;
     struct ifreq ifr;
     union {
         struct sockaddr *sa;
@@ -96,11 +96,19 @@ void proxy_options_update_host() {
     } addr;
     char *phost;
 
+    fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd == -1) {
+        return -1;
+    }
+
     ifr.ifr_addr.sa_family = AF_UNSPEC;
     strncpy(ifr.ifr_name, options.iface, IFNAMSIZ-1);
 
-    ioctl(fd, SIOCGIFADDR, &ifr);
+    rc = ioctl(fd, SIOCGIFADDR, &ifr);
     close(fd);
+    if (rc == -1) {
+        return -1;
+    }
 
     /* Convert to string and save in the binding address */
     addr.sa = &ifr.ifr_addr;
@@ -149,7 +157,7 @@ static void set_option_defaults() {
  * @param argv Argument list.
  **/
 int proxy_options_parse(int argc, char *argv[]) {
-    int c, opt=0;
+    int c, opt=0, rc;
     static struct option long_options[] = {
         {"help",            no_argument,       0, '?'},
         {"verbose",         no_argument,       0, 'v'},
@@ -287,8 +295,13 @@ int proxy_options_parse(int argc, char *argv[]) {
         options.iface = PROXY_IFACE;
 
     /* Get the IP address of the interface */
-    if (options.phost[0] == '\0' && strcasecmp("any", options.iface) && !options.cloneable)
-        proxy_options_update_host();
+    if (options.phost[0] == '\0' && strcasecmp("any", options.iface) && !options.cloneable) {
+        rc = proxy_options_update_host();
+        if (rc == -1) {
+            fprintf(stderr, "Could not get host name");
+            return EX_OSERR;
+        }
+    }
 
     /* Set defaults for unspecified options */
     options.user = options.user ?: BACKEND_USER;

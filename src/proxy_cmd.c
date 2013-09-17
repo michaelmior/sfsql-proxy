@@ -149,6 +149,9 @@ static my_bool net_status(MYSQL *mysql, char *query, ulong query_len, status_t *
 
     /* Get status request type */
     pch = strtok_r(query, " ", &t);
+    if (!pch)
+        return proxy_net_send_error(mysql, ER_SYNTAX_ERROR, "No status type given");
+
     global = (pch == last_tok) || strprefix(pch, "GLOBAL", query_len);
     if (!global)
         session = strprefix(pch, "SESSION", query_len);
