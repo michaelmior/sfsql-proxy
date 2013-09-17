@@ -80,11 +80,13 @@ int proxy_net_bind_new_socket(char *host, int port) {
     /* Bind the socket and start accepting connections */
     if (bind(serverfd, &serveraddr.sa, sizeof(serveraddr)) < 0) {
         proxy_log(LOG_ERROR, "Error binding server socket on port %d", port);
+        close(serverfd);
         return -1;
     }
 
     if (listen(serverfd, QUEUE_LENGTH) < 0) {
         proxy_log(LOG_ERROR, "Error listening on server socket: %s", errstr);
+        close(serverfd);
         return -1;
     }
 
