@@ -76,6 +76,7 @@ int proxy_net_bind_new_socket(char *host, int port) {
         hostinfo = gethostbyname(host);
         if (!hostinfo) {
             proxy_log(LOG_ERROR, "Invalid binding address %s\n", host);
+            close(serverfd);
             return -1;
         } else {
             serveraddr.sin.sin_addr = *(struct in_addr*) hostinfo->h_addr;

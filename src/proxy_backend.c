@@ -1019,7 +1019,7 @@ my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *quer
     if (map == QUERY_MAP_ALL) {
         if (options.add_ids)
             length += sprintf(query + length, "-- %lu",
-                __sync_fetch_and_add(&transaction_id, 1UL));
+                (ulong) __sync_fetch_and_add(&transaction_id, 1UL));
     }
 
     /* If we are coordinating, base replication status

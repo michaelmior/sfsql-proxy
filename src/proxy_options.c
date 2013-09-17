@@ -114,6 +114,8 @@ int proxy_options_update_host() {
     addr.sa = &ifr.ifr_addr;
     phost = inet_ntoa(addr.sin->sin_addr);
     strncpy(options.phost, phost, INET6_ADDRSTRLEN);
+
+    return 0;
 }
 
 /**
