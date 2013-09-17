@@ -1019,7 +1019,7 @@ my_bool proxy_backend_query(MYSQL *proxy, proxy_conn_idx_t *conn_idx, char *quer
     if (map == QUERY_MAP_ALL) {
         if (options.add_ids)
             length += sprintf(query + length, "-- %lu",
-                __sync_fetch_and_add(&transaction_id, 1));
+                __sync_fetch_and_add(&transaction_id, 1UL));
     }
 
     /* If we are coordinating, base replication status
@@ -1378,7 +1378,7 @@ static my_bool backend_check_commit(my_bool *needs_commit, int start_server_id, 
     }
     if (commit && options.two_pc) {
         *needs_commit = TRUE;
-        *success = *success && *(commit->results) == (ulonglong) ((2 << (commit->backends-1))-1) ? TRUE : FALSE;
+        *success = *success && *(commit->results) == (ulonglong) ((2UL << (commit->backends-1))-1) ? TRUE : FALSE;
     }
 
     if (query_trans_id)
